@@ -907,7 +907,7 @@ def ts_skriv_gama_inputfil(projektnavn, fastholdte, estimerede_punkter, observat
 
     return xmlstr
 
-def udjævn_observationer_fra_sagevent(sei, projektnavn, fastholdte):
+def udjævn_observationer_fra_sagevent(sei: str, projektnavn: str, fastholdte: dict):
 
     obs = fire.cli.firedb.session.query(Observation).filter(
         Observation._registreringtil == None,
@@ -940,7 +940,6 @@ def udjævn_observationer_fra_sagevent(sei, projektnavn, fastholdte):
 
     observerede_punkter = set(list(obs_df["Fra"]) + list(obs_df["Til"]))
 
-
     (net, singulære) = niv._netoversigt.netgraf(obs_df, observerede_punkter, tuple(fastholdte.keys()))
     forbundne_punkter = tuple(sorted(net["Punkt"]))
     estimerede_punkter = tuple(sorted(set(forbundne_punkter) - set(fastholdte)))
@@ -952,29 +951,18 @@ def udjævn_observationer_fra_sagevent(sei, projektnavn, fastholdte):
 
     observationer = niv._regn.obs_til_dataklasse(obs_df)
 
-    # Skriv Gama-inputfil i XML-format
-    # ... svarer til niv._regn.skriv_gama_inputfil(projektnavn, fastholdte, estimerede_punkter, observationer)
-    xmlstr = ts_skriv_gama_inputfil(projektnavn, fastholdte, estimerede_punkter, observationer)
+    niv._regn.skriv_gama_inputfil(projektnavn, fastholdte, estimerede_punkter, observationer)
 
     # Kør GNU Gama
-    # ... svarer til niv._regn.gama_udjævn(projektnavn, False)
-    # her gøres det bare in-memory, i stedet for at skrive til 1001 forskellige filer..
-    ret = subprocess.run(
-        ["gama-local", "--input-xml", "-", "--xml"],
-        capture_output = True,
-        input=xmlstr,
-        text = True,
-    )
+    htmlrapportnavn = niv._regn.gama_udjævn(projektnavn, False)
 
-    doc = xmltodict.parse(ret.stdout)
+    punkter, koter, varianser = niv._regn.læs_gama_output(projektnavn)
 
-    koteliste = doc["gama-local-adjustment"]["coordinates"]["adjusted"]["point"]
-    varliste = doc["gama-local-adjustment"]["coordinates"]["cov-mat"]["flt"]
 
-    punkter = [punkt["id"] for punkt in koteliste]
-    koter = [float(punkt["z"]) for punkt in koteliste]
-    varianser = [float(var) for var in varliste]
-    assert len(koter) == len(varianser), "Mismatch mellem antal koter og varianser"
+    # Ryd op i filer
+    os.remove(f"{projektnavn}.xml")
+    os.remove(f"{projektnavn}-resultat.xml")
+    os.remove(htmlrapportnavn)
 
     return punkter, koter, varianser, tidspunkt
 
