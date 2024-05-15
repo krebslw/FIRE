@@ -266,6 +266,37 @@ def observationsrapport(
     fire.cli.print("  " + 110 * "-")
 
 
+def punktsamlingsrapport(punktsamlinger: list[PunktSamling], id: str = None):
+    """
+    Hjælpefunktion for funktionerne punkt_fuld_rapport og punktsamling.
+    """
+    fire.cli.print(
+            "Navn                                Jessenpunkt  Antal punkter  Formål", bold=True
+        )
+    fire.cli.print(
+            "----------------------------------  -----------  -------------  ------------------"
+        )
+
+    # Sortér Punktsamlinger efter Jessennummer, dernæst efter Punktsamlingsnavn
+    jessennumre = [ps.jessenpunkt.jessennummer for ps in punktsamlinger]
+    psnavne = [ps.navn for ps in punktsamlinger]
+    punktsamlinger_sorted = [ps for ps , _, _ in sorted(zip(punktsamlinger,jessennumre, psnavne), key=lambda pair: pair[1:])]
+
+    for ps in punktsamlinger_sorted:
+        navn = ps.navn + " " * 34
+        formål = ps.formål
+
+        jessenpunkt = str(ps.jessenpunkt.jessennummer) + " " * 11
+
+        antal_punkter = str(len(ps.punkter)) + " "*13
+
+        farve = "white"
+        if ps.jessenpunkt.id == id:
+            farve = "green"
+
+        fire.cli.print(f"{navn[0:34]}  {jessenpunkt[0:11]}  {antal_punkter[0:13]}  {formål}", fg = farve)
+
+
 def punkt_fuld_rapport(
     punkt: Punkt,
     ident: str,
@@ -340,6 +371,11 @@ def punkt_fuld_rapport(
             punkt.observationer_til, punkt.observationer_fra, opt_obs, opt_detaljeret
         )
         fire.cli.print("")
+
+    if punkt.punktsamlinger:
+        fire.cli.print("")
+        fire.cli.print("--- PUNKTSAMLINGER ---", bold=True)
+        punktsamlingsrapport(punkt.punktsamlinger, punkt.id)
 
 
 @info.command()
@@ -689,18 +725,8 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
         if not punktsamlinger:
             raise SystemExit("Der findes ingen punktsamlinger i databasen.")
 
-        fire.cli.print(
-            "Navn                                Jessenpunkt  Formål", bold=True
-        )
-        fire.cli.print(
-            "----------------------------------  -----------  ------------------"
-        )
-        for punktsamling in punktsamlinger:
-            navn = punktsamling.navn + " " * 34
-            formål = punktsamling.formål
-            jessenpunkt = str(punktsamling.jessenpunkt.jessennummer) + " " * 11
+        punktsamlingsrapport(punktsamlinger)
 
-            fire.cli.print(f"{navn[0:34]}  {jessenpunkt[0:11]}  {formål}")
         return
 
     punktsamling = fire.cli.firedb.hent_punktsamling(punktsamlingsnavn)
