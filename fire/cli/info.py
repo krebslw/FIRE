@@ -15,6 +15,7 @@ from fire.api.model import (
     Punkt,
     PunktInformation,
     PunktInformationType,
+    PunktSamling,
     Koordinat,
     Observation,
     Boolean,
@@ -681,6 +682,7 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
     Information om en punktsamling.
 
     Anføres **PUNKTSAMLING** ikke listes alle aktive punktsamlinger.
+    I listen over punkter i punktsamlingen, er Jessenpunktet highligtet.
     """
     if not punktsamlingsnavn:
         punktsamlinger = fire.cli.firedb.hent_alle_punktsamlinger()
@@ -699,6 +701,7 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
             jessenpunkt = str(punktsamling.jessenpunkt.jessennummer) + " " * 11
 
             fire.cli.print(f"{navn[0:34]}  {jessenpunkt[0:11]}  {formål}")
+        return
 
     punktsamling = fire.cli.firedb.hent_punktsamling(punktsamlingsnavn)
 
@@ -710,13 +713,17 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
     fire.cli.print(f"  Jessenpunkt   : {punktsamling.jessenpunkt.ident}")
     fire.cli.print(f"  Jessennummer  : {punktsamling.jessenpunkt.jessennummer}")
     fire.cli.print(f"  Jessenkote    : {punktsamling.jessenkoordinat.z} m")
+    fire.cli.print(f"  Antal punkter : {len(punktsamling.punkter)}")
 
     fire.cli.print(f"--- Punkter i Punktsamling ---")
 
     if not punktsamling.punkter:
         fire.cli.print(f"  Der er ingen Punkter i Punktsamlingen !!!")
     for punkt in punktsamling.punkter:
-        fire.cli.print(f"  {punkt.ident}")
+        farve = "white"
+        if punkt.id == punktsamling.jessenpunkt.id:
+            farve = "green"
+        fire.cli.print(f"  {punkt.ident}", fg = farve)
 
     fire.cli.print(f"--- Punktsamling i Tidsserier ---")
     if not punktsamling.tidsserier:
