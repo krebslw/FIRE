@@ -409,7 +409,7 @@ def punkt(
 
     Koordinatlisten viser med grønt de gældende koordinater, og med rødt ældre,
     ikke-aktuelle koordinater. Samme information angives med et tegn før datoen:
-    
+
     \b
         * gældende koordinat
         . ikke-aktuel koordinat
@@ -419,7 +419,7 @@ def punkt(
     en EPSG-kode. Disse kan slås op med ``fire info srid``.
     Tal i parentes efter en koordinat angiver spredningen, givet i milimeter, på koordinaten.
     For fler-dimensionelle koordinater gives spredning på alle koordinatens komponenter.
-    
+
     Tilvalg ``--obs/-O`` kan sættes til ``alle`` eller ``niv``. Begge tilvælger visning
     af observationer til/fra det søgte punkt. P.t. understøttes kun visning af
     nivellementsobservationer.
@@ -671,3 +671,57 @@ def sag(sagsid: str, **kwargs):
     for sag in sager:
         beskrivelse = sag.beskrivelse[0:70].strip().replace("\n", " ").replace("\r", "")
         fire.cli.print(f"{sag.id[0:8]}:  {sag.behandler:20}{beskrivelse}...")
+
+
+@info.command()
+@fire.cli.default_options()
+@click.argument("punktsamlingsnavn", required=False)
+def punktsamling(punktsamlingsnavn: str, **kwargs):
+    """
+    Information om en punktsamling.
+
+    Anføres **PUNKTSAMLING** ikke listes alle aktive punktsamlinger.
+    """
+    if not punktsamlingsnavn:
+        punktsamlinger = fire.cli.firedb.hent_alle_punktsamlinger()
+        if not punktsamlinger:
+            raise SystemExit("Der findes ingen punktsamlinger i databasen.")
+
+        fire.cli.print(
+            "Navn                                Jessenpunkt  Formål", bold=True
+        )
+        fire.cli.print(
+            "----------------------------------  -----------  ------------------"
+        )
+        for punktsamling in punktsamlinger:
+            navn = punktsamling.navn + " " * 34
+            formål = punktsamling.formål
+            jessenpunkt = str(punktsamling.jessenpunkt.jessennummer) + " " * 11
+
+            fire.cli.print(f"{navn[0:34]}  {jessenpunkt[0:11]}  {formål}")
+
+    punktsamling = fire.cli.firedb.hent_punktsamling(punktsamlingsnavn)
+
+    fire.cli.print(
+        "------------------------- PUNKTSAMLING -------------------------", bold=True
+    )
+    fire.cli.print(f"  Navn          : {punktsamling.navn}")
+    fire.cli.print(f"  Formål        : {punktsamling.formål}")
+    fire.cli.print(f"  Jessenpunkt   : {punktsamling.jessenpunkt.ident}")
+    fire.cli.print(f"  Jessennummer  : {punktsamling.jessenpunkt.jessennummer}")
+    fire.cli.print(f"  Jessenkote    : {punktsamling.jessenkoordinat.z} m")
+
+    fire.cli.print(f"--- Punkter i Punktsamling ---")
+
+    if not punktsamling.punkter:
+        fire.cli.print(f"  Der er ingen Punkter i Punktsamlingen !!!")
+    for punkt in punktsamling.punkter:
+        fire.cli.print(f"  {punkt.ident}")
+
+    fire.cli.print(f"--- Punktsamling i Tidsserier ---")
+    if not punktsamling.tidsserier:
+        fire.cli.print(f"  Punktsamling har ingen tilknyttede tidsserier.")
+    for ts in punktsamling.tidsserier:
+        fire.cli.print(f"  {ts.navn}")
+
+    return
