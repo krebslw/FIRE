@@ -1,4 +1,3 @@
-from typing import Type
 from datetime import datetime
 
 import click
@@ -28,53 +27,12 @@ from fire.cli.ts._plot_gnss import (
     plot_konfidensbånd,
     GNSS_TS_PLOTTING_LABELS,
 )
+from fire.cli.ts import (
+    _find_tidsserie,
+    _print_tidsserieoversigt,
+)
 
 from . import ts
-
-
-def _print_tidsserieoversigt(tidsserieklasse: Type, punkt: Punkt = None):
-    """
-    Oversigt over tidsserier af en bestemt types
-
-    raises:     SystemExit
-    """
-    if punkt:
-        tidsserier = [ts for ts in punkt.tidsserier if isinstance(ts, tidsserieklasse)]
-    else:
-        tidsserier = (
-            fire.cli.firedb.session.query(tidsserieklasse)
-            .filter(tidsserieklasse._registreringtil == None)
-            .all()
-        )  # NOQA
-
-    if not tidsserier:
-        raise SystemExit("Fandt ingen tidsserier")
-
-    tabel = Table("Ident", "Tidsserie ID", "Referenceramme", box=box.SIMPLE)
-
-    for ts in tidsserier:
-        tabel.add_row(ts.punkt.gnss_navn, ts.navn, ts.referenceramme)
-
-    console = Console()
-    console.print(tabel)
-
-
-def _find_tidsserie(tidsserieklasse: Type, tidsserienavn: str) -> Tidsserie:
-    """
-    Find en navngiven tidsserie
-
-    raises:     NoResultFound
-    """
-    tidsserie = (
-        fire.cli.firedb.session.query(tidsserieklasse)
-        .filter(
-            tidsserieklasse._registreringtil == None,
-            func.lower(tidsserieklasse.navn) == func.lower(tidsserienavn),
-        )
-        .one()
-    )  # NOQA
-
-    return tidsserie
 
 
 GNSS_TS_PARAMETRE = {
