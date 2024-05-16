@@ -116,6 +116,9 @@ class Tidsserie(FikspunktregisterObjekt):
         "polymorphic_on": tstype,
     }
 
+    def __len__(self):
+        return len(self.koordinater)
+
 
 class GNSSTidsserie(Tidsserie):
     __mapper_args__ = {
@@ -535,7 +538,7 @@ class TidsserieEnsemble:
         """Valider en tidsserie inden indsættelse i ensemblet."""
         if (
             not isinstance(tidsserie, self.tidsserieklasse)
-            or (len(tidsserie.koordinater) < self.min_antal_punkter)
+            or (len(tidsserie) < self.min_antal_punkter)
             or (tidsserie.tidsseriegruppe != self.tidsseriegruppe)
             or (tidsserie.referenceramme != self.referenceramme)
         ):
@@ -628,7 +631,6 @@ class PolynomieRegression1D:
             )
             return f"{header}\n{linje}"
 
-
     @dataclass
     class StatistikSamlet:
         var_samlet: float
@@ -645,7 +647,6 @@ class PolynomieRegression1D:
                 [str(getattr(self, field.name)) for field in fields(self)]
             )
             return f"{header}\n{linje}"
-
 
     def __init__(self, tidsserie: Tidsserie, x: list, y: list, grad: int = 1, **kwargs):
         self.tidsserie = tidsserie
@@ -863,7 +864,7 @@ class PolynomieRegression1D:
         self.statistik = self.Statistik(
             TidsserieID=self.tidsserie.navn,
             GPSNR=self.tidsserie.punkt.gnss_navn,
-            N=len(self.tidsserie.koordinater),
+            N=len(self.tidsserie),
             N_binned=self.N,
             dof=self.dof,
             ddof=self.ddof,
