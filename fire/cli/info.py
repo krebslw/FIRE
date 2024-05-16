@@ -20,6 +20,7 @@ from fire.api.model import (
     Observation,
     Boolean,
     Srid,
+    Tidsserie,
 )
 
 
@@ -266,35 +267,68 @@ def observationsrapport(
     fire.cli.print("  " + 110 * "-")
 
 
+def prikprikprik(s: str, maxlen: int):
+    if len(s) > maxlen and maxlen > 0:
+        return s[: max(0, (maxlen - 3))] + "..."
+    return s
+
+
 def punktsamlingsrapport(punktsamlinger: list[PunktSamling], id: str = None):
     """
     Hjælpefunktion for funktionerne punkt_fuld_rapport og punktsamling.
     """
-    fire.cli.print(
-            "Navn                                Jessenpunkt  Antal punkter  Formål", bold=True
-        )
-    fire.cli.print(
-            "----------------------------------  -----------  -------------  ------------------"
-        )
+    kolonnebredder = (34, 11, 13)
+    kolonnenavne = ("Navn", "Jessenpunkt", "Antal punkter")
+    header = "  ".join([str(n).ljust(w) for n, w in zip(kolonnenavne, kolonnebredder)])
+    subheader = "  ".join(["-" * w for w in kolonnebredder])
+
+    fire.cli.print(header, bold=True)
+    fire.cli.print(subheader)
 
     # Sortér Punktsamlinger efter Jessennummer, dernæst efter Punktsamlingsnavn
-    jessennumre = [ps.jessenpunkt.jessennummer for ps in punktsamlinger]
-    psnavne = [ps.navn for ps in punktsamlinger]
-    punktsamlinger_sorted = [ps for ps , _, _ in sorted(zip(punktsamlinger,jessennumre, psnavne), key=lambda pair: pair[1:])]
+    punktsamlinger.sort(key=lambda x: (x.jessenpunkt.jessennummer, x.navn))
 
-    for ps in punktsamlinger_sorted:
-        navn = ps.navn + " " * 34
-        formål = ps.formål
-
-        jessenpunkt = str(ps.jessenpunkt.jessennummer) + " " * 11
-
-        antal_punkter = str(len(ps.punkter)) + " "*13
-
+    for ps in punktsamlinger:
         farve = "white"
         if ps.jessenpunkt.id == id:
             farve = "green"
 
-        fire.cli.print(f"{navn[0:34]}  {jessenpunkt[0:11]}  {antal_punkter[0:13]}  {formål}", fg = farve)
+        kolonner = [ps.navn, ps.jessenpunkt.jessennummer, len(ps.punkter)]
+
+        linje = "  ".join(
+            [prikprikprik(str(c), w).ljust(w) for c, w in zip(kolonner, kolonnebredder)]
+        )
+        fire.cli.print(linje, fg=farve)
+
+
+def tidsserierapport(tidsserier: list[Tidsserie]):
+    """
+    Hjælpefunktion for funktionerne punkt_fuld_rapport og punktsamling.
+    """
+
+    kolonnebredder = [40, 17, 6, 18]
+    kolonnenavne = ["Navn", "Antal datapunkter", "Type", "Referenceramme"]
+
+    header = "  ".join([str(n).ljust(w) for n, w in zip(kolonnenavne, kolonnebredder)])
+    subheader = "  ".join(["-" * w for w in kolonnebredder])
+
+    fire.cli.print(header, bold=True)
+    fire.cli.print(subheader)
+
+    def tidsserietype(tstype):
+        if tstype == 1:
+            return "GNSS"
+        elif tstype == 2:
+            return "Højde"
+
+    for ts in tidsserier:
+        kolonner = [ts.navn, len(ts), tidsserietype(ts.tstype), ts.referenceramme]
+        linje = "  ".join(
+            [prikprikprik(str(c), w).ljust(w) for c, w in zip(kolonner, kolonnebredder)]
+        )
+        fire.cli.print(linje)
+
+    return
 
 
 def punkt_fuld_rapport(
@@ -376,6 +410,11 @@ def punkt_fuld_rapport(
         fire.cli.print("")
         fire.cli.print("--- PUNKTSAMLINGER ---", bold=True)
         punktsamlingsrapport(punkt.punktsamlinger, punkt.id)
+
+    if punkt.tidsserier:
+        fire.cli.print("")
+        fire.cli.print("--- TIDSSERIER ---", bold=True)
+        tidsserierapport(punkt.tidsserier)
 
 
 @info.command()
@@ -749,7 +788,7 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
         farve = "white"
         if punkt.id == punktsamling.jessenpunkt.id:
             farve = "green"
-        fire.cli.print(f"  {punkt.ident}", fg = farve)
+        fire.cli.print(f"  {punkt.ident}", fg=farve)
 
     fire.cli.print(f"--- Punktsamling i Tidsserier ---")
     if not punktsamling.tidsserier:
