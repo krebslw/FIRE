@@ -768,7 +768,7 @@ def analyse_gnss(
         for ts in tidsserier
         if (
             ts.tidsseriegruppe == tidsseriegruppe
-            and len(ts.koordinater) >= min_antal_punkter
+            and len(ts) >= min_antal_punkter
         )
     ]
 
