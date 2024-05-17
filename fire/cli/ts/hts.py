@@ -125,15 +125,14 @@ def hts(objekt: str, parametre: str, fil: click.Path, **kwargs) -> None:
 @fire.cli.default_options()
 def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
     """
-    Plot en GNSS tidsserie.
+    Plot en Højdetidsserie.
 
-    Et simpelt plot der som standard viser udviklingen i nord, øst og op retningerne over tid.
-    Vælges plottypen ``konf`` vises som standard kun Op-retningen.
-    Plottes kun én enkelt tidsserieparameter vises for plottyperne ``fit`` og ``konf`` også
-    værdien af fittets hældning.
+    Et simpelt plot der som standard viser kotens udvikling over tid.
 
-    "TIDSSERIE" er et GNSS-tidsserie ID fra FIRE. Eksisterende GNSS-tidsserier kan
-    fremsøges med kommandoen ``fire ts gnss <punktnummer>``.
+    "OBJEKT" kan enten være et Højdetidsserie ID eller navnet på en Punktsamling.
+    Er "OBJEKT" en Punktsamling, plottes alle tidsserier relateret til Punktsamlingen.
+    Eksisterende Højde-tidsserier kan fremsøges med kommandoen ``fire ts hts <punktnummer>``.
+    Eksisterende Punktsamlinger for et Jessenpunkt, kan fremsøges med ``fire info punkt <punktnummer>``
     Hvilke parametre der plottes kan specificeres i en kommasepareret liste med ``--parametre``.
     Højst 3 parametre plottes. Følgende parametre kan vælges::
 
@@ -151,7 +150,7 @@ def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
         konf            Plot lineær regression med konfidensbånd
 
     \f
-    **EKSEMPLER**
+    **EKSEMPLER: NB: Dette er eksempler for fire ts plot-gnss!!! **
 
     Plot af 5D-tidsserie for BUDP::
 
@@ -190,12 +189,6 @@ def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
         "konf": plot_konfidensbånd,
     }
 
-    # try:
-    #     tidsserie = _find_tidsserie(HøjdeTidsserie, tidsserie)
-    # except NoResultFound:
-    #     raise SystemExit("Tidsserie ikke fundet")
-
-    # Prøv først med at søg efter specifik tidsserie
     try:
         tidsserie = _find_tidsserie(HøjdeTidsserie, objekt)
     except NoResultFound:
