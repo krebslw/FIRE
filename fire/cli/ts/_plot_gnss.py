@@ -11,21 +11,28 @@ from fire.api.model.tidsserier import PolynomieRegression1D
 
 GNSS_TS_PLOTTING_LABELS = {
     "t": "Dato",
-    "x": "x [mm]",
-    "y": "y [mm]",
-    "z": "z [mm]",
-    "X": "X [mm]",
-    "Y": "Y [mm]",
-    "Z": "Z [mm]",
-    "n": "Nord [mm]",
-    "e": "Øst [mm]",
-    "u": "Op [mm]",
+    "x": "x",
+    "y": "y",
+    "z": "z",
+    "X": "X",
+    "Y": "Y",
+    "Z": "Z",
+    "n": "Nord",
+    "e": "Øst",
+    "u": "Op",
     "decimalår": "År",
+}
+
+ENHEDER_SKALAFAKTOR = {
+    "m":1,
+    "mm":1e3,
+    "μm":1e6,
+    "micron":1e6,
 }
 
 
 def plot_gnss_ts(
-    ts: GNSSTidsserie, plot_funktion: Callable, parametre: list = ["n", "e", "u"]
+    ts: GNSSTidsserie, plot_funktion: Callable, parametre: list = ["n", "e", "u"], y_enhed: str = "m"
 ):
     """
     Plotter en GNSSTidsserie.
@@ -33,10 +40,9 @@ def plot_gnss_ts(
     Denne funktion håndterer figuropsætningen, og kalder ``plot_funktion``, som
     forventes at foretage selve plottingen af data.
     """
-    # Skalér y-værdien for at vise data i mm
-    skalafaktor = 1e3
-
     n_parm = min(len(parametre), 3)
+
+    skalafaktor = ENHEDER_SKALAFAKTOR[y_enhed]
 
     ax = plt.figure()
     plt.suptitle(ts.navn)
@@ -53,8 +59,8 @@ def plot_gnss_ts(
             label = parm
 
         ax = plt.subplot(int(f"{n_parm}{1}{i}"))
-        plot_funktion(ts.decimalår, y)
-        plt.ylabel(label)
+        plot_funktion(ts.decimalår, y, y_enhed=y_enhed)
+        plt.ylabel(f"{label} [{y_enhed}]")
         plt.grid()
 
     # Vis kun xlabel for nederste subplot
@@ -207,7 +213,7 @@ Std. af data fra alle tidsserier (samlet) = {np.sqrt(linreg.var_samlet):.2f} mm"
     plt.show()
 
 
-def plot_data(x: list, y: list):
+def plot_data(x: list, y: list, **kwargs):
     plt.plot(
         x,
         y,
@@ -217,11 +223,11 @@ def plot_data(x: list, y: list):
     )
 
 
-def plot_fit(x: list, y: list):
+def plot_fit(x: list, y: list, y_enhed: str = "mm"):
     """
     Plot x og y samt bedste rette linje.
 
-    Enhederne af (x,y) forventes at være (decimalår, mm).
+    Enheden på x forventes at være decimalår.
     """
 
     lr = PolynomieRegression1D("", x, y)
@@ -235,17 +241,17 @@ def plot_fit(x: list, y: list):
         y_præd,
         "-",
         color="red",
-        label=f"Hældning af fit: {lr.beta[1]:.3f} [mm/år]",
+        label=f"Hældning af fit: {lr.beta[1]:.3f} [{y_enhed}/år]",
     )
     plot_data(lr.x, lr.y)
     plt.ylim(lr.y.min(), lr.y.max())
 
 
-def plot_konfidensbånd(x: list, y: list):
+def plot_konfidensbånd(x: list, y: list, y_enhed: str = "mm"):
     """
     Plot x og y samt bedste rette linje med konfidensbånd.
 
-    Enhederne af (x,y) forventes at være (decimalår, mm).
+    Enheden på x forventes at være decimalår.
     """
     # Binning
     x_binned, y_binned = GNSSTidsserie.binning(x, y)
@@ -266,7 +272,7 @@ def plot_konfidensbånd(x: list, y: list):
         y_præd,
         "-",
         color="red",
-        label=f"Hældning af fit: {lr.beta[1]:.3f} [mm/år]",
+        label=f"Hældning af fit: {lr.beta[1]:.3f} [{y_enhed}/år]",
     )
     plt.plot(
         x_præd,
