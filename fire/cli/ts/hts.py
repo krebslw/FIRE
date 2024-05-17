@@ -104,18 +104,141 @@ def hts(objekt: str, parametre: str, fil: click.Path, **kwargs) -> None:
 
     return
 
+@ts.command()
+@click.argument("objekt", required=True, type=str)
+@click.option(
+    "--plottype",
+    "-t",
+    required=False,
+    type=click.Choice(["rå", "fit", "konf"]),
+    default="rå",
+    help="Hvilken type plot vil man se?",
+)
+@click.option(
+    "--parametre",
+    "-p",
+    required=False,
+    type=str,
+    default="kote",
+    help="Hvilken parameter skal plottes?",
+)
+@fire.cli.default_options()
+def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
+    """
+    Plot en GNSS tidsserie.
+
+    Et simpelt plot der som standard viser udviklingen i nord, øst og op retningerne over tid.
+    Vælges plottypen ``konf`` vises som standard kun Op-retningen.
+    Plottes kun én enkelt tidsserieparameter vises for plottyperne ``fit`` og ``konf`` også
+    værdien af fittets hældning.
+
+    "TIDSSERIE" er et GNSS-tidsserie ID fra FIRE. Eksisterende GNSS-tidsserier kan
+    fremsøges med kommandoen ``fire ts gnss <punktnummer>``.
+    Hvilke parametre der plottes kan specificeres i en kommasepareret liste med ``--parametre``.
+    Højst 3 parametre plottes. Følgende parametre kan vælges::
+
+    \b
+        t               Tidspunkt for koordinatobservation
+        kote            Koordinatens x-komponent (geocentrisk)
+        sz              z-komponentens (kotens) spredning (i mm)
+        decimalår       Tidspunkt for koordinatobservation i decimalår
+
+    Typen af plot som vises kan vælges med ``--plottype``. Følgende plottyper kan vælges::
+
+    \b
+        rå              Plot rå data
+        fit             Plot lineær regression oven på de rå data
+        konf            Plot lineær regression med konfidensbånd
+
+    \f
+    **EKSEMPLER**
+
+    Plot af 5D-tidsserie for BUDP::
+
+        fire ts plot-gnss BUDP_5D_IGb08
+
+    Resulterer i visning af nedenstående plot.
+
+    .. image:: figures/fire_ts_plot_gnss_BUDP_5D_IGb08.png
+        :width: 800
+        :alt: Eksempel på plot af 5D-tidsserie for BUDP.
+
+    Plot af 5D-tidsserie for SMID::
+
+        fire ts plot-gnss SMID_5D_IGb08 -p X,Y -t fit
+
+    Resulterer i visning af nedenstående plot.
+
+    .. image:: figures/fire_ts_plot_gnss_SMID_5D_IGb08_XY_fit.png
+        :width: 800
+        :alt: Eksempel på plot af 5D-tidsserie for SMID.
+
+    Plot af 5D-tidsserie for TEJH::
+
+        fire ts plot-gnss TEJH_5D_IGb08 -t konf
+
+    Resulterer i visning af nedenstående plot.
+
+    .. image:: figures/fire_ts_plot_gnss_TEJH_5D_IGb08_konf.png
+        :width: 800
+        :alt: Eksempel på plot af 5D-tidsserie for TEJH.
+
+    """
+    plot_funktioner = {
+        "rå": plot_data,
+        "fit": plot_fit,
+        "konf": plot_konfidensbånd,
+    }
+
+    # try:
+    #     tidsserie = _find_tidsserie(HøjdeTidsserie, tidsserie)
+    # except NoResultFound:
+    #     raise SystemExit("Tidsserie ikke fundet")
 
     # Prøv først med at søg efter specifik tidsserie
     try:
         tidsserie = _find_tidsserie(HøjdeTidsserie, objekt)
     except NoResultFound:
         try:
+            punktsamling = fire.cli.firedb.hent_punktsamling(objekt)
+            tidsserier = punktsamling.tidsserier
+            fig = plt.figure()
+            plt.suptitle(punktsamling.navn)
+            for ts in tidsserier:
+                x = np.array(ts.decimalår)
+                idx_sorted = np.argsort(x,)
+                x = x[idx_sorted]
+
+                y = np.array(ts.kote)
+                y = y[idx_sorted]
+                y = y-np.mean(y)
+
+                plt.plot(
+                x,
+                y,
+                "-o",
+                markersize=4,
+                label = ts.punkt.ident
+                )
+            plt.show()
+
         except NoResultFound:
+            raise SystemExit("Tidsserie eller Punktsamling ikke fundet")
 
         raise SystemExit
 
 
     parametre = parametre.split(",")
+
+    for parm in parametre:
+        if parm not in HTS_PARAMETRE.keys():
+            raise SystemExit(f"Ukendt tidsserieparameter '{parm}'")
+
+    parametre = [HTS_PARAMETRE[parm] for parm in parametre]
+
+    plot_gnss_ts(tidsserie, plot_funktioner[plottype], parametre, y_enhed="mm")
+
+
 
 import numpy as np
 import matplotlib.pyplot as plt
