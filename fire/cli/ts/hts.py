@@ -60,7 +60,7 @@ i tidsserien.  Se ``fire ts gnss --help`` for yderligere detaljer.""",
 @fire.cli.default_options()
 def hts(objekt: str, parametre: str, fil: click.Path, **kwargs) -> None:
     """
-    Udtræk en GNSS tidsserie.
+    Udtræk en Højdetidsserie.
 
 
     "OBJEKT" sættes til enten et punkt eller et specifik navngiven tidsserie.
@@ -229,7 +229,7 @@ def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
 
     parametre = [HTS_PARAMETRE[parm] for parm in parametre]
 
-    plot_gnss_ts(tidsserie, plot_funktioner[plottype], parametre, y_enhed="mm")
+    plot_ts(tidsserie, plot_funktioner[plottype], parametre, y_enhed="mm")
 
 
 
