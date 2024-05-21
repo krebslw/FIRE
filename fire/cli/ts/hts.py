@@ -32,9 +32,9 @@ from . import ts
 
 HTS_PARAMETRE = {
     "t": "t",
+    "decimalår": "decimalår",
     "kote":"kote",
     "sz": "sz",
-    "decimalår": "decimalår",
 }
 
 
@@ -45,10 +45,10 @@ HTS_PARAMETRE = {
     "-p",
     required=False,
     type=str,
-    default="t,kote,sz,decimalår",
+    default="t,decimalår,kote,sz",
     help="""Vælg hvilke parametre i tidsserien der skal udtrækkes. Som standard
-sat til 't,x,sx,y,sy,z,sz'. Bruges værdien 'alle' udtrækkes alle mulige parametre
-i tidsserien.  Se ``fire ts gnss --help`` for yderligere detaljer.""",
+sat til 't,decimalår,kote,sz'. Bruges værdien 'alle' udtrækkes alle mulige parametre
+i tidsserien.  Se ``fire ts hts --help`` for yderligere detaljer.""",
 )
 @click.option(
     "--fil",
@@ -65,15 +65,15 @@ def hts(objekt: str, parametre: str, fil: click.Path, **kwargs) -> None:
 
     "OBJEKT" sættes til enten et punkt eller et specifik navngiven tidsserie.
     Hvis "OBJEKT" er et punkt udskrives en oversigt over de tilgængelige
-    tidsserier til dette punkt. Hvis 'OBJEKT' er en tidsserie udskrives
+    tidsserier til dette punkt. Hvis "OBJEKT" er en tidsserie udskrives
     tidsserien på skærmen. Hvilke parametre der udskrives kan specificeres
     i en kommasepareret liste med ``--parametre``. Følgende parametre kan vælges::
 
     \b
         t               Tidspunkt for koordinatobservation
-        kote            Koordinatens x-komponent (geocentrisk)
-        sz              z-komponentens (kotens) spredning (i mm)
         decimalår       Tidspunkt for koordinatobservation i decimalår
+        kote            Koordinatens z-komponent
+        sz              z-komponentens (kotens) spredning (i mm)
 
     Tidsserien kan skrives til en fil ved brug af ``--fil``, der resulterer i
     en csv-fil på den angivne placering. Denne fil kan efterfølgende åbnes
@@ -84,21 +84,21 @@ def hts(objekt: str, parametre: str, fil: click.Path, **kwargs) -> None:
 
     Vis alle tidsserier for punktet RDIO::
 
-        fire ts gnss RDIO
+        fire ts hts RDIO
 
     Vis tidsserien (med det lange navn som skal ændres!):
     "Højdetidsserie for punkt G.I.2133 ift. Jessenpunkt 81066"
     med standardparametre::
 
-        fire ts gnss "Højdetidsserie for punkt G.I.2133 ift. Jessenpunkt 81066"
+        fire ts hts "Højdetidsserie for punkt G.I.2133 ift. Jessenpunkt 81066"
 
     Vis tidsserie med brugerdefinerede parametre::
 
-        fire ts gnss "Højdetidsserie for punkt G.I.2133 ift. Jessenpunkt 81066" --parametre decimalår,kote,sz
+        fire ts hts "Højdetidsserie for punkt G.I.2133 ift. Jessenpunkt 81066" --parametre decimalår,kote,sz
 
     Gem tidsserie med samtlige tilgængelige parametre::
 
-        fire ts gnss "Højdetidsserie for punkt G.I.2133 ift. Jessenpunkt 81066" -p alle -f RDIO_HTS_81066.xlsx
+        fire ts hts "Højdetidsserie for punkt G.I.2133 ift. Jessenpunkt 81066" -p alle -f RDIO_HTS_81066.xlsx
     """
     _udtræk_tidsserie(objekt, HøjdeTidsserie, HTS_PARAMETRE, parametre, fil)
 
@@ -138,7 +138,7 @@ def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
 
     \b
         t               Tidspunkt for koordinatobservation
-        kote            Koordinatens x-komponent (geocentrisk)
+        kote            Koordinatens z-komponent
         sz              z-komponentens (kotens) spredning (i mm)
         decimalår       Tidspunkt for koordinatobservation i decimalår
 
@@ -152,35 +152,35 @@ def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
     \f
     **EKSEMPLER: NB: Dette er eksempler for fire ts plot-gnss!!! **
 
-    Plot af 5D-tidsserie for BUDP::
+    Plot af højdetidsserie for GED3::
 
-        fire ts plot-gnss BUDP_5D_IGb08
-
-    Resulterer i visning af nedenstående plot.
-
-    .. image:: figures/fire_ts_plot_gnss_BUDP_5D_IGb08.png
-        :width: 800
-        :alt: Eksempel på plot af 5D-tidsserie for BUDP.
-
-    Plot af 5D-tidsserie for SMID::
-
-        fire ts plot-gnss SMID_5D_IGb08 -p X,Y -t fit
+        fire ts plot-hts "Højdetidsserie for punkt GED3 ift. Jessenpunkt 81005"
 
     Resulterer i visning af nedenstående plot.
 
-    .. image:: figures/fire_ts_plot_gnss_SMID_5D_IGb08_XY_fit.png
+    .. image:: figures/fire_ts_plot_hts_GED3_HTS_81005.png
         :width: 800
-        :alt: Eksempel på plot af 5D-tidsserie for SMID.
+        :alt: Eksempel på plot af højde-tidsserie for GED3.
 
-    Plot af 5D-tidsserie for TEJH::
+    Plot af højdetidsserie for GED2::
 
-        fire ts plot-gnss TEJH_5D_IGb08 -t konf
+        fire ts plot-hts "Højdetidsserie for punkt GED2 ift. Jessenpunkt 81050" -t fit
 
     Resulterer i visning af nedenstående plot.
 
-    .. image:: figures/fire_ts_plot_gnss_TEJH_5D_IGb08_konf.png
+    .. image:: figures/fire_ts_plot_hts_GED2_HTS_81050_fit.png
         :width: 800
-        :alt: Eksempel på plot af 5D-tidsserie for TEJH.
+        :alt: Eksempel på plot af højde-tidsserie for GED2.
+
+    Plot af højdetidsserie for GED5::
+
+        fire ts plot-hts "Højdetidsserie for punkt GED5 ift. Jessenpunkt 81068" -t konf
+
+    Resulterer i visning af nedenstående plot.
+
+    .. image:: figures/fire_ts_plot_hts_GED5_HTS_81068_konf.png
+        :width: 800
+        :alt: Eksempel på plot af højde-tidsserie for GED5.
 
     """
     plot_funktioner = {

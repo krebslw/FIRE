@@ -108,7 +108,7 @@ def gnss(objekt: str, parametre: str, fil: click.Path, **kwargs) -> None:
 
     "OBJEKT" sættes til enten et punkt eller et specifik navngiven tidsserie.
     Hvis "OBJEKT" er et punkt udskrives en oversigt over de tilgængelige
-    tidsserier til dette punkt. Hvis 'OBJEKT' er en tidsserie udskrives
+    tidsserier til dette punkt. Hvis "OBJEKT" er en tidsserie udskrives
     tidsserien på skærmen. Hvilke parametre der udskrives kan specificeres
     i en kommasepareret liste med ``--parametre``. Følgende parametre kan vælges::
 
