@@ -19,7 +19,7 @@ from fire.api.model import (
 from fire.api.model.tidsserier import (
     TidsserieEnsemble,
 )
-from fire.cli.ts._plot_gnss import (
+from fire.cli.ts._plot_ts import (
     plot_gnss_ts,
     plot_gnss_analyse,
     plot_data,

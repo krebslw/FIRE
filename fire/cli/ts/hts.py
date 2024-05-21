@@ -26,7 +26,7 @@ from fire.cli.ts import (
     _print_tidsserieoversigt,
     _udtræk_tidsserie,
 )
-from ._plot_gnss import *
+from ._plot_ts import *
 
 from . import ts
 
