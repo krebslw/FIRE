@@ -793,7 +793,6 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
     fire.cli.print(f"--- Punktsamling i Tidsserier ---")
     if not punktsamling.tidsserier:
         fire.cli.print(f"  Punktsamling har ingen tilknyttede tidsserier.")
-    for ts in punktsamling.tidsserier:
-        fire.cli.print(f"  {ts.navn}")
+    tidsserierapport(punktsamling.tidsserier)
 
     return
