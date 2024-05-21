@@ -4,16 +4,21 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 import numpy as np
 
-from fire.api.model import GNSSTidsserie
+from fire.api.model import (
+    Tidsserie,
+    GNSSTidsserie,
+    HøjdeTidsserie,
+)
 
 from fire.api.model.tidsserier import PolynomieRegression1D
 
 
-GNSS_TS_PLOTTING_LABELS = {
+TS_PLOTTING_LABELS = {
     "t": "Dato",
     "x": "x",
     "y": "y",
     "z": "z",
+    "kote": "Kote",
     "X": "X",
     "Y": "Y",
     "Z": "Z",
@@ -31,11 +36,11 @@ ENHEDER_SKALAFAKTOR = {
 }
 
 
-def plot_gnss_ts(
-    ts: GNSSTidsserie, plot_funktion: Callable, parametre: list = ["n", "e", "u"], y_enhed: str = "m"
+def plot_ts(
+    ts: Tidsserie, plot_funktion: Callable, parametre: list = ["n", "e", "u"], y_enhed: str = "m"
 ):
     """
-    Plotter en GNSSTidsserie.
+    Plotter en Tidsserie.
 
     Denne funktion håndterer figuropsætningen, og kalder ``plot_funktion``, som
     forventes at foretage selve plottingen af data.
@@ -54,7 +59,7 @@ def plot_gnss_ts(
         y = [skalafaktor * yy for yy in getattr(ts, parm)]
 
         try:
-            label = GNSS_TS_PLOTTING_LABELS[parm]
+            label = TS_PLOTTING_LABELS[parm]
         except KeyError:
             label = parm
 
