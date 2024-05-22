@@ -16,6 +16,7 @@ from fire.api.model import (
     GNSSTidsserie,
     HøjdeTidsserie,
     Punkt,
+    PunktSamling,
 )
 from fire.api.model.tidsserier import (
     TidsserieEnsemble,
@@ -122,8 +123,16 @@ def hts(objekt: str, parametre: str, fil: click.Path, **kwargs) -> None:
     default="kote",
     help="Hvilken parameter skal plottes?",
 )
+@click.option(
+    "--minpunkter",
+    "-N",
+    required=False,
+    type=int,
+    default = 3,
+    help="Minimum antal punkter i tidsserien.",
+)
 @fire.cli.default_options()
-def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
+def plot_hts(objekt: str, plottype: str, parametre: str, minpunkter, **kwargs) -> None:
     """
     Plot en Højdetidsserie.
 
@@ -150,7 +159,7 @@ def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
         konf            Plot lineær regression med konfidensbånd
 
     \f
-    **EKSEMPLER: NB: Dette er eksempler for fire ts plot-gnss!!! **
+    **EKSEMPLER:**
 
     Plot af højdetidsserie for GED3::
 
@@ -192,34 +201,7 @@ def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
     try:
         tidsserie = _find_tidsserie(HøjdeTidsserie, objekt)
     except NoResultFound:
-        try:
-            punktsamling = fire.cli.firedb.hent_punktsamling(objekt)
-            tidsserier = punktsamling.tidsserier
-            fig = plt.figure()
-            plt.suptitle(punktsamling.navn)
-            for ts in tidsserier:
-                x = np.array(ts.decimalår)
-                idx_sorted = np.argsort(x,)
-                x = x[idx_sorted]
-
-                y = np.array(ts.kote)
-                y = y[idx_sorted]
-                y = y-np.mean(y)
-
-                plt.plot(
-                x,
-                y,
-                "-o",
-                markersize=4,
-                label = ts.punkt.ident
-                )
-            plt.show()
-
-        except NoResultFound:
-            raise SystemExit("Tidsserie eller Punktsamling ikke fundet")
-
-        raise SystemExit
-
+        raise SystemExit("Højdetidsserie ikke fundet")
 
     parametre = parametre.split(",")
 
@@ -230,6 +212,71 @@ def plot_hts(objekt: str, plottype: str, parametre: str, **kwargs) -> None:
     parametre = [HTS_PARAMETRE[parm] for parm in parametre]
 
     plot_ts(tidsserie, plot_funktioner[plottype], parametre, y_enhed="mm")
+
+
+
+@ts.command()
+@click.argument("punktsamling", required=True, type=str)
+@click.option(
+    "--parametre",
+    "-p",
+    required=False,
+    type=str,
+    default="kote",
+    help="Hvilken parameter skal plottes?",
+)
+@click.option(
+    "--minpunkter",
+    "-N",
+    required=False,
+    type=int,
+    default = 3,
+    help="Minimum antal punkter i tidsserien.",
+)
+@fire.cli.default_options()
+def plot_punktsamling(punktsamling: str, minpunkter: int, **kwargs) -> None:
+    """ Plot en Punktsamling """
+
+    ps: PunktSamling= fire.cli.firedb.hent_punktsamling(punktsamling)
+    jessenpunkt = ps.jessenpunkt
+
+    # alle tidsserier som er direkte koblet til punktsamlingen
+    tser = {ts for ts in ps.tidsserier}
+
+    punkter: list[Punkt] = ps.punkter
+
+
+    # Find alle tidsserier som relateres til punkterne i punktsamlingen, og til samme Jessenpunkt
+    tidsserier_alle: list[HøjdeTidsserie] = {ts for p in punkter for ts in p.tidsserier if ts.tstype==2
+                                             and ts.punktsamling.jessenpunkt == jessenpunkt}
+
+
+    if not tser.issubset(tidsserier_alle):
+        fire.cli.print(f"hmm")
+
+    fig = plt.figure()
+    plt.suptitle(ps.navn)
+    for ts in tidsserier_alle:
+        if len(ts)<minpunkter:
+            continue
+        x = np.array(ts.decimalår)
+        idx_sorted = np.argsort(x,)
+        x = x[idx_sorted]
+
+        y = np.array(ts.kote)
+        y = y[idx_sorted]
+        y = y-np.mean(y)
+
+        plt.plot(
+        x,
+        y,
+        "-o",
+        markersize=4,
+        label = ts.punkt.ident
+        )
+    plt.legend()
+    plt.show()
+
 
 
 
