@@ -363,7 +363,7 @@ WITH
 	punkter AS (
 		SELECT pi.punktid FROM punktinfo pi
 		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
-		WHERE pit.infotype='NET:5D' AND pi.registreringtil IS NULL
+		WHERE (pit.infotype='NET:jessen' OR ) AND pi.registreringtil IS NULL
 	),
 	gnss_ident AS (
 		SELECT pi.punktid, pi.tekst ident FROM punktinfo pi
@@ -1228,3 +1228,178 @@ VALUES
   );
 
 CREATE INDEX v_pres1_obs_geometri_idx ON v_pres1_obs (geometri) INDEXTYPE IS MDSYS.SPATIAL_INDEX PARAMETERS('layer_gtype=line');
+
+-- Jessenpunkter
+CREATE MATERIALIZED VIEW v_jessen
+REFRESH ON DEMAND
+START WITH SYSDATE NEXT SYSDATE + 1 / 24
+AS
+WITH
+	punkter AS (
+		SELECT pi.punktid FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE (pit.infotype='NET:jessen')
+			AND pi.registreringtil IS NULL
+	),
+	gi_ident AS (
+		SELECT pi.punktid, pi.tekst ident FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE pit.infotype='IDENT:GI' AND pi.registreringtil IS NULL
+	),
+	landsnr AS (
+		SELECT pi.punktid, pi.tekst ident FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE pit.infotype='IDENT:landsnr' AND pi.registreringtil IS NULL
+	),
+	jessennr AS (
+		SELECT pi.punktid, pi.tekst ident FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE pit.infotype='IDENT:jessen' AND pi.registreringtil IS NULL
+	),
+	dvr90 AS (
+		SELECT k.punktid, k.t, k.z FROM koordinat k
+		JOIN sridtype st ON k.sridid=st.sridid
+		WHERE st.srid = 'EPSG:5799' AND k.registreringtil IS NULL
+	),
+	jessenkote AS (
+		SELECT k.punktid, k.t, k.z FROM koordinat k
+		JOIN sridtype st ON k.sridid=st.sridid
+		WHERE st.srid LIKE 'TS:81%' AND k.registreringtil IS NULL
+	),
+	geometrier AS (
+		SELECT geometri, punktid FROM geometriobjekt go
+		WHERE go.registreringtil IS NULL
+	),
+	tabtgaaet AS (
+		SELECT pi.punktid, 'TRUE' AS tabtgaaet FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE pit.infotype='ATTR:tabtgået' AND pi.registreringtil IS NULL
+	)
+SELECT
+	geometrier.geometri,
+	gi_ident.ident GI_IDENT,
+	landsnr.ident LANDSNR,
+	jessennr.ident JESSENNR,
+	dvr90.t   DVR90_T,
+	dvr90.z   DVR90_KOTE,
+	jessenkote.t   JESSENKOTE_T,
+	jessenkote.z   JESSENKOTE,
+	COALESCE(tabtgaaet.tabtgaaet, 'FALSE') AS tabtgaaet
+FROM punkter
+LEFT JOIN gi_ident ON punkter.punktid=gi_ident.punktid
+LEFT JOIN landsnr ON punkter.punktid=landsnr.punktid
+LEFT JOIN jessennr ON punkter.punktid=jessennr.punktid
+LEFT JOIN dvr90 ON punkter.punktid=dvr90.punktid
+LEFT JOIN jessenkote ON punkter.punktid=jessenkote.punktid
+LEFT JOIN tabtgaaet ON punkter.punktid=tabtgaaet.punktid
+JOIN geometrier ON punkter.punktid=geometrier.punktid
+
+INSERT INTO
+  user_sdo_geom_metadata (table_name, column_name, diminfo, srid)
+VALUES
+  (
+    'V_JESSEN',
+    'GEOMETRI',
+    MDSYS.SDO_DIM_ARRAY(
+      MDSYS.SDO_DIM_ELEMENT('Longitude', 7.0, 16.0, 0.005),
+      MDSYS.SDO_DIM_ELEMENT('Latitude', 54.0000, 59.0000, 0.005)
+    ),
+    4326
+  );
+
+CREATE INDEX v_jessen_geometri_idx ON v_jessen (geometri) INDEXTYPE IS MDSYS.SPATIAL_INDEX PARAMETERS('layer_gtype=point');
+
+
+-- Punktsamlinger
+CREATE MATERIALIZED VIEW v_punktsamling
+REFRESH ON DEMAND
+START WITH SYSDATE NEXT SYSDATE + 1 / 24
+AS
+WITH
+	jessenpunkter AS (
+		SELECT pi.punktid FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE (pit.infotype='NET:jessen')
+			AND pi.registreringtil IS NULL
+	),
+    punkter AS (
+	 	SELECT punktid, jessenpunktid, ps.objektid AS punktsamlingsid
+	 	FROM punktsamling_punkt psp
+	 	JOIN punktsamling ps ON psp.punktsamlingsid = ps.objektid
+ ),
+	gi_ident AS (
+		SELECT pi.punktid, pi.tekst ident FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE pit.infotype='IDENT:GI' AND pi.registreringtil IS NULL
+	),
+	landsnr AS (
+		SELECT pi.punktid, pi.tekst ident FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE pit.infotype='IDENT:landsnr' AND pi.registreringtil IS NULL
+	),
+	jessennr AS (
+		SELECT pi.punktid, pi.tekst ident FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE pit.infotype='IDENT:jessen' AND pi.registreringtil IS NULL
+	),
+	dvr90 AS (
+		SELECT k.punktid, k.t, k.z FROM koordinat k
+		JOIN sridtype st ON k.sridid=st.sridid
+		WHERE st.srid = 'EPSG:5799' AND k.registreringtil IS NULL
+	),
+	tidsserier AS (
+		SELECT objektid, punktid, punktsamlingsid
+		FROM TIDSSERIE t
+		WHERE t.registreringtil IS NULL AND TSTYPE = 2
+	),
+	jessenkote AS (
+		SELECT  k.punktid, k.t, k.z, tk.tidsserieobjektid
+		FROM TIDSSERIE_KOORDINAT tk
+		INNER JOIN koordinat_backup_20240422 k ON tk.koordinatobjektid = k.objektid
+		INNER JOIN sridtype st ON k.sridid=st.sridid
+		WHERE st.srid = 'TS:jessen'
+	),
+	geometrier AS (
+		SELECT geometri, punktid FROM geometriobjekt go
+		WHERE go.registreringtil IS NULL
+	),
+	tabtgaaet AS (
+		SELECT pi.punktid, 'TRUE' AS tabtgaaet FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE pit.infotype='ATTR:tabtgået' AND pi.registreringtil IS NULL
+	)
+SELECT
+	geometrier.geometri,
+	gi_ident.ident GI_IDENT,
+	landsnr.ident LANDSNR,
+	jessennr.ident JESSENNR,
+	dvr90.t   DVR90_T,
+	dvr90.z   DVR90_KOTE,
+	jessenkote.t   JESSENKOTE_T,
+	jessenkote.z   JESSENKOTE,
+	COALESCE(tabtgaaet.tabtgaaet, 'FALSE') AS tabtgaaet
+FROM punkter
+LEFT JOIN gi_ident ON punkter.punktid=gi_ident.punktid
+LEFT JOIN landsnr ON punkter.punktid=landsnr.punktid
+LEFT JOIN jessennr ON punkter.jessenpunktid=jessennr.punktid
+LEFT JOIN dvr90 ON punkter.punktid=dvr90.punktid
+INNER JOIN tidsserier t ON punkter.punktid = t.punktid AND punkter.punktsamlingsid = t.punktsamlingsid
+INNER JOIN jessenkote ON jessenkote.tidsserieobjektid = t.objektid  AND punkter.punktid=jessenkote.punktid
+LEFT JOIN tabtgaaet ON punkter.punktid=tabtgaaet.punktid
+LEFT JOIN geometrier ON punkter.punktid=geometrier.punktid
+
+
+INSERT INTO
+  user_sdo_geom_metadata (table_name, column_name, diminfo, srid)
+VALUES
+  (
+    'V_PUNKTSAMLING',
+    'GEOMETRI',
+    MDSYS.SDO_DIM_ARRAY(
+      MDSYS.SDO_DIM_ELEMENT('Longitude', 7.0, 16.0, 0.005),
+      MDSYS.SDO_DIM_ELEMENT('Latitude', 54.0000, 59.0000, 0.005)
+    ),
+    4326
+  );
+
+CREATE INDEX v_punktsamling_geometri_idx ON v_punktsamling (geometri) INDEXTYPE IS MDSYS.SPATIAL_INDEX PARAMETERS('layer_gtype=point');
