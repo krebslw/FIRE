@@ -648,13 +648,14 @@ class PolynomieRegression1D:
             )
             return f"{header}\n{linje}"
 
-    def __init__(self, tidsserie: Tidsserie, x: list, y: list, grad: int = 1, **kwargs):
+    def __init__(self, tidsserie: Tidsserie, x: list, y: list, y_vægte: list = None, grad: int = 1, **kwargs):
         self.tidsserie = tidsserie
         self.x = np.array(x)
         self.y = np.array(y)
         self.grad = grad
         self.hældning_reference = float("inf")
 
+        self._y_vægte = y_vægte
         self._var0 = None
         self.var_samlet = None
 
@@ -664,23 +665,36 @@ class PolynomieRegression1D:
         return P.polyvander(self.x, self.grad)
 
     @functools.cached_property
+    def _W(self) -> np.ndarray:
+        """
+        Returner vægtmatricen W
+
+        Hvis vægtene er udefineret returnes enhedsmatricen. Pt. understøttes kun
+        ukorrelerede observationer, dvs. at vægtmatricen er en diagonalmatrix.
+        """
+        if self._y_vægte is None:
+            return np.ones(self.N)
+
+        return np.array(self._y_vægte)
+
+    @functools.cached_property
     def _invATA(self) -> np.ndarray:
         """
-        Returner den inverse matrix af størrelsen (A^T * A)
+        Returner den inverse matrix af størrelsen (A^T * W * A)
 
-        A er designmatricen for regressionen.
+        A er designmatricen for regressionen. W er vægtmatricen for observationerne.
         """
-        return np.linalg.inv(self._A.T @ self._A)
+        return np.linalg.inv(self._A.T @ np.diag(self._W) @ self._A)
 
     def solve(self) -> None:
         """Løs hvad løses skal"""
-
-        self.beta, [SSR, _, _, _] = P.polyfit(self.x, self.y, self.grad, full=True)
 
         if self.dof <= 0:
             raise ValueError(
                 "Antallet af punkter er mindre end eller lig antallet af parametre."
             )
+
+        self.beta, [SSR, _, _, _] = P.polyfit(self.x, self.y, self.grad, full=True, w=self._W)
 
         if SSR.size == 0:
             raise ValueError(
@@ -688,9 +702,8 @@ class PolynomieRegression1D:
                 "eller sætte polynomiegraden ned."
             )
 
-        # Bruger item() istedet for SSR[0], så der smides fejl hvis SSR mod forventning
-        # har mere end 1 element.
-        self.SSR = SSR.item()
+        self.residualer = self.y - self.beregn_prædiktioner(self.x)
+        self.SSR = np.dot(self._W, self.residualer**2)
 
         self._var0 = self.SSR / self.dof
         self.var_samlet = self._var0
@@ -741,6 +754,10 @@ class PolynomieRegression1D:
         Kovariansmatricen har følgende struktur:
         COV =  [[Var(β₀)    , Cov(β₀,β₁)],
                 [Cov(β₁, β₀), Var(β₁)   ]]
+
+        Kovariansmatricen beregnes som:
+            COV = Var * (A^T * W * A)^(-1), hvor Var=SSR/dof
+        Se fx. https://en.wikipedia.org/wiki/Weighted_least_squares#Parameter_errors_and_correlation
         """
         if er_samlet is False:
             var = self.var0
@@ -967,3 +984,20 @@ class HøjdeTidsserie(Tidsserie):
         Spredning givet i milimeter.
         """
         return [k.sz for k in self.koordinater]
+
+    def forbered_lineær_regression(self, x: list, y: list, **kwargs) -> None:
+        """
+        Opret "linreg" attribut af typen PolynomieRegression1D på tidsserien.
+
+        Initialiserer en simpel PolynomieRegression i 1 dimension, dvs. med én
+        forklarende variabel x, og én afhængig variabel y.
+        """
+        self.linreg = PolynomieRegression1D(self, x, y, **kwargs)
+
+    def beregn_lineær_regression(self) -> None:
+        """
+        Løs tidsseriens lineære regression.
+
+        Forudsætter at denne er initialiseret med "forbered_lineær_regression(...)".
+        """
+        self.linreg.solve()
