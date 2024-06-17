@@ -250,7 +250,9 @@ def plot_punktsamling(punktsamling: str, minpunkter: int, **kwargs) -> None:
     tidsserier_alle: list[HøjdeTidsserie] = {ts for p in punkter for ts in p.tidsserier if ts.tstype==2
                                              and ts.punktsamling.jessenpunkt == jessenpunkt}
 
-
+    # De to ovenstående måder, skulle gerne give det samme
+    # Punktsamling -> Tidsserie
+    # Punktsamling -> Jessenpunkter + Punkter -> Tidserie
     if not tser.issubset(tidsserier_alle):
         fire.cli.print(f"hmm")
 
@@ -278,6 +280,140 @@ def plot_punktsamling(punktsamling: str, minpunkter: int, **kwargs) -> None:
     plt.show()
 
 
+@ts.command()
+@click.argument(
+    "punktsamlingsnavn",
+    required=False,
+    type=str,
+    # help="Analyser tidsserier ud fra punktsamling",
+)
+@click.option(
+    "--ofil",
+    "-o",
+    required=False,
+    type=click.Path(writable=True),
+    help="Skriv beregnet tidsseriestatistik til csv-fil.",
+)
+@click.option(
+    "--min-antal-punkter",
+    required=False,
+    type=int,
+    default=3,
+    help="Minimum antal punkter i tidsserien.",
+)
+@click.option(
+    "--alpha",
+    required=False,
+    type=float,
+    default=0.05,
+    help="Signifikansniveau for statistiske tests og konfidensintervaller.",
+)
+@click.option(
+    "--jessenpunkt",
+    required=False,
+    type=str,
+    help="Vælg tidseriernes jessenpunkt.",
+)
+@click.option(
+    "--alle",
+    is_flag=True,
+    default=False,
+    help="Sættes dette flag, bliver alle Punkter i Punktsamlingen analyseret",
+)
+@click.option(
+    "--plot/--no-plot",
+    is_flag=True,
+    default=True,
+    help="Vælg om plots skal vises eller ej.",
+)
+@fire.cli.default_options()
+def analyse_hts(
+    # ts_liste: str,
+    # ts_fil: click.Path,
+    # jessenpunkt: str,
+    punktsamlingsnavn: str,
+    # ofil: click.Path,
+    min_antal_punkter: int,
+    alpha: float,
+    # alle: bool,
+    plot: bool,
+    **kwargs,
+):
+    """
+    Analyser en Højdetidsserie.
+    """
+
+    # skaler data så der regnes og plottes i [mm] i stedet for [m]
+    skalafaktor = 1e3
+
+    tsensemble = TidsserieEnsemble(
+        GNSSTidsserie,
+        min_antal_punkter=min_antal_punkter,
+        tidsseriegruppe="HTS",
+        referenceramme="Lokalt højdesystem",
+    )
+
+    # Hent tidsserier som skal analyseres baseret på bruger input.
+    # Skal det være en enkelt tidsserie
+
+    punktsamling = fire.cli.firedb.hent_punktsamling(punktsamlingsnavn)
+
+    tidsserier: list[HøjdeTidsserie] = punktsamling.tidsserier
+
+    # Filtrér desuden på min_antal_punkter, da de ikke kan filtreres via SQL
+    tidsserier = [
+        ts
+        for ts in tidsserier
+        if (len(ts) >= min_antal_punkter)
+    ]
+
+    if not tidsserier:
+        raise SystemExit("Fandt ingen tidsserier")
+
+    for ts in tidsserier:
+        y = [skalafaktor * yy for yy in ts.kote]
+
+        # Divider med 1000, idet spredningerne allerede er i mm
+        # Spredning på mindst 1 mm, da mange spredninger i DB er nul
+        y_vægte = [1/(skalafaktor * max(sy, 1)/1e3)**2  for sy in ts.sz]
+        print(y_vægte)
+        # yvægte = None
+        ts.forbered_lineær_regression(ts.decimalår, y, y_vægte = y_vægte)
+
+        try:
+            ts.beregn_lineær_regression()
+        except ValueError as e:
+            print(f"Fejl ved løsning af tidsserien {ts.navn}:\n{e}")
+            continue
+
+        # Lav Hypotesetest med nulhypotese: Hældningen er 0 (Punktet er stabilt.)
+        H0 = 0 - ts.linreg.beta[1]
+        T_test = ts.linreg.beregn_hypotesetest(H0=H0, alpha=alpha)
+
+        plot_hts_analyse(
+            "Kote [mm]", ts.linreg, alpha, er_samlet=False
+        )
+
+
+
+        # Statistik til output
+        print(f"Punkt: {ts.punkt.ident}")
+        print(f"Start: {ts.t[0]}")
+        print(f"Slut : {ts.t[-1]}")
+        print(f"N    : {ts.linreg.N}")
+        print(f"Trend: {ts.linreg.beta[1]} [mm/år]")
+        print(f"Std. af trend: {np.sqrt(ts.linreg.VarBeta()[1])} [mm/år]")
+        print(f"Trend signifikant?: {T_test.H0accepteret}")
+        print(f"Stabilitetstest: ")
+
+
+
+
+
+
+
+
+    return
 
 
 import numpy as np
