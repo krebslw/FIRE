@@ -664,7 +664,7 @@ def analyse_gnss(
 
         query = query.filter(GNSSTidsserie.navn.in_(tidsserienavne))
 
-    tidsserier = query.all()
+    tidsserier: list[GNSSTidsserie] = query.all()
 
     # Filtrér desuden på tidsseriegruppe og min_antal_punkter, da de ikke kan filtreres via SQL
     tidsserier = [
@@ -705,7 +705,6 @@ def analyse_gnss(
 
         uplift_reference[ts.navn] = uplift_rate_interpoleret
 
-    ts: GNSSTidsserie
     for ts in tidsserier:
         y = [skalafaktor * yy for yy in getattr(ts, parameter)]
         ts.forbered_lineær_regression(ts.decimalår, y, grad=grad, binsize=binsize)
