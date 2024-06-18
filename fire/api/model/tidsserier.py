@@ -648,7 +648,15 @@ class PolynomieRegression1D:
             )
             return f"{header}\n{linje}"
 
-    def __init__(self, tidsserie: Tidsserie, x: list, y: list, y_vægte: list = None, grad: int = 1, **kwargs):
+    def __init__(
+        self,
+        tidsserie: Tidsserie,
+        x: list,
+        y: list,
+        y_vægte: float | list = None,
+        grad: int = 1,
+        **kwargs,
+    ):
         self.tidsserie = tidsserie
         self.x = np.array(x)
         self.y = np.array(y)
@@ -667,15 +675,15 @@ class PolynomieRegression1D:
     @functools.cached_property
     def _W(self) -> np.ndarray:
         """
-        Returner vægtmatricen W
+        Returner diagonalen af vægtmatricen W
 
-        Hvis vægtene er udefineret returnes enhedsmatricen. Pt. understøttes kun
+        Hvis vægtene er udefineret returneres enhedsmatricen. Pt. understøttes kun
         ukorrelerede observationer, dvs. at vægtmatricen er en diagonalmatrix.
         """
         if self._y_vægte is None:
             return np.ones(self.N)
 
-        return np.array(self._y_vægte)
+        return np.ones(self.N) * np.array(self._y_vægte)
 
     @functools.cached_property
     def _invATA(self) -> np.ndarray:
@@ -694,7 +702,9 @@ class PolynomieRegression1D:
                 "Antallet af punkter er mindre end eller lig antallet af parametre."
             )
 
-        self.beta, [SSR, _, _, _] = P.polyfit(self.x, self.y, self.grad, full=True, w=self._W)
+        self.beta, [SSR, _, _, _] = P.polyfit(
+            self.x, self.y, self.grad, full=True, w=self._W
+        )
 
         if SSR.size == 0:
             raise ValueError(
