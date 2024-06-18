@@ -943,9 +943,10 @@ class HypoteseTest:
     """Foretag statistisk hypotesetest."""
 
     def __init__(
-        self, std_est: float, kritiskværdi: float=None, H0: float = 0
+        self, std_est: float, kritiskværdi: float, H0: float = 0, alpha: float = 0.05
     ):
         self.H0 = H0
+        self.alpha = alpha
         self.std_est = std_est
         self.kritiskværdi = kritiskværdi
 
@@ -966,21 +967,30 @@ class HypoteseTest:
         """
         return bool(self.score < self.kritiskværdi)
 
-class Ztest(HypoteseTest):
-    """ Foretag statistisk Z-test"""
 
-    def __init__(self, std_est: float, alpha: float = 0.05, H0: float = 0):
-        self.alpha = alpha
+class Ztest(HypoteseTest):
+    """Foretag statistisk Z-test"""
+
+    def __init__(self, std_est: float, H0: float = 0, alpha: float = 0.05):
+
         kritiskværdi = beregn_fraktil_for_normalfordeling(1 - alpha / 2)
-        super().__init__(std_est, kritiskværdi, H0)
+        super().__init__(std_est, kritiskværdi, H0, alpha)
+
 
 class Ttest(HypoteseTest):
-    """ Foretag statistisk T-test"""
+    """Foretag statistisk T-test"""
 
-    def __init__(self, std_est: float, dof: int, alpha: float = 0.05, H0: float = 0):
-        self.alpha = alpha
+    def __init__(
+        self,
+        std_est: float,
+        dof: int,
+        H0: float = 0,
+        alpha: float = 0.05,
+    ):
+
         kritiskværdi = beregn_fraktil_for_t_fordeling(1 - alpha / 2, dof)
-        super().__init__(std_est, kritiskværdi, H0)
+        super().__init__(std_est, kritiskværdi, H0, alpha)
+
 
 class HøjdeTidsserie(Tidsserie):
     __mapper_args__ = {
