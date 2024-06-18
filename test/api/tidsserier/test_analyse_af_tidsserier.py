@@ -78,12 +78,11 @@ def test_initialiser_HypoteseTest():
     kritiskværdi = beregn_fraktil_for_normalfordeling(1 - alpha / 2)
     std_est = 4.321
     H0 = 1.234
-    hypotesetest = HypoteseTest(std_est, kritiskværdi, H0, alpha)
+    hypotesetest = HypoteseTest(std_est, kritiskværdi, H0)
 
     assert hypotesetest.std_est == std_est
     assert hypotesetest.kritiskværdi == kritiskværdi
     assert hypotesetest.H0 == H0
-    assert hypotesetest.alpha == alpha
 
     assert hasattr(hypotesetest, "score")
     assert isinstance(hypotesetest.score, float)
@@ -98,7 +97,7 @@ def test_initialiser_PolynomieRegression1D():
     y = [1, 2, 3, 4, 5]
     grad = 1
 
-    lr = PolynomieRegression1D(tidsserie, x, y, grad)
+    lr = PolynomieRegression1D(tidsserie, x, y, grad=grad)
 
     assert isinstance(lr, PolynomieRegression1D)
     assert lr.tidsserie is not None
@@ -211,7 +210,7 @@ def test_fit_model_fejlhåndtering(grad, y, match, x):
     if x is None:
         x = [1, 2, 4]
 
-    lr = PolynomieRegression1D(tidsserie, x, y, grad)
+    lr = PolynomieRegression1D(tidsserie, x, y, grad=grad)
 
     with pytest.raises(ValueError, match=match):
         lr.solve()

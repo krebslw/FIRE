@@ -851,16 +851,12 @@ class PolynomieRegression1D:
 
         Returnerer objekt af typen HypoteseTest.
         """
-        if er_samlet:
-            kritiskværdi = beregn_fraktil_for_normalfordeling(1 - alpha / 2)
-        else:
-            kritiskværdi = beregn_fraktil_for_t_fordeling(1 - alpha / 2, self.dof)
-
         std_est = np.sqrt(self.VarBeta(er_samlet)[1])
 
-        return HypoteseTest(
-            H0=H0, alpha=alpha, std_est=std_est, kritiskværdi=kritiskværdi
-        )
+        if er_samlet:
+            return Ztest(std_est=std_est, H0=H0, alpha=alpha)
+
+        return Ttest(std_est=std_est, dof=self.dof, H0=H0, alpha=alpha)
 
     def beregn_statistik(self, alpha: float, er_samlet: bool = False) -> None:
         """
@@ -937,10 +933,9 @@ class HypoteseTest:
     """Foretag statistisk hypotesetest."""
 
     def __init__(
-        self, std_est: float, kritiskværdi: float, H0: float = 0, alpha: float = 0.05
+        self, std_est: float, kritiskværdi: float=None, H0: float = 0
     ):
         self.H0 = H0
-        self.alpha = alpha
         self.std_est = std_est
         self.kritiskværdi = kritiskværdi
 
@@ -961,6 +956,21 @@ class HypoteseTest:
         """
         return bool(self.score < self.kritiskværdi)
 
+class Ztest(HypoteseTest):
+    """ Foretag statistisk Z-test"""
+
+    def __init__(self, std_est: float, alpha: float = 0.05, H0: float = 0):
+        self.alpha = alpha
+        kritiskværdi = beregn_fraktil_for_normalfordeling(1 - alpha / 2)
+        super().__init__(std_est, kritiskværdi, H0)
+
+class Ttest(HypoteseTest):
+    """ Foretag statistisk T-test"""
+
+    def __init__(self, std_est: float, dof: int, alpha: float = 0.05, H0: float = 0):
+        self.alpha = alpha
+        kritiskværdi = beregn_fraktil_for_t_fordeling(1 - alpha / 2, dof)
+        super().__init__(std_est, kritiskværdi, H0)
 
 class HøjdeTidsserie(Tidsserie):
     __mapper_args__ = {
