@@ -346,6 +346,9 @@ def analyse_hts(
     # skaler data så der regnes og plottes i [mm] i stedet for [m]
     skalafaktor = 1e3
 
+    # Minimum spredning
+    apriori_spredning = 1 # svarer til APRIORI_SD
+
     tsensemble = TidsserieEnsemble(
         GNSSTidsserie,
         min_antal_punkter=min_antal_punkter,
@@ -374,10 +377,9 @@ def analyse_hts(
         y = [skalafaktor * yy for yy in ts.kote]
 
         # Divider med 1000, idet spredningerne allerede er i mm
-        # Spredning på mindst 1 mm, da mange spredninger i DB er nul
-        y_vægte = [1/(skalafaktor * max(sy, 1)/1e3)**2  for sy in ts.sz]
-        print(y_vægte)
-        # yvægte = None
+        # Anvend minimum værdi for spredning, da mange spredninger i databasen er nul
+        y_vægte = [1/(skalafaktor * max(sy, apriori_spredning)/1e3)**2  for sy in ts.sz]
+
         ts.forbered_lineær_regression(ts.decimalår, y, y_vægte = y_vægte)
 
         try:
@@ -406,15 +408,7 @@ def analyse_hts(
         print(f"Trend signifikant?: {T_test.H0accepteret}")
         print(f"Stabilitetstest: ")
 
-
-
-
-
-
-
-
     return
-
 
 import numpy as np
 import matplotlib.pyplot as plt
