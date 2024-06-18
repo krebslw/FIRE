@@ -390,13 +390,17 @@ def analyse_hts(
 
         # Lav Hypotesetest med nulhypotese: Hældningen er 0 (Punktet er stabilt.)
         H0 = 0 - ts.linreg.beta[1]
-        T_test = ts.linreg.beregn_hypotesetest(H0=H0, alpha=alpha)
+        T_test = ts.linreg.beregn_hypotesetest(H0=H0, alpha=0.01)
+
+        er_trend_signifikant = ts.signifikant_trend_test(alpha = 0.01).H0accepteret
+
+        assert T_test.H0accepteret == er_trend_signifikant
+
+        er_stabil = ts.stabilitetstest(alpha = 0.05, apriori_spredning = apriori_spredning)
 
         plot_hts_analyse(
             "Kote [mm]", ts.linreg, alpha, er_samlet=False
         )
-
-
 
         # Statistik til output
         print(f"Punkt: {ts.punkt.ident}")
@@ -405,8 +409,8 @@ def analyse_hts(
         print(f"N    : {ts.linreg.N}")
         print(f"Trend: {ts.linreg.beta[1]} [mm/år]")
         print(f"Std. af trend: {np.sqrt(ts.linreg.VarBeta()[1])} [mm/år]")
-        print(f"Trend signifikant?: {T_test.H0accepteret}")
-        print(f"Stabilitetstest: ")
+        print(f"Trend signifikant?: {er_trend_signifikant}")
+        print(f"Stabilitetstest: {er_stabil}")
 
     return
 
