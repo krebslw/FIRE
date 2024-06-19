@@ -943,11 +943,20 @@ class HypoteseTest:
     """Foretag statistisk hypotesetest."""
 
     def __init__(
-        self, std_est: float, kritiskværdi: float, H0: float = 0, alpha: float = 0.05
+        self, std_est: float, kritiskværdi: float, H0: float = 0, alpha: float = 0.05,
+            # metode=None, dof=0,
     ):
         self.H0 = H0
         self.alpha = alpha
         self.std_est = std_est
+
+        # TODO: Dette er en anden måde at implementere Z og T-test. Vurder hvad der er smartest til FIRE sparring.
+        # if metode=="z":
+        #     self.kritiskværdi = beregn_fraktil_for_normalfordeling(1 - alpha / 2)
+        # elif metode=="t":
+        #     self.kritiskværdi = beregn_fraktil_for_normalfordeling(1 - alpha / 2, dof)
+        #     self.dof=dof
+
         self.kritiskværdi = kritiskværdi
 
     @property
@@ -987,7 +996,7 @@ class Ttest(HypoteseTest):
         H0: float = 0,
         alpha: float = 0.05,
     ):
-
+        self.dof = dof
         kritiskværdi = beregn_fraktil_for_t_fordeling(1 - alpha / 2, dof)
         super().__init__(std_est, kritiskværdi, H0, alpha)
 
@@ -1002,7 +1011,7 @@ class HøjdeTidsserie(Tidsserie):
         """
         Liste med z-komponenter fra tidsseriens koordinater.
 
-        Koordinatkomponenten er i geocentrisk repræsentation.
+        Koordinatkomponenten er i lokal højdereference.
         """
         return [k.z for k in self.koordinater]
 
@@ -1044,7 +1053,7 @@ class HøjdeTidsserie(Tidsserie):
         H0 = 0 - self.linreg.beta[1]
         return self.linreg.beregn_hypotesetest(H0=H0,alpha=alpha)
 
-    def stabilitetstest(self, alpha: float = 0.05, bagatelgrænse: float = 0.1, apriori_spredning: float = 1):
+    def stabilitetstest(self, alpha: float = 0.05, bagatelgrænse: float = 0.1, apriori_spredning: float = 1) -> "HypoteseTest":
         """
         Test om punktet er stabilt.
 
@@ -1066,9 +1075,10 @@ class HøjdeTidsserie(Tidsserie):
         ymax = max(self.kote)
         ymin = min(self.kote)
 
+        # Det her vil fejle i frontend når der forventes objekt af typen HypoteseTest
         # Hvis forskellen er under bagatelgrænsen siges punktet at være stabilt
-        if (ymax - ymin) <= bagatelgrænse:
-            return True
+        # if (ymax - ymin) <= bagatelgrænse:
+        #     return True
 
         er_stabil = True
         for i in range(len(self)):
@@ -1082,14 +1092,18 @@ class HøjdeTidsserie(Tidsserie):
                 # Omregn til m
                 std_samlet=max(std_samlet, apriori_spredning)/1e3
 
-                hypotese_test = Ztest(
+                z_test = Ztest(
                     std_est=std_samlet,
                     H0=abs(self.kote[i]-self.kote[j]),
                     alpha=alpha,
                     )
-                er_stabil = hypotese_test.H0accepteret
+                er_stabil = z_test.H0accepteret
 
                 if not er_stabil:
                     break
 
-        return er_stabil
+        return z_test
+
+    def generer_statisik_rapport():
+
+        return
