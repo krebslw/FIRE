@@ -499,7 +499,7 @@ class GNSSTidsserie(Tidsserie):
         """
         x_binned, y_binned = self.binning(x, y, **kwargs)
 
-        self.linreg = PolynomieRegression1D(self, x_binned, y_binned, **kwargs)
+        self.linreg = PolynomieRegression1D(x_binned, y_binned, **kwargs)
 
     def beregn_lineær_regression(self) -> None:
         """
@@ -650,14 +650,12 @@ class PolynomieRegression1D:
 
     def __init__(
         self,
-        tidsserie: Tidsserie,
         x: list,
         y: list,
         y_vægte: float | list = None,
         grad: int = 1,
         **kwargs,
     ):
-        self.tidsserie = tidsserie
         self.x = np.array(x)
         self.y = np.array(y)
         self.grad = grad
@@ -1031,7 +1029,7 @@ class HøjdeTidsserie(Tidsserie):
         Initialiserer en simpel PolynomieRegression i 1 dimension, dvs. med én
         forklarende variabel x, og én afhængig variabel y.
         """
-        self.linreg = PolynomieRegression1D(self, x, y, **kwargs)
+        self.linreg = PolynomieRegression1D(x, y, **kwargs)
 
     def beregn_lineær_regression(self) -> None:
         """

@@ -82,7 +82,7 @@ def plot_ts(
 
 def plot_gnss_analyse(
     label: str,
-    linreg: PolynomieRegression1D,
+    tidsserie: GNSSTidsserie,
     alpha: float = 0.05,
     er_samlet: bool = False,
 ):
@@ -98,6 +98,7 @@ def plot_gnss_analyse(
     Reference-hældningen vises som en linje der skærer regressionslinjen i punktet (mex,
     mey), som er punktet i midten af tidsserien (middelepoken).
     """
+    linreg = tidsserie.linreg
 
     # Prædiktioner og intervaller
     x_præd = np.linspace(linreg.x[0], linreg.x[-1], 1000)
@@ -174,7 +175,7 @@ def plot_gnss_analyse(
     )
 
     ax.set_title(
-        f"Tidsserie: {linreg.tidsserie.navn}    R$^2$ = {linreg.R2:.2f}   N = {len(linreg.tidsserie.decimalår)}   N$\\mathregular{{_{{binned}}}}$ = {linreg.N}"
+        f"Tidsserie: {tidsserie.navn}    R$^2$ = {linreg.R2:.2f}   N = {len(tidsserie.decimalår)}   N$\\mathregular{{_{{binned}}}}$ = {linreg.N}"
     )
     ax.set_xlabel("Dato")
     ax.set_ylabel(label)
@@ -219,7 +220,7 @@ Std. af data fra alle tidsserier (samlet) = {np.sqrt(linreg.var_samlet):.2f} mm"
 
 def plot_hts_analyse(
     label: str,
-    linreg: PolynomieRegression1D,
+    tidsserie: HøjdeTidsserie,
     alpha: float = 0.05,
     er_samlet: bool = False,
 ):
@@ -235,6 +236,7 @@ def plot_hts_analyse(
     Reference-hældningen vises som en linje der skærer regressionslinjen i punktet (mex,
     mey), som er punktet i midten af tidsserien (middelepoken).
     """
+    linreg = tidsserie.linreg
 
     # Prædiktioner og intervaller
     x_præd = np.linspace(linreg.x[0], linreg.x[-1], 1000)
@@ -271,7 +273,7 @@ def plot_hts_analyse(
     ax.plot(x_præd, konfidensbånd[1, :], color="green", label="95% Konfidensbånd")
 
     ax.set_title(
-        f"Tidsserie: {linreg.tidsserie.navn}    R$^2$ = {linreg.R2:.2f}   N = {len(linreg.tidsserie.decimalår)}"
+        f"Tidsserie: {tidsserie.navn}    R$^2$ = {linreg.R2:.2f}   N = {len(tidsserie.decimalår)}"
     )
     ax.set_xlabel("Dato")
     ax.set_ylabel(label)
@@ -322,7 +324,7 @@ def plot_fit(x: list, y: list, y_enhed: str = "mm"):
     Enheden på x forventes at være decimalår.
     """
 
-    lr = PolynomieRegression1D("", x, y)
+    lr = PolynomieRegression1D(x, y)
     lr.solve()
 
     x_præd = np.linspace(lr.x[0], lr.x[-1], 1000)
@@ -349,7 +351,7 @@ def plot_konfidensbånd(x: list, y: list, y_enhed: str = "mm"):
     x_binned, y_binned = GNSSTidsserie.binning(x, y)
 
     # Foretag lineær regresion
-    lr = PolynomieRegression1D("", x_binned, y_binned)
+    lr = PolynomieRegression1D(x_binned, y_binned)
     lr.solve()
 
     # Prædiktioner
