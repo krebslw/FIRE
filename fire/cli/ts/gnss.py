@@ -676,6 +676,47 @@ def analyse_gnss(
     if not tidsserier:
         raise SystemExit("Fandt ingen tidsserier")
 
+    uplift_reference = læs_uplift_for_tidsserier(tidsserier, uplift_station, uplift_grid)
+
+    for ts in tidsserier:
+        y = [skalafaktor * yy for yy in getattr(ts, parameter)]
+        ts.forbered_lineær_regression(ts.decimalår, y, grad=grad, binsize=binsize)
+
+        if parameter == "u":
+            hældning_reference = uplift_reference[ts.navn]
+        else:
+            hældning_reference = 0
+
+        try:
+            ts.beregn_lineær_regression()
+        except ValueError as e:
+            print(f"Fejl ved løsning af tidsserien {ts.navn}:\n{e}")
+            continue
+
+        tsensemble.tilføj_tidsserie(ts)
+
+    try:
+        tsensemble.beregn_samlet_varians()
+    except ValueError as e:
+        raise SystemExit(e)
+
+    # Gem statistik
+    if ofil:
+        outstr = generer_gnss_statistik_streng_ensemble(tsensemble, alpha=alpha)
+        with open(ofil, "w") as f:
+            f.write(outstr)
+
+    if not plot:
+        return
+
+    # Plot analyseresultater
+    for _, ts in tsensemble.tidsserier.items():
+        plot_gnss_analyse(
+            TS_PLOTTING_LABELS[parameter], ts.linreg, alpha, er_samlet=True
+        )
+
+def læs_uplift_for_tidsserier(tidsserier: list[Tidsserie], uplift_station: Path, uplift_grid: Path):
+    """Hjælpefunktion for analyse-gnss til indlæsning af uplift værdier"""
     # Læs uplift-værdier som brugeren eksplicit har givet pr. station.
     uplift_rate_station = {}
     if uplift_station:
@@ -705,12 +746,9 @@ def analyse_gnss(
 
         uplift_reference[ts.navn] = uplift_rate_interpoleret
 
-    for ts in tidsserier:
-        y = [skalafaktor * yy for yy in getattr(ts, parameter)]
-        ts.forbered_lineær_regression(ts.decimalår, y, grad=grad, binsize=binsize)
+    return uplift_reference
 
-        if parameter == "u":
-            ts.linreg.hældning_reference = uplift_reference[ts.navn]
+
 
         try:
             ts.beregn_lineær_regression()
