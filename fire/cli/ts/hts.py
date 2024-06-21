@@ -12,12 +12,12 @@ from fire.api.model import (
     Punkt,
     PunktSamling,
 )
-from fire.cli.ts._statistik_ts import (
+from fire.cli.ts.statistik_ts import (
     Statistik_HTS,
     beregn_statistik_til_hts_rapport,
 )
-from fire.cli.ts._plot_ts import (
-    plot_ts,
+from fire.cli.ts.plot_ts import (
+    plot_tidsserie,
     plot_data,
     plot_fit,
     plot_konfidensbånd,
@@ -217,7 +217,7 @@ def plot_hts(objekt: str, plottype: str, parametre: str, minpunkter, **kwargs) -
 
     parametre = [HTS_PARAMETRE[parm] for parm in parametre]
 
-    plot_ts(tidsserie, plot_funktioner[plottype], parametre, y_enhed="mm")
+    plot_tidsserie(tidsserie, plot_funktioner[plottype], parametre, y_enhed="mm")
 
 
 
