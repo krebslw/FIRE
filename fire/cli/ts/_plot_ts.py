@@ -11,7 +11,10 @@ from fire.api.model import (
 )
 
 from fire.api.model.tidsserier import PolynomieRegression1D
-
+from fire.cli.ts._statistik_ts import (
+    Statistik_GNSS,
+    Statistik_GNSS_Samlet,
+)
 
 TS_PLOTTING_LABELS = {
     "t": "Dato",
@@ -82,7 +85,8 @@ def plot_ts(
 
 def plot_gnss_analyse(
     label: str,
-    tidsserie: GNSSTidsserie,
+    linreg: PolynomieRegression1D,
+    statistik: Statistik_GNSS_Samlet,
     alpha: float = 0.05,
     er_samlet: bool = False,
 ):
@@ -92,13 +96,11 @@ def plot_gnss_analyse(
     Hvis regressionen er en del af et TidsserieEnsemble kan "samlet" statistik
     plottes hvis flaget ``er_samlet`` sættes.
 
-    ``alpha`` bestemmer signifkansniveauet for konfidensbånd til fittet samt for hypo-
-    tesetests.
+    ``alpha`` bestemmer signifkansniveauet for konfidensbånd til fittet.
 
     Reference-hældningen vises som en linje der skærer regressionslinjen i punktet (mex,
     mey), som er punktet i midten af tidsserien (middelepoken).
     """
-    linreg = tidsserie.linreg
 
     # Prædiktioner og intervaller
     x_præd = np.linspace(linreg.x[0], linreg.x[-1], 1000)
@@ -119,14 +121,7 @@ def plot_gnss_analyse(
     )
 
     # Uplift
-    uplift_rate = linreg.hældning_reference
-    uplift_fit = uplift_rate * (x_præd - linreg.mex) + linreg.mey
-
-    # Hypotesetest
-    H0 = uplift_rate - linreg.beta[1]
-
-    T_test = linreg.beregn_hypotesetest(H0=H0, alpha=alpha)
-    Z_test = linreg.beregn_hypotesetest(H0=H0, alpha=alpha, er_samlet=True)
+    uplift_fit = statistik.reference_hældning * (x_præd - linreg.mex) + linreg.mey
 
     # Plotting
     plt.rcParams["figure.autolayout"] = True
@@ -144,12 +139,12 @@ def plot_gnss_analyse(
         x_præd,
         uplift_fit,
         "k",
-        label=f"Uplift-rate: {uplift_rate:.3f} [mm/år]",
+        label=f"Uplift-rate: {statistik.reference_hældning:.3f} [mm/år]",
     )
 
     # Konfidensbånd
     ax.plot(x_præd, konfidensbånd[0, :], color="green")
-    ax.plot(x_præd, konfidensbånd[1, :], color="green", label="95% Konfidensbånd")
+    ax.plot(x_præd, konfidensbånd[1, :], color="green", label=f"{100*(1-alpha):g}% Konfidensbånd")
 
     # Konfidensbånd (samlet)
     if er_samlet:
@@ -162,7 +157,7 @@ def plot_gnss_analyse(
             x_præd,
             konfidensbånd_samlet[1, :],
             color="blue",
-            label="95% Konfidensbånd (samlet)",
+            label=f"{100*(1-alpha):g}% Konfidensbånd (samlet)",
         )
 
     ax.scatter(
@@ -175,7 +170,7 @@ def plot_gnss_analyse(
     )
 
     ax.set_title(
-        f"Tidsserie: {tidsserie.navn}    R$^2$ = {linreg.R2:.2f}   N = {len(tidsserie.decimalår)}   N$\\mathregular{{_{{binned}}}}$ = {linreg.N}"
+        f"Tidsserie: {statistik.TidsserieID}    R$^2$ = {statistik.R2:.2f}   N = {statistik.N}   N$\\mathregular{{_{{binned}}}}$ = {statistik.N_binned}"
     )
     ax.set_xlabel("Dato")
     ax.set_ylabel(label)
@@ -192,24 +187,24 @@ def plot_gnss_analyse(
     )
 
     # T-test resultater til visning
-    t_tekst = f"|t| = {T_test.score:.2f}\nt$\\mathregular{{_{{crit}}}}$ = {T_test.kritiskværdi:.2f}\n"
+    t_tekst = f"|t| = {statistik.T_test_score:.2f}\nt$\\mathregular{{_{{crit}}}}$ = {statistik.T_test_kritiskværdi:.2f}\n"
 
-    if T_test.H0accepteret:
-        t_tekst += f"H$_{{0}}$ accepteret ved {T_test.alpha*100}% signifikansniveau"
+    if statistik.T_test_H0accepteret:
+        t_tekst += f"H$_{{0}}$ accepteret ved {statistik.T_test_alpha*100}% signifikansniveau"
     else:
-        t_tekst += f"H$_{{0}}$ forkastet ved {T_test.alpha*100}% signifikansniveau"
+        t_tekst += f"H$_{{0}}$ forkastet ved {statistik.T_test_alpha*100}% signifikansniveau"
 
     # Z-test resultater til visning
-    z_tekst = f"|z| = {Z_test.score:.2f}\nz$\\mathregular{{_{{crit}}}}$ = {Z_test.kritiskværdi:.2f}\n"
+    z_tekst = f"|z| = {statistik.Z_test_score:.2f}\nz$\\mathregular{{_{{crit}}}}$ = {statistik.Z_test_kritiskværdi:.2f}\n"
 
-    if Z_test.H0accepteret:
-        z_tekst += f"H$_{{0}}$ accepteret ved {Z_test.alpha*100}% signifikansniveau (samlet)"
+    if statistik.Z_test_H0accepteret:
+        z_tekst += f"H$_{{0}}$ accepteret ved {statistik.Z_test_alpha*100}% signifikansniveau (samlet)"
     else:
-        z_tekst += f"H$_{{0}}$ forkastet ved {Z_test.alpha*100}% signifikansniveau (samlet)"
+        z_tekst += f"H$_{{0}}$ forkastet ved {statistik.Z_test_alpha*100}% signifikansniveau (samlet)"
 
     # Standardafvigelse data til visning
-    std_tekst = f"Std. af data = {np.sqrt(linreg.var0):.2f} mm\n\
-Std. af data fra alle tidsserier (samlet) = {np.sqrt(linreg.var_samlet):.2f} mm"
+    std_tekst = f"Std. af data = {statistik.std_0:.2f} mm\n\
+Std. af data fra alle tidsserier (samlet) = {statistik.std_samlet:.2f} mm"
 
     plt.figtext(0.55, 0.18, t_tekst)
     if er_samlet:
