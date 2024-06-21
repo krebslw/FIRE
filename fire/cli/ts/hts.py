@@ -2,12 +2,6 @@ from datetime import datetime
 
 import click
 import pandas as pd
-from pathlib import Path
-from pyproj import Transformer
-from rich.table import Table
-from rich.console import Console
-from rich import box
-from sqlalchemy import func
 from sqlalchemy.exc import NoResultFound
 
 import fire.cli
@@ -18,6 +12,19 @@ from fire.api.model import (
     Punkt,
     PunktSamling,
 )
+from fire.cli.ts._statistik_ts import (
+    Statistik_HTS,
+    beregn_statistik_til_hts_rapport,
+)
+from fire.cli.ts._plot_ts import (
+    plot_ts,
+    plot_data,
+    plot_fit,
+    plot_konfidensbånd,
+    plot_hts_analyse,
+    plot_punktsamling,
+)
+
 from fire.api.model.tidsserier import (
     TidsserieEnsemble,
 )
@@ -27,7 +34,6 @@ from fire.cli.ts import (
     _print_tidsserieoversigt,
     _udtræk_tidsserie,
 )
-from ._plot_ts import *
 
 from . import ts
 
@@ -241,14 +247,15 @@ def plot_punktsamling(punktsamling: str, minpunkter: int, **kwargs) -> None:
     jessenpunkt = ps.jessenpunkt
 
     # alle tidsserier som er direkte koblet til punktsamlingen
-    tser = {ts for ts in ps.tidsserier}
+    tser = {ts for ts in ps.tidsserier if len(ts)>minpunkter}
 
     punkter: list[Punkt] = ps.punkter
 
 
     # Find alle tidsserier som relateres til punkterne i punktsamlingen, og til samme Jessenpunkt
     tidsserier_alle: list[HøjdeTidsserie] = {ts for p in punkter for ts in p.tidsserier if ts.tstype==2
-                                             and ts.punktsamling.jessenpunkt == jessenpunkt}
+                                             and ts.punktsamling.jessenpunkt == jessenpunkt
+                                             and len(ts)>minpunkter}
 
     # De to ovenstående måder, skulle gerne give det samme
     # Punktsamling -> Tidsserie
@@ -256,28 +263,7 @@ def plot_punktsamling(punktsamling: str, minpunkter: int, **kwargs) -> None:
     if not tser.issubset(tidsserier_alle):
         fire.cli.print(f"hmm")
 
-    fig = plt.figure()
-    plt.suptitle(ps.navn)
-    for ts in tidsserier_alle:
-        if len(ts)<minpunkter:
-            continue
-        x = np.array(ts.decimalår)
-        idx_sorted = np.argsort(x,)
-        x = x[idx_sorted]
-
-        y = np.array(ts.kote)
-        y = y[idx_sorted]
-        y = y-np.mean(y)
-
-        plt.plot(
-        x,
-        y,
-        "-o",
-        markersize=4,
-        label = ts.punkt.ident
-        )
-    plt.legend()
-    plt.show()
+    plot_punktsamling(ps, tidsserier_alle)
 
 
 @ts.command()
@@ -332,7 +318,7 @@ def analyse_hts(
     # ts_fil: click.Path,
     # jessenpunkt: str,
     punktsamlingsnavn: str,
-    # ofil: click.Path,
+    ofil: click.Path,
     min_antal_punkter: int,
     alpha: float,
     # alle: bool,
@@ -350,7 +336,7 @@ def analyse_hts(
     apriori_spredning = 1 # svarer til APRIORI_SD
 
     tsensemble = TidsserieEnsemble(
-        GNSSTidsserie,
+        HøjdeTidsserie,
         min_antal_punkter=min_antal_punkter,
         tidsseriegruppe="HTS",
         referenceramme="Lokalt højdesystem",
@@ -373,6 +359,8 @@ def analyse_hts(
     if not tidsserier:
         raise SystemExit("Fandt ingen tidsserier")
 
+    # Beregn lineær regression for alle tidsserier samt statistik til rapportering.
+    ts_statistik = {}
     for ts in tidsserier:
         y = [skalafaktor * yy for yy in ts.kote]
 
@@ -388,29 +376,32 @@ def analyse_hts(
             print(f"Fejl ved løsning af tidsserien {ts.navn}:\n{e}")
             continue
 
-        # Lav Hypotesetest med nulhypotese: Hældningen er 0 (Punktet er stabilt.)
-        er_trend_signifikant = ts.signifikant_trend_test(alpha = 0.01).H0accepteret
+        ts_statistik[ts.navn] = beregn_statistik_til_hts_rapport(ts)
 
-        er_stabil = ts.stabilitetstest(alpha = 0.05, apriori_spredning = apriori_spredning).H0accepteret
+    # Gem statistik
+    if ofil:
+        linjer = ""
+        for _, statistik in ts_statistik.items():
+            header = str(statistik).split("\n")[0]
+            linje = str(statistik).split("\n")[1]
 
-        plot_hts_analyse(
-            "Kote [mm]", ts.linreg, alpha, er_samlet=False
-        )
+            linjer += f"{linje}\n"
 
-        # Statistik til output
-        print(f"Punkt: {ts.punkt.ident}")
-        print(f"Start: {ts.t[0]}")
-        print(f"Slut : {ts.t[-1]}")
-        print(f"N    : {ts.linreg.N}")
-        print(f"Trend: {ts.linreg.beta[1]} [mm/år]")
-        print(f"Std. af trend: {np.sqrt(ts.linreg.VarBeta()[1])} [mm/år]")
-        print(f"Trend signifikant?: {er_trend_signifikant}")
-        print(f"Stabilitetstest: {er_stabil}")
+        outstr = f"{header}\n{linjer}"
 
-    return
+        with open(ofil, "w") as f:
+            f.write(outstr)
 
-def generer_hts_rapport():
-    """ Pladsholderske """
+    if not plot:
+        return
+
+    # Plot punktsamlingen
+    plot_punktsamling(punktsamling, tidsserier)
+
+    # Detaljerede plots af analyseresultater for de enkelte tidsrækker.
+    for ts in tidsserier:
+        plot_hts_analyse("Kote [mm]", ts.linreg, ts_statistik[ts.navn], alpha)
+
     return
 
 import numpy as np

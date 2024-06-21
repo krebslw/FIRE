@@ -8,12 +8,14 @@ from fire.api.model import (
     Tidsserie,
     GNSSTidsserie,
     HøjdeTidsserie,
+    PunktSamling,
 )
 
 from fire.api.model.tidsserier import PolynomieRegression1D
 from fire.cli.ts._statistik_ts import (
     Statistik_GNSS,
     Statistik_GNSS_Samlet,
+    Statistik_HTS,
 )
 
 TS_PLOTTING_LABELS = {
@@ -215,23 +217,15 @@ Std. af data fra alle tidsserier (samlet) = {statistik.std_samlet:.2f} mm"
 
 def plot_hts_analyse(
     label: str,
-    tidsserie: HøjdeTidsserie,
+    linreg: PolynomieRegression1D,
+    statistik: Statistik_HTS,
     alpha: float = 0.05,
-    er_samlet: bool = False,
 ):
     """
-    Plot resultaterne af en GNSS-analyse.
+    Plot resultaterne af en Højdetidsserie-analyse.
 
-    Hvis regressionen er en del af et TidsserieEnsemble kan "samlet" statistik
-    plottes hvis flaget ``er_samlet`` sættes.
-
-    ``alpha`` bestemmer signifkansniveauet for konfidensbånd til fittet samt for hypo-
-    tesetests.
-
-    Reference-hældningen vises som en linje der skærer regressionslinjen i punktet (mex,
-    mey), som er punktet i midten af tidsserien (middelepoken).
+    ``alpha`` bestemmer signifkansniveauet for konfidensbånd til fittet.
     """
-    linreg = tidsserie.linreg
 
     # Prædiktioner og intervaller
     x_præd = np.linspace(linreg.x[0], linreg.x[-1], 1000)
@@ -243,12 +237,6 @@ def plot_hts_analyse(
         alpha=alpha,
         er_samlet=False,
     )
-
-    # Hypotesetest
-    H0 = 0 - linreg.beta[1]
-
-    T_test = linreg.beregn_hypotesetest(H0=H0, alpha=alpha)
-    Z_test = linreg.beregn_hypotesetest(H0=H0, alpha=alpha, er_samlet=True)
 
     # Plotting
     plt.rcParams["figure.autolayout"] = True
@@ -265,12 +253,12 @@ def plot_hts_analyse(
 
     # Konfidensbånd
     ax.plot(x_præd, konfidensbånd[0, :], color="green")
-    ax.plot(x_præd, konfidensbånd[1, :], color="green", label="95% Konfidensbånd")
+    ax.plot(x_præd, konfidensbånd[1, :], color="green", label=f"{100*(1-alpha):g}% Konfidensbånd")
 
     ax.set_title(
-        f"Tidsserie: {tidsserie.navn}    R$^2$ = {linreg.R2:.2f}   N = {len(tidsserie.decimalår)}"
+        f"Tidsserie: {statistik.TidsserieID}    R$^2$ = {statistik.R2:.2f}   N = {statistik.N}"
     )
-    ax.set_xlabel("Dato")
+    ax.set_xlabel("År")
     ax.set_ylabel(label)
 
     ax.yaxis.set_major_formatter(FormatStrFormatter("%.3f"))
@@ -283,20 +271,6 @@ def plot_hts_analyse(
         shadow=True,
         ncol=1,
     )
-
-    # T-test resultater til visning
-    t_tekst = f"|t| = {T_test.score:.2f}\nt$\\mathregular{{_{{crit}}}}$ = {T_test.kritiskværdi:.2f}\n"
-
-    if T_test.H0accepteret:
-        t_tekst += f"H$_{{0}}$ accepteret ved {T_test.alpha*100}% signifikansniveau"
-    else:
-        t_tekst += f"H$_{{0}}$ forkastet ved {T_test.alpha*100}% signifikansniveau"
-
-    # Standardafvigelse data til visning
-    std_tekst = f"Std. af data = {np.sqrt(linreg.var0):.2f} mm"
-
-    plt.figtext(0.55, 0.07, t_tekst)
-    plt.figtext(0.55, 0.02, std_tekst)
 
     plt.show()
 
@@ -375,3 +349,42 @@ def plot_konfidensbånd(x: list, y: list, y_enhed: str = "mm"):
         label="95% konf. bånd",
     )
     plot_data(lr.x, lr.y)
+
+
+def plot_punktsamling(punktsamling: PunktSamling, tidsserier: list[HøjdeTidsserie]=None):
+
+
+    if not tidsserier:
+        tidsserier = punktsamling.tidsserier
+
+    fig = plt.figure()
+    plt.suptitle(punktsamling.navn)
+    for ts in tidsserier:
+        x = np.array(ts.decimalår)
+        idx_sorted = np.argsort(x,)
+        x = x[idx_sorted]
+
+        xd = np.diff(x)/2+x[:-1]
+
+        y = np.array(ts.kote)
+        y = y[idx_sorted]
+        # Kan normalisere efter mean
+        y = y-np.mean(y)
+
+        # Eller starttidspunkt. (Tidsserier starter i y=0)
+        # Problemet med startidspunktet er at tidsserier ikke er lige lange og
+        # kan starte i forskellige tidspunkter, hvilket forskyder tidsserien/det bliver svært at sammenligne visuelt.
+        # Ide! Hvad med at plotte diff(y)?
+        y = y-y[0]
+
+        yd = np.diff(y)
+
+        plt.plot(
+        x,
+        y,
+        "-o",
+        markersize=4,
+        label = ts.punkt.ident
+        )
+    plt.legend()
+    plt.show()
