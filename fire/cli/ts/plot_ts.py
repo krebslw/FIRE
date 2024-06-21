@@ -12,7 +12,7 @@ from fire.api.model import (
 )
 
 from fire.api.model.tidsserier import PolynomieRegression1D
-from fire.cli.ts._statistik_ts import (
+from fire.cli.ts.statistik_ts import (
     Statistik_GNSS,
     Statistik_GNSS_Samlet,
     Statistik_HTS,
@@ -41,7 +41,7 @@ ENHEDER_SKALAFAKTOR = {
 }
 
 
-def plot_ts(
+def plot_tidsserie(
     ts: Tidsserie, plot_funktion: Callable, parametre: list = ["n", "e", "u"], y_enhed: str = "m"
 ):
     """
