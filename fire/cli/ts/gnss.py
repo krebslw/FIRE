@@ -1,20 +1,12 @@
-from datetime import datetime
-
 import click
-import pandas as pd
 from pathlib import Path
 from pyproj import Transformer
-from rich.table import Table
-from rich.console import Console
-from rich import box
-from sqlalchemy import func
 from sqlalchemy.exc import NoResultFound
 
 import fire.cli
 from fire.api.model import (
     Tidsserie,
     GNSSTidsserie,
-    Punkt,
 )
 from fire.api.model.tidsserier import (
     TidsserieEnsemble,
@@ -27,6 +19,10 @@ from fire.cli.ts._plot_ts import (
     plot_konfidensbånd,
     TS_PLOTTING_LABELS,
 )
+from fire.cli.ts._statistik_ts import (
+    beregn_statistik_til_gnss_rapport,
+)
+
 from fire.cli.ts import (
     _find_tidsserie,
     _print_tidsserieoversigt,
@@ -619,6 +615,9 @@ def analyse_gnss(
     t-fordeling med fraktilen :math:`T_{1-\\alpha/2}`.
 
     """
+    if not plot and not ofil:
+        raise SystemExit("Både plotting og skrivning af statistik til disk er fravalgt. Der er intet at foretage.")
+
     # denne funktion regner altid på 5D punkter. Kan evt. udvides.
     tidsseriegruppe = "5D"
 
@@ -676,16 +675,18 @@ def analyse_gnss(
     if not tidsserier:
         raise SystemExit("Fandt ingen tidsserier")
 
-    uplift_reference = læs_uplift_for_tidsserier(tidsserier, uplift_station, uplift_grid)
+    # Indlæs uplift værdier
+    if parameter == "u":
+        uplift_reference = læs_uplift_for_tidsserier(tidsserier, uplift_station, uplift_grid)
 
+    # Beregn lineær regression for alle tidsserier
     for ts in tidsserier:
         y = [skalafaktor * yy for yy in getattr(ts, parameter)]
         ts.forbered_lineær_regression(ts.decimalår, y, grad=grad, binsize=binsize)
 
+        reference_hældning = 0
         if parameter == "u":
-            hældning_reference = uplift_reference[ts.navn]
-        else:
-            hældning_reference = 0
+            reference_hældning = uplift_reference[ts.navn]
 
         try:
             ts.beregn_lineær_regression()
@@ -695,14 +696,33 @@ def analyse_gnss(
 
         tsensemble.tilføj_tidsserie(ts)
 
+    # Beregner samlet varians og opdaterer alle tidsserier med samlet varians
     try:
         tsensemble.beregn_samlet_varians()
     except ValueError as e:
         raise SystemExit(e)
 
+    # Beregner statistik for alle tidsserier i ensemble
+    ts_statistik = {}
+    for _, ts in tsensemble.tidsserier.items():
+        reference_hældning = 0
+        if parameter == "u":
+            reference_hældning = uplift_reference[ts.navn]
+
+        ts_statistik[ts.navn] = beregn_statistik_til_gnss_rapport(ts, alpha=alpha, reference_hældning=reference_hældning, er_samlet=True)
+
+
     # Gem statistik
     if ofil:
-        outstr = generer_gnss_statistik_streng_ensemble(tsensemble, alpha=alpha)
+        linjer = ""
+        for _, statistik in ts_statistik.items():
+            header = str(statistik).split("\n")[0]
+            linje = str(statistik).split("\n")[1]
+
+            linjer += f"{linje}\n"
+
+        outstr = f"{header}\n{linjer}"
+
         with open(ofil, "w") as f:
             f.write(outstr)
 
@@ -712,7 +732,7 @@ def analyse_gnss(
     # Plot analyseresultater
     for _, ts in tsensemble.tidsserier.items():
         plot_gnss_analyse(
-            TS_PLOTTING_LABELS[parameter], ts.linreg, alpha, er_samlet=True
+            TS_PLOTTING_LABELS[parameter], ts.linreg, ts_statistik[ts.navn], alpha, er_samlet=True
         )
 
 def læs_uplift_for_tidsserier(tidsserier: list[Tidsserie], uplift_station: Path, uplift_grid: Path):
@@ -747,33 +767,3 @@ def læs_uplift_for_tidsserier(tidsserier: list[Tidsserie], uplift_station: Path
         uplift_reference[ts.navn] = uplift_rate_interpoleret
 
     return uplift_reference
-
-
-
-        try:
-            ts.beregn_lineær_regression()
-        except ValueError as e:
-            print(f"Fejl ved løsning af tidsserien {ts.navn}:\n{e}")
-            continue
-
-        tsensemble.tilføj_tidsserie(ts)
-
-    try:
-        tsensemble.beregn_samlet_varians()
-    except ValueError as e:
-        raise SystemExit(e)
-
-    # Gem statistik
-    if ofil:
-        outstr = tsensemble.generer_statistik_streng_ensemble(alpha=alpha)
-        with open(ofil, "w") as f:
-            f.write(outstr)
-
-    if not plot:
-        return
-
-    # Plot analyseresultater
-    for _, ts in tsensemble.tidsserier.items():
-        plot_gnss_analyse(
-            TS_PLOTTING_LABELS[parameter], ts.linreg, alpha, er_samlet=True
-        )
