@@ -15,8 +15,11 @@ from fire.cli.ts.statistik_ts import (
 def test_beregn_statistik_til_gnss_rapport(gnsstidsserie):
 
     x = np.linspace(-1, 1, 1000)
-    lr = PolynomieRegression1D(x, x)
-    lr.solve()
+
+    gnsstidsserie.forbered_lineær_regression(x, x)
+
+    gnsstidsserie.beregn_lineær_regression()
+
     statistik = beregn_statistik_til_gnss_rapport(
         gnsstidsserie, alpha=0.05, reference_hældning=0
     )
@@ -33,8 +36,11 @@ def test_beregn_statistik_til_gnss_rapport(gnsstidsserie):
 def test_beregn_statistik_til_hts_rapport(højdetidsserie):
 
     x = np.linspace(-1, 1, 1000)
-    lr = PolynomieRegression1D(x, x)
-    lr.solve()
+
+    højdetidsserie.forbered_lineær_regression(x, x)
+
+    højdetidsserie.beregn_lineær_regression()
+
     statistik = beregn_statistik_til_hts_rapport(højdetidsserie)
 
     assert isinstance(statistik, Statistik_HTS)
