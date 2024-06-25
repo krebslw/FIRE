@@ -16,6 +16,7 @@ from fire.api.model.tidsserier import PolynomieRegression1D
         (["--referenceramme", "IGb14", "RDIO_5D_IGb08"]),
         (["--min-antal-punkter", "20", "RDIO_5D_IGb08"]),
         (["--parameter", "test", "RDIO_5D_IGb08"]),
+        (["--no-plot", "RDIO_5D_IGb08"]),
     ],
 )
 def test_cli_analyse_gnss_fejler(mocker, options):
@@ -43,7 +44,6 @@ def test_cli_analyse_gnss_fejler(mocker, options):
 @pytest.mark.parametrize(
     "options, tjek_sti",
     [
-        (["--no-plot", "RDIO_5D_IGb08"], "."),
         (["--plot", "--referenceramme", "IGb08", "RDIO_5D_IGb08"], "."),
         (
             ["--plot", "--ofil", "test_statistik.csv", "RDIO_5D_IGb08"],
