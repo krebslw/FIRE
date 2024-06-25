@@ -242,7 +242,10 @@ def plot_hts_analyse(
     plt.rcParams["figure.autolayout"] = True
     plt.figure(figsize=(12, 9))
     ax = plt.subplot(111)
-    ax.scatter(linreg.x, linreg.y, marker="*", color="black", label="GNSS Observation")
+    ax.errorbar(x=linreg.x, y=linreg.y, yerr=np.sqrt(1/linreg._W),
+                fmt = "ko",
+                capsize=3,
+                label=f"GNSS Observation $\pm$ standardafvigelse")
 
     ax.plot(
         x_præd,
@@ -266,7 +269,6 @@ def plot_hts_analyse(
     ax.grid()
     ax.legend(
         loc="upper center",
-        bbox_to_anchor=(0.2, -0.15),
         fancybox=True,
         shadow=True,
         ncol=1,
