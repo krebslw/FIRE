@@ -245,7 +245,7 @@ def plot_hts_analyse(
     ax.errorbar(x=linreg.x, y=linreg.y, yerr=np.sqrt(1/linreg._W),
                 fmt = "ko",
                 capsize=3,
-                label=f"GNSS Observation $\pm$ standardafvigelse")
+                label=f"GNSS Observation $\\pm$ standardafvigelse")
 
     ax.plot(
         x_præd,
