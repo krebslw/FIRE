@@ -268,14 +268,10 @@ def plot_hts(objekt: str, plottype: str, parametre: str, minpunkter, **kwargs) -
 )
 @fire.cli.default_options()
 def analyse_hts(
-    # ts_liste: str,
-    # ts_fil: click.Path,
-    # jessenpunkt: str,
     punktsamlingsnavn: str,
     ofil: click.Path,
     min_antal_punkter: int,
     alpha: float,
-    # alle: bool,
     plot: bool,
     **kwargs,
 ):
@@ -288,13 +284,6 @@ def analyse_hts(
 
     # Minimum spredning
     apriori_spredning = 0.5 # [mm]
-
-    tsensemble = TidsserieEnsemble(
-        HøjdeTidsserie,
-        min_antal_punkter=min_antal_punkter,
-        tidsseriegruppe="HTS",
-        referenceramme="Lokalt højdesystem",
-    )
 
     # Hent tidsserier som skal analyseres baseret på bruger input.
     # Skal det være en enkelt tidsserie
