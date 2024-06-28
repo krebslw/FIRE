@@ -363,7 +363,7 @@ WITH
 	punkter AS (
 		SELECT pi.punktid FROM punktinfo pi
 		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
-		WHERE (pit.infotype='NET:jessen' OR ) AND pi.registreringtil IS NULL
+		WHERE (pit.infotype='NET:5D' AND pi.registreringtil IS NULL
 	),
 	gnss_ident AS (
 		SELECT pi.punktid, pi.tekst ident FROM punktinfo pi
@@ -1322,10 +1322,10 @@ WITH
 		WHERE (pit.infotype='NET:jessen')
 			AND pi.registreringtil IS NULL
 	),
-    punkter AS (
-	 	SELECT punktid, jessenpunktid, ps.objektid AS punktsamlingsid
-	 	FROM punktsamling_punkt psp
-	 	JOIN punktsamling ps ON psp.punktsamlingsid = ps.objektid
+	punkter AS (
+		SELECT punktid, jessenpunktid, jessenkoordinatid, ps.navn
+		FROM punktsamling_punkt psp
+		JOIN punktsamling ps ON psp.punktsamlingsid = ps.objektid
  ),
 	gi_ident AS (
 		SELECT pi.punktid, pi.tekst ident FROM punktinfo pi
@@ -1342,22 +1342,9 @@ WITH
 		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
 		WHERE pit.infotype='IDENT:jessen' AND pi.registreringtil IS NULL
 	),
-	dvr90 AS (
-		SELECT k.punktid, k.t, k.z FROM koordinat k
-		JOIN sridtype st ON k.sridid=st.sridid
-		WHERE st.srid = 'EPSG:5799' AND k.registreringtil IS NULL
-	),
-	tidsserier AS (
-		SELECT objektid, punktid, punktsamlingsid
-		FROM TIDSSERIE t
-		WHERE t.registreringtil IS NULL AND TSTYPE = 2
-	),
-	jessenkote AS (
-		SELECT  k.punktid, k.t, k.z, tk.tidsserieobjektid
-		FROM TIDSSERIE_KOORDINAT tk
-		INNER JOIN koordinat_backup_20240422 k ON tk.koordinatobjektid = k.objektid
-		INNER JOIN sridtype st ON k.sridid=st.sridid
-		WHERE st.srid = 'TS:jessen'
+		koordinater AS (
+		SELECT k.objektid AS koordinatid, k.punktid, k.t, k.z
+		FROM koordinat_backup_20240422 k
 	),
 	geometrier AS (
 		SELECT geometri, punktid FROM geometriobjekt go
@@ -1372,19 +1359,16 @@ SELECT
 	geometrier.geometri,
 	gi_ident.ident GI_IDENT,
 	landsnr.ident LANDSNR,
+	punkter.NAVN AS PUNKTSAMLINGSNAVN,
 	jessennr.ident JESSENNR,
-	dvr90.t   DVR90_T,
-	dvr90.z   DVR90_KOTE,
-	jessenkote.t   JESSENKOTE_T,
-	jessenkote.z   JESSENKOTE,
+	koordinater.z   JESSENKOTE,
+	koordinater.t   JESSENKOTE_T,
 	COALESCE(tabtgaaet.tabtgaaet, 'FALSE') AS tabtgaaet
 FROM punkter
 LEFT JOIN gi_ident ON punkter.punktid=gi_ident.punktid
 LEFT JOIN landsnr ON punkter.punktid=landsnr.punktid
 LEFT JOIN jessennr ON punkter.jessenpunktid=jessennr.punktid
-LEFT JOIN dvr90 ON punkter.punktid=dvr90.punktid
-INNER JOIN tidsserier t ON punkter.punktid = t.punktid AND punkter.punktsamlingsid = t.punktsamlingsid
-INNER JOIN jessenkote ON jessenkote.tidsserieobjektid = t.objektid  AND punkter.punktid=jessenkote.punktid
+LEFT JOIN koordinater ON punkter.jessenkoordinatid = koordinater.koordinatid
 LEFT JOIN tabtgaaet ON punkter.punktid=tabtgaaet.punktid
 LEFT JOIN geometrier ON punkter.punktid=geometrier.punktid
 
