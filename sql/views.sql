@@ -1387,3 +1387,68 @@ VALUES
   );
 
 CREATE INDEX v_punktsamling_geometri_idx ON v_punktsamling (geometri) INDEXTYPE IS MDSYS.SPATIAL_INDEX PARAMETERS('layer_gtype=point');
+
+
+CREATE MATERIALIZED VIEW v_multipunktsamling
+REFRESH ON DEMAND
+START WITH SYSDATE NEXT SYSDATE + 1 / 24
+AS
+WITH
+	punkter AS (
+		SELECT punktid, jessenpunktid, jessenkoordinatid, ps.navn
+		FROM punktsamling_punkt psp
+		JOIN punktsamling ps ON psp.punktsamlingsid = ps.objektid
+	),
+	geometrier AS (
+		SELECT geometri, punktid FROM geometriobjekt go
+		WHERE go.registreringtil IS NULL
+	),
+--	tabtgaaet AS (
+--		SELECT pi.punktid, 'TRUE' AS tabtgaaet FROM punktinfo pi
+--		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+--		WHERE pit.infotype='ATTR:tabtgået' AND pi.registreringtil IS NULL
+--	),
+	multigeometrier AS (
+		SELECT punkter.navn,
+			punkter.jessenpunktid,
+			punkter.jessenkoordinatid,
+			SDO_AGGR_UNION(SDOAGGRTYPE(geometrier.geometri, NULL)) AS multigeometri
+		FROM punkter
+		INNER JOIN geometrier ON punkter.punktid=geometrier.punktid
+--		LEFT JOIN tabtgaaet ON punkter.punktid=tabtgaaet.punktid
+--		WHERE tabtgaaet.tabtgaaet IS NULL
+		GROUP BY punkter.navn, punkter.jessenpunktid, punkter.jessenkoordinatid
+	),
+	jessennr AS (
+		SELECT pi.punktid, pi.tekst ident FROM punktinfo pi
+		JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+		WHERE pit.infotype='IDENT:jessen' AND pi.registreringtil IS NULL
+	),
+	koordinater AS (
+		SELECT k.objektid AS koordinatid, k.punktid, k.t, k.z
+		FROM koordinat_backup_20240422 k
+	)
+SELECT
+	multigeometrier.multigeometri,
+	multigeometrier.NAVN AS PUNKTSAMLINGSNAVN,
+	jessennr.ident JESSENNR,
+	koordinater.z   JESSENKOTE,
+	koordinater.t   JESSENKOTE_T
+FROM multigeometrier
+LEFT JOIN jessennr ON multigeometrier.jessenpunktid=jessennr.punktid
+LEFT JOIN koordinater ON multigeometrier.jessenkoordinatid = koordinater.koordinatid
+
+INSERT INTO
+  user_sdo_geom_metadata (table_name, column_name, diminfo, srid)
+VALUES
+  (
+    'V_MULTIPUNKTSAMLING',
+    'MULTIGEOMETRI',
+    MDSYS.SDO_DIM_ARRAY(
+      MDSYS.SDO_DIM_ELEMENT('Longitude', 7.0, 16.0, 0.005),
+      MDSYS.SDO_DIM_ELEMENT('Latitude', 54.0000, 59.0000, 0.005)
+    ),
+    4326
+  );
+
+ CREATE INDEX v_multipunktsamling_multigeometri_idx ON v_multipunktsamling (multigeometri) INDEXTYPE IS MDSYS.SPATIAL_INDEX PARAMETERS('layer_gtype=multipoint');
