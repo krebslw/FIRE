@@ -175,6 +175,10 @@ class FireDb(FireDbLuk, FireDbHent, FireDbIndset):
 
         return [gi_ident(p, lnr) for lnr, p in enumerate(punkter, start=løbenr)]
 
+    def tilknyt_jessennumre(self, punkter: List[Punkt]) -> List[PunktInformation]:
+        """Tillknyt Jessennumre til Punkter"""
+        raise NotImplementedError
+
     def fejlmeld_koordinat(self, koordinat: Koordinat, sagsevent: Sagsevent, commit = True):
         """
         Fejlmeld en allerede eksisterende koordinat.
