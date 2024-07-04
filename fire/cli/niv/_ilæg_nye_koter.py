@@ -26,6 +26,11 @@ from . import (
     er_projekt_okay,
 )
 
+KOTESYSTEMER = {
+    "DVR90": "EPSG:5799",
+    "Jessen": "TS:jessen",
+    "LRL": "TS:LRL",
+}
 
 def punktdata_ikke_skal_opdateres(punktdata: dict) -> bool:
     """
@@ -98,9 +103,20 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     ny_punktoversigt = punktoversigt.copy()
 
     # Forbered data til kote-oprettelse
-    DVR90 = fire.cli.firedb.hent_srid("EPSG:5799")
+    if len(punktoversigt["System"].unique()) > 1:
+        fire.cli.print(
+            "FEJL: Flere forskellige højdereferencesystemer er angivet!",
+            fg="white",
+            bg="red",
+            bold=True,
+        )
+        raise SystemExit()
+
+    anvendt_system = punktoversigt["System"][0]
+
+    anvendt_srid = fire.cli.firedb.hent_srid(KOTESYSTEMER[anvendt_system])
     tid = gyldighedstidspunkt(projektnavn)
-    ny_kote = partial(Koordinat, srid=DVR90, t=tid)
+    ny_kote = partial(Koordinat, srid=anvendt_srid, t=tid)
 
     event_id = uuid()
     til_registrering = []

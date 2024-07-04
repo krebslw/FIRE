@@ -66,6 +66,12 @@ class Arbejdssæt:
     udelad: List[str]
 
 
+KOTESYSTEMER = {
+    "DVR90": "EPSG:5799",
+    "Jessen": "TS:jessen",
+    "LRL": "TS:LRL",
+}
+
 @niv.command()
 @fire.cli.default_options()
 @click.argument("projektnavn", nargs=1, type=str)
@@ -486,18 +492,24 @@ def opdater_arbejdssæt(
     arbejdssæt: Arbejdssæt,
     tg: Timestamp,
 ) -> Arbejdssæt:
-    for j, (punkt, ny_kote, var) in enumerate(zip(punkter, koter, varianser)):
+
+    if len(set(arbejdssæt.system)) > 1:
+        fire.cli.print(
+            "FEJL: Flere forskellige højdereferencesystemer er angivet!",
+            fg="white",
+            bg="red",
+            bold=True,
+        )
+        raise SystemExit()
+
+    anvendt_system = arbejdssæt.system[0]
+
+    for (punkt, ny_kote, var) in zip(punkter, koter, varianser):
         if punkt in arbejdssæt.punkt:
             # Hvis punkt findes, sæt indeks til hvor det findes
             i = arbejdssæt.punkt.index(punkt)
-            if i > j:
-                # Gem info i det punkt hvis allerede skrevet
-                arbejdssæt.punkt.append(arbejdssæt.punkt[i])
-                arbejdssæt.ny_sigma.append(arbejdssæt.ny_sigma[i])
-                arbejdssæt.hvornår.append(arbejdssæt.hvornår[i])
-                arbejdssæt.system.append("DVR90")
+
             # Overskriv info i punkt der findes
-            arbejdssæt.punkt[i] = punkt
             arbejdssæt.ny_kote[i] = ny_kote
             arbejdssæt.ny_sigma[i] = sqrt(var)
 
@@ -514,14 +526,13 @@ def opdater_arbejdssæt(
                 continue
             arbejdssæt.opløft[i] = Delta / dt
             arbejdssæt.hvornår[i] = tg
-            arbejdssæt.system[i] = "DVR90"
         else:
             # Tilføj nye punkter
             arbejdssæt.punkt.append(punkt)
             arbejdssæt.ny_sigma.append(sqrt(var))
             arbejdssæt.hvornår.append(tg)
             arbejdssæt.ny_kote.append(ny_kote)
-            arbejdssæt.system.append("DVR90")
+            arbejdssæt.system.append(anvendt_system)
 
             # Fyld
             arbejdssæt.fasthold.append("")
