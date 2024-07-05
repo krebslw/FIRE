@@ -645,3 +645,4 @@ from ._opret_sag import opret_sag
 from ._regn import regn
 from ._udtræk_observationer import udtræk_observationer
 from ._udtræk_revision import udtræk_revision
+from ._opret_punktsamling import opret_punktsamling
