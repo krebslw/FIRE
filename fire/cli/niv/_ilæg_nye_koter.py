@@ -112,9 +112,9 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         )
         raise SystemExit()
 
-    anvendt_system = punktoversigt["System"][0]
+    kotesystem = punktoversigt["System"][0]
 
-    anvendt_srid = fire.cli.firedb.hent_srid(KOTESYSTEMER[anvendt_system])
+    anvendt_srid = fire.cli.firedb.hent_srid(KOTESYSTEMER[kotesystem])
     tid = gyldighedstidspunkt(projektnavn)
     ny_kote = partial(Koordinat, srid=anvendt_srid, t=tid)
 
@@ -182,7 +182,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     # opdaterer mere end 10 punkter ad gangen
     punktnavne = [p.ident for p in opdaterede_punkter]
     punktnavne = forkort(punktnavne)
-    sagseventtekst = f"Opdatering af DVR90 kote til {', '.join(punktnavne)}"
+    sagseventtekst = f"Opdatering af {kotesystem}-kote til {', '.join(punktnavne)}"
     clob_html = filnavn_gama_output.read_text()
 
     sagsevent = sag.ny_sagsevent(

@@ -502,7 +502,7 @@ def opdater_arbejdssæt(
         )
         raise SystemExit()
 
-    anvendt_system = arbejdssæt.system[0]
+    kotesystem = arbejdssæt.system[0]
 
     for (punkt, ny_kote, var) in zip(punkter, koter, varianser):
         if punkt in arbejdssæt.punkt:
@@ -532,7 +532,7 @@ def opdater_arbejdssæt(
             arbejdssæt.ny_sigma.append(sqrt(var))
             arbejdssæt.hvornår.append(tg)
             arbejdssæt.ny_kote.append(ny_kote)
-            arbejdssæt.system.append(anvendt_system)
+            arbejdssæt.system.append(kotesystem)
 
             # Fyld
             arbejdssæt.fasthold.append("")
