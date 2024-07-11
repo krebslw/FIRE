@@ -919,16 +919,16 @@ class HøjdeTidsserie(Tidsserie):
         hvilket svarer til en kritisk værdi på 2.58 (for dof>>1).
         """
 
-        H0 = 0 - self.linreg.beta[1]
-        return self.linreg.beregn_hypotesetest(H0=H0,alpha=alpha)
+        return self.linreg.beregn_hypotesetest_hældning(reference_hældning=0, alpha=alpha)
 
-    def stabilitetstest(self, alpha: float = 0.05, bagatelgrænse: float = 0.1, apriori_spredning: float = 1) -> "HypoteseTest":
+    def stabilitetstest(self, alpha: float = 0.05, bagatelgrænse: float = 0.1, apriori_spredning: float = 0.05) -> "HypoteseTest":
         """
         Test om punktet er stabilt.
 
         Tester om datapunkterne i Højdetidsserien varierer for meget i højden til at vi
         kan sige at punktet er stabilt. Anvender en bagatelgrænse, som angives i mm, for
-        variationen.
+        variationen. Bagatelgrænsens default-værdi er 0.1 mm, hvilket svarer til
+        "IGNORE_LIMIT" i gammelt analyseprogram.
 
         NB! Dette er en implementering af en gammel stabilitetstest. Skal måske laves på
         en anden måde, da jeg ikke er helt overbevist om de statistiske begrundelser for
