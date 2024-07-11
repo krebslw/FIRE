@@ -10,6 +10,7 @@ from fire.api.model import (
     Punkt,
 )
 
+
 @dataclass
 class Statistik:
     TidsserieID: str
@@ -31,10 +32,10 @@ class Statistik:
 
     def __str__(self):
         header = ", ".join([str(field.name) for field in fields(self)])
-        linje = ", ".join(
-            [str(getattr(self, field.name)) for field in fields(self)]
-        )
+        linje = ", ".join([str(getattr(self, field.name)) for field in fields(self)])
         return f"{header}\n{linje}"
+
+
 @dataclass
 class Statistik_GNSS(Statistik):
     N_binned: int
@@ -43,6 +44,7 @@ class Statistik_GNSS(Statistik):
     T_test_score: float
     T_test_alpha: float
     T_test_kritiskværdi: float
+
 
 @dataclass
 class Statistik_GNSS_Samlet(Statistik_GNSS):
@@ -57,125 +59,130 @@ class Statistik_GNSS_Samlet(Statistik_GNSS):
     Z_test_alpha: float
     Z_test_kritiskværdi: float
 
+
 @dataclass
 class Statistik_HTS(Statistik):
     Start: datetime
     Slut: datetime
     er_bevægelse_signifikant: bool
-    er_punkt_stabilt: bool
     alpha_bevægelse_signifikant: float
-    alpha_punkt_stabilt: float
 
 
-def beregn_statistik_til_gnss_rapport(tidsserie: GNSSTidsserie, alpha: float, reference_hældning: float, er_samlet: bool = False) -> Statistik_GNSS:
-        """
-        Metode til samlet beregning af statistik for en GNSS tidsserie
+def beregn_statistik_til_gnss_rapport(
+    tidsserie: GNSSTidsserie,
+    alpha: float,
+    reference_hældning: float,
+    er_samlet: bool = False,
+) -> Statistik_GNSS:
+    """
+    Metode til samlet beregning af statistik for en GNSS tidsserie
 
-        Resultaterne gemmes i dataklassen `Statistik_GNSS`.
-        """
-        linreg = tidsserie.linreg
+    Resultaterne gemmes i dataklassen `Statistik_GNSS`.
+    """
+    linreg = tidsserie.linreg
 
-        # Er ikke samlet
-        var_beta = linreg.VarBeta(er_samlet=False)[1]
-        std_beta = np.sqrt(var_beta)
-        konfidensinterval = linreg.beregn_konfidensinterval(alpha, er_samlet=False)
-        T_test = linreg.beregn_hypotesetest_hældning(reference_hældning, alpha, er_samlet=False)
+    # Er ikke samlet
+    var_beta = linreg.VarBeta(er_samlet=False)[1]
+    std_beta = np.sqrt(var_beta)
+    konfidensinterval = linreg.beregn_konfidensinterval(alpha, er_samlet=False)
+    T_test = linreg.beregn_hypotesetest_hældning(
+        reference_hældning, alpha, er_samlet=False
+    )
 
-        statistik = Statistik_GNSS(
-            TidsserieID=tidsserie.navn,
-            Ident=tidsserie.punkt.gnss_navn,
-            N=len(tidsserie),
-            N_binned=linreg.N,
-            dof=linreg.dof,
-            ddof=linreg.ddof,
-            grad=linreg.grad,
-            R2=linreg.R2,
-            var_0=linreg.var0,
-            std_0=np.sqrt(linreg.var0),
-            reference_hældning=reference_hældning,
-            hældning=linreg.beta[1],
-            var_hældning=var_beta,
-            std_hældning=std_beta,
-            ki_hældning_nedre=konfidensinterval[0, 1],
-            ki_hældning_øvre=konfidensinterval[1, 1],
-            mex=linreg.mex,
-            mey=linreg.mey,
-            T_test_H0accepteret=T_test.H0accepteret,
-            T_test_score=T_test.score,
-            T_test_alpha=T_test.alpha,
-            T_test_kritiskværdi=T_test.kritiskværdi,
-            )
+    statistik = Statistik_GNSS(
+        TidsserieID=tidsserie.navn,
+        Ident=tidsserie.punkt.gnss_navn,
+        N=len(tidsserie),
+        N_binned=linreg.N,
+        dof=linreg.dof,
+        ddof=linreg.ddof,
+        grad=linreg.grad,
+        R2=linreg.R2,
+        var_0=linreg.var0,
+        std_0=np.sqrt(linreg.var0),
+        reference_hældning=reference_hældning,
+        hældning=linreg.beta[1],
+        var_hældning=var_beta,
+        std_hældning=std_beta,
+        ki_hældning_nedre=konfidensinterval[0, 1],
+        ki_hældning_øvre=konfidensinterval[1, 1],
+        mex=linreg.mex,
+        mey=linreg.mey,
+        T_test_H0accepteret=T_test.H0accepteret,
+        T_test_score=T_test.score,
+        T_test_alpha=T_test.alpha,
+        T_test_kritiskværdi=T_test.kritiskværdi,
+    )
 
-        # er_samlet
-        if not er_samlet:
-            return statistik
+    # er_samlet
+    if not er_samlet:
+        return statistik
 
-        var_beta_samlet = linreg.VarBeta(er_samlet=True)[1]
-        std_beta_samlet = np.sqrt(var_beta_samlet)
-        konfidensinterval_samlet = linreg.beregn_konfidensinterval(alpha, er_samlet=True)
-        Z_test = linreg.beregn_hypotesetest_hældning(reference_hældning, alpha, er_samlet=True)
+    var_beta_samlet = linreg.VarBeta(er_samlet=True)[1]
+    std_beta_samlet = np.sqrt(var_beta_samlet)
+    konfidensinterval_samlet = linreg.beregn_konfidensinterval(alpha, er_samlet=True)
+    Z_test = linreg.beregn_hypotesetest_hældning(
+        reference_hældning, alpha, er_samlet=True
+    )
 
-        statistik_samlet = Statistik_GNSS_Samlet(
-            **asdict(statistik),
-            var_samlet=linreg.var_samlet,
-            std_samlet=np.sqrt(linreg.var_samlet),
-            var_hældning_samlet=var_beta_samlet,
-            std_hældning_samlet=std_beta_samlet,
-            ki_hældning_nedre_samlet=konfidensinterval_samlet[0, 1],
-            ki_hældning_øvre_samlet=konfidensinterval_samlet[1, 1],
-            Z_test_H0accepteret=Z_test.H0accepteret,
-            Z_test_score=Z_test.score,
-            Z_test_alpha=Z_test.alpha,
-            Z_test_kritiskværdi=Z_test.kritiskværdi,
-        )
-        return statistik_samlet
+    statistik_samlet = Statistik_GNSS_Samlet(
+        **asdict(statistik),
+        var_samlet=linreg.var_samlet,
+        std_samlet=np.sqrt(linreg.var_samlet),
+        var_hældning_samlet=var_beta_samlet,
+        std_hældning_samlet=std_beta_samlet,
+        ki_hældning_nedre_samlet=konfidensinterval_samlet[0, 1],
+        ki_hældning_øvre_samlet=konfidensinterval_samlet[1, 1],
+        Z_test_H0accepteret=Z_test.H0accepteret,
+        Z_test_score=Z_test.score,
+        Z_test_alpha=Z_test.alpha,
+        Z_test_kritiskværdi=Z_test.kritiskværdi,
+    )
+    return statistik_samlet
+
 
 def beregn_statistik_til_hts_rapport(tidsserie: HøjdeTidsserie) -> Statistik_HTS:
-        """
-        Metode til samlet beregning af statistik for en HøjdeTidsserie
+    """
+    Metode til samlet beregning af statistik for en HøjdeTidsserie
 
-        Kalder den lineære regressions beregningsmetoder og returnerer de nødvendige
-        statistik-parametre til brug i rapportering.
+    Kalder den lineære regressions beregningsmetoder og returnerer de nødvendige
+    statistik-parametre til brug i rapportering.
 
-        NB! Konfidensintervaller, Trend-test og stabilitetstest foretages med default
-        værdier for signifikansniveau, men der skal muligvis gives mulighed for at kunne
-        indstille på dem.
+    NB! Konfidensintervaller, Trend-test og stabilitetstest foretages med default
+    værdier for signifikansniveau, men der skal muligvis gives mulighed for at kunne
+    indstille på dem.
 
-        """
-        linreg = tidsserie.linreg
+    """
+    linreg = tidsserie.linreg
 
-        trend_test = tidsserie.signifikant_trend_test()
+    trend_test = tidsserie.signifikant_trend_test()
 
-        stabilitetstest = tidsserie.stabilitetstest()
+    # Er ikke samlet
+    var_beta = linreg.VarBeta(er_samlet=False)[1]
+    std_beta = np.sqrt(var_beta)
+    konfidensinterval = linreg.beregn_konfidensinterval(er_samlet=False)
 
-        # Er ikke samlet
-        var_beta = linreg.VarBeta(er_samlet=False)[1]
-        std_beta = np.sqrt(var_beta)
-        konfidensinterval = linreg.beregn_konfidensinterval(er_samlet=False)
+    statistik = Statistik_HTS(
+        TidsserieID=tidsserie.navn,
+        Ident=tidsserie.punkt.ident,
+        N=len(tidsserie),
+        dof=linreg.dof,
+        ddof=linreg.ddof,
+        grad=linreg.grad,
+        R2=linreg.R2,
+        var_0=linreg.var0,
+        std_0=np.sqrt(linreg.var0),
+        hældning=linreg.beta[1],
+        var_hældning=var_beta,
+        std_hældning=std_beta,
+        ki_hældning_nedre=konfidensinterval[0, 1],
+        ki_hældning_øvre=konfidensinterval[1, 1],
+        mex=linreg.mex,
+        mey=linreg.mey,
+        Start=tidsserie.t[0],
+        Slut=tidsserie.t[-1],
+        er_bevægelse_signifikant=trend_test.H0accepteret,
+        alpha_bevægelse_signifikant=trend_test.alpha,
+    )
 
-        statistik = Statistik_HTS(
-            TidsserieID=tidsserie.navn,
-            Ident=tidsserie.punkt.ident,
-            N=len(tidsserie),
-            dof=linreg.dof,
-            ddof=linreg.ddof,
-            grad=linreg.grad,
-            R2=linreg.R2,
-            var_0=linreg.var0,
-            std_0=np.sqrt(linreg.var0),
-            hældning=linreg.beta[1],
-            var_hældning=var_beta,
-            std_hældning=std_beta,
-            ki_hældning_nedre=konfidensinterval[0, 1],
-            ki_hældning_øvre=konfidensinterval[1, 1],
-            mex=linreg.mex,
-            mey=linreg.mey,
-            Start = tidsserie.t[0],
-            Slut = tidsserie.t[-1],
-            er_bevægelse_signifikant = trend_test.H0accepteret,
-            er_punkt_stabilt = stabilitetstest.H0accepteret,
-            alpha_bevægelse_signifikant = trend_test.alpha,
-            alpha_punkt_stabilt = stabilitetstest.alpha,
-        )
-
-        return statistik
+    return statistik

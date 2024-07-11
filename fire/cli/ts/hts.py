@@ -220,52 +220,6 @@ def plot_hts(objekt: str, plottype: str, parametre: str, minpunkter, **kwargs) -
     plot_tidsserie(tidsserie, plot_funktioner[plottype], parametre, y_enhed="mm")
 
 
-
-@ts.command()
-@click.argument("punktsamling", required=True, type=str)
-@click.option(
-    "--parametre",
-    "-p",
-    required=False,
-    type=str,
-    default="kote",
-    help="Hvilken parameter skal plottes?",
-)
-@click.option(
-    "--minpunkter",
-    "-N",
-    required=False,
-    type=int,
-    default = 3,
-    help="Minimum antal punkter i tidsserien.",
-)
-@fire.cli.default_options()
-def plot_punktsamling(punktsamling: str, minpunkter: int, **kwargs) -> None:
-    """ Plot en Punktsamling """
-
-    ps: PunktSamling= fire.cli.firedb.hent_punktsamling(punktsamling)
-    jessenpunkt = ps.jessenpunkt
-
-    # alle tidsserier som er direkte koblet til punktsamlingen
-    tser = {ts for ts in ps.tidsserier if len(ts)>minpunkter}
-
-    punkter: list[Punkt] = ps.punkter
-
-
-    # Find alle tidsserier som relateres til punkterne i punktsamlingen, og til samme Jessenpunkt
-    tidsserier_alle: list[HøjdeTidsserie] = {ts for p in punkter for ts in p.tidsserier if ts.tstype==2
-                                             and ts.punktsamling.jessenpunkt == jessenpunkt
-                                             and len(ts)>minpunkter}
-
-    # De to ovenstående måder, skulle gerne give det samme
-    # Punktsamling -> Tidsserie
-    # Punktsamling -> Jessenpunkter + Punkter -> Tidserie
-    if not tser.issubset(tidsserier_alle):
-        fire.cli.print(f"hmm")
-
-    plot_punktsamling(ps, tidsserier_alle)
-
-
 @ts.command()
 @click.argument(
     "punktsamlingsnavn",
@@ -333,7 +287,7 @@ def analyse_hts(
     skalafaktor = 1e3
 
     # Minimum spredning
-    apriori_spredning = 1 # svarer til APRIORI_SD
+    apriori_spredning = 0.5 # [mm]
 
     tsensemble = TidsserieEnsemble(
         HøjdeTidsserie,
