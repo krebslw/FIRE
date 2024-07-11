@@ -6,6 +6,7 @@ import numpy as np
 from fire.api.model import (
     Tidsserie,
     GNSSTidsserie,
+    HøjdeTidsserie,
     Punkt,
 )
 
@@ -20,7 +21,6 @@ class Statistik:
     R2: float
     var_0: float
     std_0: float
-    reference_hældning: float
     hældning: float
     var_hældning: float
     std_hældning: float
@@ -38,6 +38,7 @@ class Statistik:
 @dataclass
 class Statistik_GNSS(Statistik):
     N_binned: int
+    reference_hældning: float
     T_test_H0accepteret: bool
     T_test_score: float
     T_test_alpha: float
@@ -56,6 +57,7 @@ class Statistik_GNSS_Samlet(Statistik_GNSS):
     Z_test_alpha: float
     Z_test_kritiskværdi: float
 
+@dataclass
 class Statistik_HTS(Statistik):
     Start: datetime
     Slut: datetime
@@ -128,3 +130,52 @@ def beregn_statistik_til_gnss_rapport(tidsserie: GNSSTidsserie, alpha: float, re
         )
         return statistik_samlet
 
+def beregn_statistik_til_hts_rapport(tidsserie: HøjdeTidsserie) -> Statistik_HTS:
+        """
+        Metode til samlet beregning af statistik for en HøjdeTidsserie
+
+        Kalder den lineære regressions beregningsmetoder og returnerer de nødvendige
+        statistik-parametre til brug i rapportering.
+
+        NB! Konfidensintervaller, Trend-test og stabilitetstest foretages med default
+        værdier for signifikansniveau, men der skal muligvis gives mulighed for at kunne
+        indstille på dem.
+
+        """
+        linreg = tidsserie.linreg
+
+        trend_test = tidsserie.signifikant_trend_test()
+
+        stabilitetstest = tidsserie.stabilitetstest()
+
+        # Er ikke samlet
+        var_beta = linreg.VarBeta(er_samlet=False)[1]
+        std_beta = np.sqrt(var_beta)
+        konfidensinterval = linreg.beregn_konfidensinterval(er_samlet=False)
+
+        statistik = Statistik_HTS(
+            TidsserieID=tidsserie.navn,
+            Ident=tidsserie.punkt.ident,
+            N=len(tidsserie),
+            dof=linreg.dof,
+            ddof=linreg.ddof,
+            grad=linreg.grad,
+            R2=linreg.R2,
+            var_0=linreg.var0,
+            std_0=np.sqrt(linreg.var0),
+            hældning=linreg.beta[1],
+            var_hældning=var_beta,
+            std_hældning=std_beta,
+            ki_hældning_nedre=konfidensinterval[0, 1],
+            ki_hældning_øvre=konfidensinterval[1, 1],
+            mex=linreg.mex,
+            mey=linreg.mey,
+            Start = tidsserie.t[0],
+            Slut = tidsserie.t[-1],
+            er_bevægelse_signifikant = trend_test.H0accepteret,
+            er_punkt_stabilt = stabilitetstest.H0accepteret,
+            alpha_bevægelse_signifikant = trend_test.alpha,
+            alpha_punkt_stabilt = stabilitetstest.alpha,
+        )
+
+        return statistik
