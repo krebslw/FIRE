@@ -1031,3 +1031,65 @@ class HøjdeTidsserie(Tidsserie):
         Forudsætter at denne er initialiseret med "forbered_lineær_regression(...)".
         """
         self.linreg.solve()
+
+    def signifikant_trend_test(self, alpha: float=0.01) -> "HypoteseTest":
+        """
+        Test om punktets trend er signifikant forskellig fra 0.
+
+        NB! Dette er en implementering af en gammel test. Førhen anvendtes den kritiske
+        værdi TREND_SD_MULTIPLIER = 2.5 Nu anvendes T-test med signifikansniveau på 1 %,
+        hvilket svarer til en kritisk værdi på 2.58 (for dof>>1).
+        """
+
+        H0 = 0 - self.linreg.beta[1]
+        return self.linreg.beregn_hypotesetest(H0=H0,alpha=alpha)
+
+    def stabilitetstest(self, alpha: float = 0.05, bagatelgrænse: float = 0.1, apriori_spredning: float = 1):
+        """
+        Test om punktet er stabilt.
+
+        Tester om datapunkterne i Højdetidsserien varierer for meget i højden til at vi
+        kan sige at punktet er stabilt. Anvender en bagatelgrænse, som angives i mm, for
+        variationen.
+
+        NB! Dette er en implementering af en gammel stabilitetstest. Skal måske laves på
+        en anden måde, da jeg ikke er helt overbevist om de statistiske begrundelser for
+        at gøre det på denne måde.
+
+        Førhen anvendtes den kritiske værdi STABILITY_SD_MULTIPLIER = 2. Nu anvendes
+        Z-test med signifikansniveau på 5 %, hvilket svarer til en kritisk værdi på 1.96.
+        """
+        # Internt regnes i m
+        bagatelgrænse/=1e3
+
+        # Max/min af koter
+        ymax = max(self.kote)
+        ymin = min(self.kote)
+
+        # Hvis forskellen er under bagatelgrænsen siges punktet at være stabilt
+        if (ymax - ymin) <= bagatelgrænse:
+            return True
+
+        er_stabil = True
+        for i in range(len(self)):
+            if not er_stabil:
+                break
+            for j in range(i+1,len(self)):
+
+                # Lægger varianser på obs. sammen
+                std_samlet=np.sqrt(self.sz[i]**2+self.sz[j]**2)
+
+                # Omregn til m
+                std_samlet=max(std_samlet, apriori_spredning)/1e3
+
+                hypotese_test = Ztest(
+                    std_est=std_samlet,
+                    H0=abs(self.kote[i]-self.kote[j]),
+                    alpha=alpha,
+                    )
+                er_stabil = hypotese_test.H0accepteret
+
+                if not er_stabil:
+                    break
+
+        return er_stabil
