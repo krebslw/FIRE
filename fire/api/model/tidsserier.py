@@ -809,20 +809,15 @@ class HypoteseTest:
     """Foretag statistisk hypotesetest."""
 
     def __init__(
-        self, std_est: float, kritiskværdi: float, H0: float = 0, alpha: float = 0.05,
-            # metode=None, dof=0,
+        self,
+        std_est: float,
+        kritiskværdi: float,
+        H0: float = 0,
+        alpha: float = 0.05,
     ):
         self.H0 = H0
         self.alpha = alpha
         self.std_est = std_est
-
-        # TODO: Dette er en anden måde at implementere Z og T-test. Vurder hvad der er smartest til FIRE sparring.
-        # if metode=="z":
-        #     self.kritiskværdi = beregn_fraktil_for_normalfordeling(1 - alpha / 2)
-        # elif metode=="t":
-        #     self.kritiskværdi = beregn_fraktil_for_normalfordeling(1 - alpha / 2, dof)
-        #     self.dof=dof
-
         self.kritiskværdi = kritiskværdi
 
     @property
@@ -907,7 +902,7 @@ class HøjdeTidsserie(Tidsserie):
         """
         self.linreg.solve()
 
-    def signifikant_trend_test(self, alpha: float=0.01) -> "HypoteseTest":
+    def signifikant_trend_test(self, alpha: float = 0.01) -> "HypoteseTest":
         """
         Test om punktets trend er signifikant forskellig fra 0.
 
@@ -916,60 +911,6 @@ class HøjdeTidsserie(Tidsserie):
         hvilket svarer til en kritisk værdi på 2.58 (for dof>>1).
         """
 
-        return self.linreg.beregn_hypotesetest_hældning(reference_hældning=0, alpha=alpha)
-
-    def stabilitetstest(self, alpha: float = 0.05, bagatelgrænse: float = 0.1, apriori_spredning: float = 0.05) -> "HypoteseTest":
-        """
-        Test om punktet er stabilt.
-
-        Tester om datapunkterne i Højdetidsserien varierer for meget i højden til at vi
-        kan sige at punktet er stabilt. Anvender en bagatelgrænse, som angives i mm, for
-        variationen. Bagatelgrænsens default-værdi er 0.1 mm, hvilket svarer til
-        "IGNORE_LIMIT" i gammelt analyseprogram.
-
-        NB! Dette er en implementering af en gammel stabilitetstest. Skal måske laves på
-        en anden måde, da jeg ikke er helt overbevist om de statistiske begrundelser for
-        at gøre det på denne måde.
-
-        Førhen anvendtes den kritiske værdi STABILITY_SD_MULTIPLIER = 2. Nu anvendes
-        Z-test med signifikansniveau på 5 %, hvilket svarer til en kritisk værdi på 1.96.
-        """
-        # Internt regnes i m
-        bagatelgrænse/=1e3
-
-        # Max/min af koter
-        ymax = max(self.kote)
-        ymin = min(self.kote)
-
-        # Det her vil fejle i frontend når der forventes objekt af typen HypoteseTest
-        # Hvis forskellen er under bagatelgrænsen siges punktet at være stabilt
-        # if (ymax - ymin) <= bagatelgrænse:
-        #     return True
-
-        er_stabil = True
-        for i in range(len(self)):
-            if not er_stabil:
-                break
-            for j in range(i+1,len(self)):
-
-                # Lægger varianser på obs. sammen
-                std_samlet=np.sqrt(self.sz[i]**2+self.sz[j]**2)
-
-                # Omregn til m
-                std_samlet=max(std_samlet, apriori_spredning)/1e3
-
-                z_test = Ztest(
-                    std_est=std_samlet,
-                    H0=abs(self.kote[i]-self.kote[j]),
-                    alpha=alpha,
-                    )
-                er_stabil = z_test.H0accepteret
-
-                if not er_stabil:
-                    break
-
-        return z_test
-
-    def generer_statisik_rapport():
-
-        return
+        return self.linreg.beregn_hypotesetest_hældning(
+            reference_hældning=0, alpha=alpha
+        )
