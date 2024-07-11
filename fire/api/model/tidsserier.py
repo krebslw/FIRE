@@ -592,7 +592,7 @@ class PolynomieRegression1D:
         self,
         x: list,
         y: list,
-        y_vægte: float | list = None,
+        y_vægte: float | list = 1,
         grad: int = 1,
         **kwargs,
     ):
@@ -600,7 +600,7 @@ class PolynomieRegression1D:
         self.y = np.array(y)
         self.grad = grad
 
-        self._y_vægte = y_vægte
+        self._y_vægte = np.array(y_vægte)
         self._var0 = None
         self.var_samlet = None
 
@@ -617,10 +617,7 @@ class PolynomieRegression1D:
         Hvis vægtene er udefineret returneres enhedsmatricen. Pt. understøttes kun
         ukorrelerede observationer, dvs. at vægtmatricen er en diagonalmatrix.
         """
-        if self._y_vægte is None:
-            return np.ones(self.N)
-
-        return np.ones(self.N) * np.array(self._y_vægte)
+        return np.ones(self.N) * self._y_vægte
 
     @functools.cached_property
     def _invATA(self) -> np.ndarray:
@@ -789,7 +786,7 @@ class PolynomieRegression1D:
 
     def beregn_hypotesetest_hældning(
         self,
-        reference_hældning: float,
+        reference_hældning: float = 0,
         alpha: float = 0.05,
         er_samlet: bool = False,
     ) -> "HypoteseTest":
