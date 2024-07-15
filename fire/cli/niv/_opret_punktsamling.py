@@ -25,6 +25,8 @@ from fire.api.model import (
     Punkt,
     PunktSamling,
     Koordinat,
+    Tidsserie,
+    HøjdeTidsserie,
 )
 
 import fire.cli
@@ -603,10 +605,183 @@ def ilæg_punktsamling(
 
 
 
-
-def valider_punktsamling(punktoversigt: pd.DataFrame):
+@niv.command()
+@fire.cli.default_options()
+@click.argument(
+    "projektnavn",
+    nargs=1,
+    type=str,
+)
+@click.option(
+    "--sagsbehandler",
+    default=getpass.getuser(),
+    type=str,
+    help="Angiv andet brugernavn end den aktuelt indloggede",
+)
+def ilæg_tidsserie(
+    # jessenpunkt_ident: str,
+    # navn: str,
+    # formål: str,
+    projektnavn: str,
+    sagsbehandler: str,
+    # punktsamlingsnavn: str,
+    **kwargs,
+) -> None:
     """
-    Validerer en punktsamling ud fra oplysningerne i Punktoversigten.
+    Ilæg en ny Højdetidsserie eller rediger en eksisterende (kan kun redigere "Formål")
+
+    Anvender arket Højdetidsserier.
+    """
+
+    er_projekt_okay(projektnavn)
+    sag = find_sag(projektnavn)
+    sagsgang = find_sagsgang(projektnavn)
+
+    fire.cli.print(f"Sags/projekt-navn: {projektnavn}  ({sag.id})")
+    fire.cli.print(f"Sagsbehandler:     {sagsbehandler}")
+
+    # Læs arkene
+    # punktgruppe_ark = find_faneblad(projektnavn, "Punktgruppe", arkdef.PUNKTGRUPPE)
+    hts_ark = find_faneblad(projektnavn, "Højdetidsserier", arkdef.HØJDETIDSSERIE)
+
+
+    # hent kotesystem. Lige nu understøttes kun jessen-system.
+    # Mest pga. kolonnenavne i database (jessenkoordinat/kote).
+    # Kunne ellers godt have punktsamlinger i andre kotesystemer
+    kotesystem = fire.cli.firedb.hent_srid("TS:jessen")
+
+    ts_til_redigering=[]
+    ts_til_oprettelse=[]
+    for index, row in hts_ark.iterrows():
+        try:
+            ts = fire.cli.firedb.hent_tidsserie(row["Tidsserienavn"])
+        except NoResultFound:
+            fire.cli.print(f"Kunne ikke finde tidsserie: {row['Tidsserienavn']}. Opretter ny tidsserie.")
+
+            # Her smides fejl hvis punkt eller punktgruppe ikke kan findes!
+            punkt = fire.cli.firedb.hent_punkt(row["Punkt"])
+            ps = fire.cli.firedb.hent_punktsamling(row["Punktgruppenavn"])
+
+
+            # Hvis punktet er jessenpunkt, så oprettes tidsserien med punktsamlingens jessenpunkt.
+            # Ellers er tidsserien bare tom
+            koordinat = []
+            if ps.jessenpunkt == punkt:
+                koordinat = [ps.jessenkoordinat,]
+
+            ts = HøjdeTidsserie(
+                navn = row["Tidsserienavn"],
+                punkt = punkt,
+                punktsamling = ps,
+                formål = row["Formål"],
+                referenceramme = "Jessen",
+                srid = kotesystem,
+                # De her to behøves ikke
+                # tstype=2,
+                koordinater = koordinat,
+            )
+            ts_til_oprettelse.append(ts)
+            pass
+        else:
+            if ts.formål == row["Formål"]:
+                continue
+            ts.formål == row["Formål"]
+            ts_til_redigering.append(ts)
+
+
+    #================= 3A. SAGSEVENT REDIGER TIDSSERIE =================
+    if ts_til_redigering:
+        tsnavne = "'" + "', '".join([ts.navn for ts in ts_til_redigering]) + "'"
+        sagsevent_rediger_tidsserier = sag.ny_sagsevent(
+            id=uuid(),
+            beskrivelse=f"Redigering af tidsserierne {tsnavne}",
+            tidsserier = ts_til_redigering,
+        )
+        fire.cli.firedb.indset_sagsevent(sagsevent_rediger_tidsserier, commit=False)
+        try:
+            fire.cli.firedb.session.flush()
+        except Exception as ex:
+            # rul tilbage hvis databasen smider en exception
+            fire.cli.firedb.session.rollback()
+            raise ex
+
+        # Generer dokumentation til fanebladet "Sagsgang"
+        sagsgangslinje = {
+            "Dato": sagsevent_rediger_tidsserier.registreringfra,
+            "Hvem": sagsbehandler,
+            "Hændelse": "Tidsserie modificeret",
+            "Tekst": sagsevent_rediger_tidsserier.sagseventinfos[0].beskrivelse,
+            "uuid": sagsevent_rediger_tidsserier.id,
+        }
+        sagsgang = frame.append(sagsgang, sagsgangslinje)
+
+    #================= 3B. SAGSEVENT OPRET TIDSSERIE =================
+    if ts_til_oprettelse:
+        tsnavne = "'" + "', '".join([ts.navn for ts in ts_til_oprettelse]) + "'"
+        sagsevent_opret_tidsserier = sag.ny_sagsevent(
+            id=uuid(),
+            beskrivelse=f"Oprettelse af tidsserierne {tsnavne}",
+            tidsserier = ts_til_oprettelse,
+        )
+        fire.cli.firedb.indset_sagsevent(sagsevent_opret_tidsserier, commit=False)
+        try:
+            fire.cli.firedb.session.flush()
+        except Exception as ex:
+            # rul tilbage hvis databasen smider en exception
+            fire.cli.firedb.session.rollback()
+            raise ex
+
+        # Generer dokumentation til fanebladet "Sagsgang"
+        sagsgangslinje = {
+            "Dato": sagsevent_opret_tidsserier.registreringfra,
+            "Hvem": sagsbehandler,
+            "Hændelse": "Tidsserie oprettet",
+            "Tekst": sagsevent_opret_tidsserier.sagseventinfos[0].beskrivelse,
+            "uuid": sagsevent_opret_tidsserier.id,
+        }
+        sagsgang = frame.append(sagsgang, sagsgangslinje)
+
+    # indsæt_kote_tekst = f"- indsætte {len(koord_til_oprettelse)} {kotesystem.name}-kote(r)"
+    opret_tekst = f"- oprette {len(ts_til_oprettelse)} nye højdetidsserier"
+    ret_tekst = f"- rette formål på {len(ts_til_redigering)} højdetidsserier"
+
+    fire.cli.print("")
+    fire.cli.print("-" * 50)
+    fire.cli.print("Tidsserier færdigbehandlet, klar til at")
+    fire.cli.print(opret_tekst)
+    fire.cli.print(ret_tekst)
+
+    spørgsmål = click.style(f"Er du sikker på du vil indsætte ovenstående i ", fg="white", bg="red")
+    spørgsmål += click.style(f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True)
+    spørgsmål += click.style("-databasen?", fg="white", bg="red")
+
+    if bekræft(spørgsmål):
+        # Bordet fanger!
+        fire.cli.firedb.session.commit()
+
+        # Skriver opdateret sagsgang til excel-ark
+        resultater = {"Sagsgang": sagsgang}
+        if skriv_ark(projektnavn, resultater):
+            fire.cli.print(f"Tidsserier registreret.")
+    else:
+        fire.cli.firedb.session.rollback()
+
+    return
+
+
+
+
+
+
+
+
+
+
+
+
+def find_jessenpunkt(punktoversigt: pd.DataFrame):
+    """
+    Finder Jessenpunktet ud fra oplysningerne i Punktoversigten.
 
     Returnerer oplysninger om det validerede jessenpunkt.
     """
@@ -634,7 +809,8 @@ def valider_punktsamling(punktoversigt: pd.DataFrame):
 
     # Tjek om der kun er ét fastholdt punkt, og gør brugeren opmærksom på hvis punktet
     # ikke har et Jessennummer.
-    fastholdte_punkter = tuple(punktoversigt["Punkt"][punktoversigt["Fasthold"] == "x"])
+    fastholdte_punkter = punktoversigt["Punkt"][punktoversigt["Fasthold"] == "x"]
+    fastholdte_koter = punktoversigt["Kote"][punktoversigt["Fasthold"] == "x"]
 
     if len(fastholdte_punkter)!=1:
         fire.cli.print(
@@ -645,7 +821,7 @@ def valider_punktsamling(punktoversigt: pd.DataFrame):
         )
         raise SystemExit(1)
 
-    if pd.isna(punktoversigt["Kote"][punktoversigt["Fasthold"] == "x"]).any():
+    if pd.isna(fastholdte_koter).any():
         fire.cli.print(
             "FEJL: Fastholdt punkt har ikke nogen fastholdt kote!",
             fg="white",
@@ -654,7 +830,8 @@ def valider_punktsamling(punktoversigt: pd.DataFrame):
         )
         raise SystemExit(1)
 
-    jessenpunkt_ident = fastholdte_punkter[0]
+    jessenpunkt_ident = fastholdte_punkter.iloc[0]
+    jessenpunkt_kote = fastholdte_koter.iloc[0]
 
     try:
         jessenpunkt = fire.cli.firedb.hent_punkt(jessenpunkt_ident)
@@ -667,17 +844,14 @@ def valider_punktsamling(punktoversigt: pd.DataFrame):
         )
         raise SystemExit(1)
 
-
     if not jessenpunkt.jessennummer:
         fire.cli.print(
-            f"BEMÆRK: Fastholdt Jessenpunkt {jessenpunkt_ident} har intet Jessennummer. "
+            f"FEJL: Fastholdt Jessenpunkt {jessenpunkt.ident} har intet Jessennummer. "
             "Jessennummer kan oprettes igennem Punktrevision ved indsættelse af IDENT:jessen og NET:jessen.",
             fg="black",
             bg="yellow",
             )
+        raise SystemExit(1)
 
-    # Returner det fundne jessenpunkts ident, som det fremgår af Punktoversigt-arket, da
-    # vi ikke kan regne med (eller kan man?) at identen fra Punktoversigt-arket er den
-    # samme som den kanoniske ident.
-    return jessenpunkt_ident, jessenpunkt
+    return jessenpunkt_kote, jessenpunkt
 
