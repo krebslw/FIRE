@@ -105,7 +105,8 @@ def er_punktsamling_unik(punktsamling_A: PunktSamling) -> dict[list]:
     "--punkter",
     default = "",
     type=str,
-    help="Angiv punkter som skal indgå i punktsamlingen",
+    callback = (lambda ctx, param, x: "".join(x.split()).split(",")),
+    help="Angiv kommasepareret liste over punkter som skal indgå i punktsamlingen",
 )
 def opret_punktsamling(
     # jessenpunkt_ident: str,
@@ -114,7 +115,7 @@ def opret_punktsamling(
     projektnavn: str,
     sagsbehandler: str,
     punktsamlingsnavn: str,
-    punkter: str,
+    punkter: list,
     **kwargs,
 ) -> None:
     """
@@ -131,8 +132,8 @@ def opret_punktsamling(
     # Opbyg Punktsamling ud fra Punktoversigten
     punktoversigt = find_faneblad(projektnavn, "Punktoversigt", arkdef.PUNKTOVERSIGT)
 
-    if punkter:
-        punkter = punkter.split(",")
+    punkter.extend(list(punktoversigt["Punkt"]))
+    punkter = fire.cli.firedb.hent_punkt_liste(punkter, ignorer_ukendte = False)
 
     # Find jessenpunktet ud fra oplysningerne i Punktoversigt-arket
     jessenpunkt_kote, jessenpunkt = find_jessenpunkt(punktoversigt)
@@ -162,7 +163,7 @@ def opret_punktsamling(
             resultater.update({"Punktoversigt": punktoversigt})
 
         # Højdetidsseriedata
-        hts_data = generer_højdetidsserie_ark(punktsamling, punktoversigt)
+        hts_data = generer_højdetidsserie_ark(punkter, punktsamling)
 
     else:
         # Hvis vi ikke kan finde nogen Punktsamlinger, så må det være fordi vi er ved
@@ -179,7 +180,6 @@ def opret_punktsamling(
             )
         }
 
-        punkter = fire.cli.firedb.hent_punkt_liste(list(punktoversigt["Punkt"]), ignorer_ukendte = False)
         hts_data = {
             (
                 punktsamlingsnavn,
@@ -265,7 +265,7 @@ def generer_punktsamling_ark(punktsamling: PunktSamling, jessenpunkt_ident: str)
     return ps_data
 
 
-def generer_højdetidsserie_ark(punktoversigt: arkdef.PUNKTOVERSIGT, punktsamling: PunktSamling) -> set[tuple]:
+def generer_højdetidsserie_ark(punkter: list[Punkt], punktsamling: PunktSamling) -> set[tuple]:
 
     """Genererer data til indsættelse i Højdetidsserie-ark"""
 
@@ -310,10 +310,8 @@ def generer_højdetidsserie_ark(punktoversigt: arkdef.PUNKTOVERSIGT, punktsamlin
     # Tilføj alle punktsamlingens punkter
     punktliste.extend(punktsamling.punkter)
 
-    #  Tilføj alle punkter fra Punktoversigten
-    punktliste.extend(
-        fire.cli.firedb.hent_punkt_liste(list(punktoversigt["Punkt"]), ignorer_ukendte = False)
-        )
+    #  Tilføj alle punkter som brugeren har valgt via "--punkter" eller via Punktoversigten.
+    punktliste.extend(punkter)
 
     for pkt in punktliste:
         if pkt.ident in tilføjede_punkter:
