@@ -139,17 +139,26 @@ def opret_punktsamling(
     jessenpunkt_kote, jessenpunkt = find_jessenpunkt(punktoversigt)
 
     # Find punktsamling
+    # TODO: Gør så man kan oprette mange punktsamlinger samtidig.
+    # Kan enten gøres ved at opret-punktsamling kaldes én gang med mange Punktsamlingsnavne, som der så skal loopes over
+    #       - I så fald skal der laves flere checks?
+    # Eller ved at man kalder opret-punktsamling mange gange med ét Punktsamlingsnavn hver gang.
+    #       - I så fald skal arkene Punktgruppe/Højdetidsserie indlæses og der skal bruges "frame.append" metoden til at tilføje nye rækker.
     punktsamling = find_punktsamling(jessenpunkt, punktsamlingsnavn)
+
+    # TODO: Få det her til igen at virke for liste af punktsamlinger i arket.
+    punktsamlinger_liste = []
+    if not punktsamling:
+        punktsamlinger_liste = [ps for ps in jessenpunkt.punktsamlinger if ps.jessenpunkt == jessenpunkt]
 
     if punktsamling:
         # Vi fandt en punktsamling!
         # TODO: Her kan man måske bruge regnearksfunktionaliteten "til_nyt_ark"
 
-        # TODO: Få det her til igen at virke for liste af punktsamlinger i arket.
         # Generer Punktsamlingsdata
         ps_data = {
             (
-                punktsamlingsnavn,
+                punktsamling.navn,
                 jessenpunkt.ident,
                 jessenpunkt.jessennummer,
                 punktsamling.jessenkoordinat.z, # ignorerer fastholdt jessen-kote som står i arket.
@@ -165,8 +174,31 @@ def opret_punktsamling(
         # Højdetidsseriedata
         hts_data = generer_højdetidsserie_ark(punkter, punktsamling)
 
+    elif punktsamlinger_liste and not punktsamlingsnavn:
+        # Hvis man ikke har givet et Punktsamlingsnavn og det er muligt at finde
+        # Punktsamlinger ud fra det valgte jessenpunkt
+
+        # Generer Punktsamlingsdata
+        ps_data = {
+            (
+                punktsamling.navn,
+                jessenpunkt.ident,
+                jessenpunkt.jessennummer,
+                punktsamling.jessenkoordinat.z, # ignorerer fastholdt jessen-kote som står i arket.
+                punktsamling.formål,
+            )
+            for punktsamling in punktsamlinger_liste
+        }
+
+        hts_data = {}
+        for punktsamling in punktsamlinger_liste:
+            hts_data.update(generer_højdetidsserie_ark(punkter, punktsamling))
+
+
+
     else:
-        # Hvis vi ikke kan finde nogen Punktsamlinger, så må det være fordi vi er ved
+        # Hvis vi ikke kan finde nogen Punktsamlinger (enten fordi navn ikke er givet,
+        #  eller fordi navn på en ny punktsamling er givet) så må det være fordi vi er ved
         # at oprette en helt ny punktsamling
 
         # Indsæt i arket
