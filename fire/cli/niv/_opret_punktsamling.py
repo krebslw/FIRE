@@ -82,6 +82,207 @@ def er_punktsamling_unik(punktsamling_A: PunktSamling) -> dict[list]:
     return dol
 
 
+
+def rediger_punktsamling(
+        punktsamling: PunktSamling,
+        nyt_formål: str = None,
+        punkter_tilføjes: list[Punkt] = [],
+        punkter_fjernes: list[Punkt] = [],
+    ):
+
+    if nyt_formål:
+        punktsamling.formål = nyt_formål
+
+    if len(set(punkter_tilføjes) & set(punkter_fjernes)) > 0:
+        raise ValueError("Kan ikke tilføje og fjerne samme punkt!")
+
+    if punkter_tilføjes:
+        føj_punkter_til_punktsamling(punktsamling, punkter_tilføjes)
+
+    if punkter_fjernes:
+        fjern_punkter_fra_punktsamling(punktsamling, punkter_fjernes)
+
+    return
+
+def føj_punkter_til_punktsamling(punktsamling: PunktSamling, punkter: list[Punkt]) -> list[Punkt]:
+    """
+    Føjer punkter til en punktsamling.
+
+    Hvis et eller flere punkter findes i forvejen udsendes en ValueError.
+    """
+    fællesmængde = set(punkter) & set(punktsamling.punkter)
+
+    if len(fællesmængde)!= 0:
+        raise ValueError(f"Kan ikke tilføje et eller flere af de angivne punkter til Punktsamling '{punktsamling.navn}' da de allerede er indeholdt!")
+
+    punktsamling.punkter.extend(punkter)
+
+
+def fjern_punkter_fra_punktsamling(punktsamling: PunktSamling, punkter: list[Punkt]):
+    """
+    Fjerner punkter fra en punktsamling.
+
+    Hvis et eller flere punkter ikke findes i forvejen udsendes en ValueError.
+
+    """
+    for p in punkter:
+        punktsamling.punkter.remove(p)
+
+
+@niv.command()
+@fire.cli.default_options()
+@click.argument(
+    "projektnavn",
+    nargs=1,
+    type=str,
+)
+@click.option(
+    "--sagsbehandler",
+    default=getpass.getuser(),
+    type=str,
+    help="Angiv andet brugernavn end den aktuelt indloggede",
+)
+@click.option(
+    "--punktsamlingsid",
+    type=str,
+    help="Angiv punktsamlingens objektid",
+)
+@click.option(
+    "--ident",
+    type=str,
+    help="Angiv punktet ident",
+)
+def fjern_punkt_fra_punktsamling(
+    projektnavn: str,
+    sagsbehandler: str,
+    punktsamlingsid: str,
+    ident: list,
+    **kwargs,
+) -> None:
+    """Fjern et punkt fra en punktsamling
+
+    Bemærk at denne handling, i modsætning til langt de fleste andre FIRE-handlinger,
+    ikke er historik-styret. Dvs. at man ikke umiddelbart kan bringe Punktsamlingen
+    tilbage til tilstanden før denne kommando blev kørt. Brug den derfor varsomt!
+
+    I tilfælde af at man utilsigtet har fjernet et punkt kan det dog tilføjes igen med
+    ``fire niv rediger-punktsamling``. Databasen giver ingen hjælp til at huske hvilket
+    punkt man har fjernet så det skal man selv kunne huske.
+
+    For at kunne fjerne et punkt fra punktsamlingen, forudsættes det at punktet ikke har
+    nogle tidsserier tilknyttet. Tidsserier kan lukkes med ``fire luk tidsserie``.
+    Man kan desuden ikke fjerne punktsamlingens jessenpunkt.
+
+    Punktet angives med ``ident`` og punktsamlingens angives med ``punktsamlingsid``
+    hvilket svarer til punktsamlinges objektid. Denne skal findes med opslag i databasen,
+    fx. ved udtræk som følgende:
+
+    \b
+        SELECT ps.*
+        FROM PUNKTSAMLING ps
+        JOIN PUNKTINFO pi ON
+            ps.JESSENPUNKTID = pi.PUNKTID AND pi.INFOTYPEID = 346 -- joiner landsnumre på
+        JOIN PUNKTSAMLING_PUNKT psp ON
+            ps.OBJEKTID = psp.PUNKTSAMLINGSID
+        JOIN PUNKTINFO pi2 ON
+            psp.PUNKTID = pi2.PUNKTID AND pi2.INFOTYPEID = 346 -- joiner landsnumre på
+        WHERE pi.TEKST = '123-07-09059' -- jessenpunktet til punktsamlingen
+	        AND pi2.TEKST = '123-07-09034' -- punktet som skal fjernes
+
+    """
+    db = fire.cli.firedb
+
+    er_projekt_okay(projektnavn)
+    sag = find_sag(projektnavn)
+    sagsgang = find_sagsgang(projektnavn)
+
+    fire.cli.print(f"Sags/projekt-navn: {projektnavn}  ({sag.id})")
+    fire.cli.print(f"Sagsbehandler:     {sagsbehandler}")
+
+    punkt = db.hent_punkt(ident)
+
+    try:
+        punktsamling = (
+            db.session.query(PunktSamling)
+            .filter(
+                PunktSamling.objektid == punktsamlingsid,
+                PunktSamling._registreringtil == None,
+            ) # NOQA
+            .one()
+        )
+    except NoResultFound:
+        fire.cli.print(f"Punktsamling med objektid {punktsamlingsid} ikke fundet!")
+        raise SystemExit
+
+    if punktsamling.jessenpunkt == punkt:
+        fire.cli.print(
+            f"FEJL: Må ikke fjerne punktsamlingens jessenpunkt!",
+            bold=True,
+            fg="black",
+            bg="yellow",
+        )
+        raise SystemExit()
+
+    # Tidsserier som skal lukkes først!
+    tidsserier = [ts.navn for ts in punktsamling.tidsserier if ts.punkt == punkt and ts.registreringtil is None]
+
+    if tidsserier:
+        fire.cli.print(
+            f"FEJL: Må ikke fjerne et punkt fra en punktsamling hvor der ligger aktive tidsserier ({tidsserier})! ",
+            bold=True,
+            fg="black",
+            bg="yellow",
+        )
+        fire.cli.print(f"Anvend 'fire luk tidsserie' for at lukke tidsserierne først.", bold=True)
+        raise SystemExit()
+
+    fjern_punkter_fra_punktsamling(punktsamling, [punkt])
+
+    sagsevent = sag.ny_sagsevent(
+        punktsamlinger = [punktsamling],
+        beskrivelse=f"fire niv fjern-punkt-fra-punktsamling: Fjernet punkt {ident} fra punktsamling {punktsamling.navn}"
+        )
+    fire.cli.firedb.indset_sagsevent(sagsevent, commit=False)
+    try:
+        fire.cli.firedb.session.flush()
+    except Exception as ex:
+        # rul tilbage hvis databasen smider en exception
+        fire.cli.firedb.session.rollback()
+        raise ex
+
+    # Generer dokumentation til fanebladet "Sagsgang"
+    sagsgangslinje = {
+            "Dato": sagsevent.registreringfra,
+            "Hvem": sagsbehandler,
+            "Hændelse": "Punktsamling modificeret",
+            "Tekst": sagsevent.sagseventinfos[0].beskrivelse,
+            "uuid": sagsevent.id,
+        }
+    sagsgang = frame.append(sagsgang, sagsgangslinje)
+
+    fjern_tekst = f"- fjerne punktet {ident} fra punktsamlingen {punktsamling.navn}?"
+    fire.cli.print("")
+    fire.cli.print("-" * 50)
+    fire.cli.print("Punktsamling færdigbehandlet, klar til at")
+    fire.cli.print(fjern_tekst)
+
+    spørgsmål = click.style(f"Er du sikker på du vil indsætte ovenstående i ", fg="white", bg="red")
+    spørgsmål += click.style(f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True)
+    spørgsmål += click.style("-databasen?", fg="white", bg="red")
+
+    if bekræft(spørgsmål):
+        # Bordet fanger!
+        fire.cli.firedb.session.commit()
+        # Skriver opdateret sagsgang til excel-ark
+        resultater = {"Sagsgang": sagsgang}
+        if skriv_ark(projektnavn, resultater):
+            fire.cli.print(f"Punktsamlinger registreret.")
+    else:
+        fire.cli.firedb.session.rollback()
+
+    return
+
+
 @niv.command()
 @fire.cli.default_options()
 @click.argument(
