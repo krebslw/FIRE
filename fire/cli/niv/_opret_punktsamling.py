@@ -27,6 +27,7 @@ from fire.api.model import (
     Koordinat,
     Tidsserie,
     HøjdeTidsserie,
+    Srid,
 )
 
 import fire.cli
@@ -576,7 +577,7 @@ def opret_ny_tidsserie(punkt: Punkt, punktsamling: PunktSamling, tidsserienavn: 
         raise SystemExit
 
     if punkt not in punktsamling.punkter:
-        punktsamling.punkter.add(punkt)
+        punktsamling.punkter.append(punkt)
 
     tidsserie = HøjdeTidsserie(
         punkt = punkt,
@@ -725,9 +726,9 @@ def ilæg_punktsamling(
     kotesystem = fire.cli.firedb.hent_srid("TS:jessen")
 
     # Initialisér variable som bruges til logning
-    koord_til_oprettelse = list()
-    pktsamling_til_redigering = list()
-    pktsamling_til_oprettelse = list()
+    koord_til_oprettelse = []
+    pktsamling_til_redigering = []
+    pktsamling_til_oprettelse = []
     antal_punkter_i_pktsamling_til_oprettelse = 0
     antal_punkter_i_pktsamling_til_redigering = 0
 
@@ -741,7 +742,11 @@ def ilæg_punktsamling(
 
         fire.cli.print(f"Behandler punktgruppe {punktgruppenavn}")
 
-        jessenpunkt = fire.cli.firedb.hent_punkt(punktgruppedata["Jessenpunkt"])
+        jessenpunkt = hent_jessenpunkt(punktgruppedata["Jessenpunkt"])
+        valider_jessenpunkt(jessenpunkt)
+
+        # Opdater arkets Jessennummer, i tilfælde af at brugeren har ændret jessenpunktet
+        punktgruppe_ark.loc[index, "Jessennummer"] = jessenpunkt.jessennummer
 
         punktliste = list(hts_ark["Punkt"][hts_ark["Punktgruppenavn"]==punktgruppenavn])
         punkter_i_punktgruppe = fire.cli.firedb.hent_punkt_liste(punktliste)
@@ -749,33 +754,23 @@ def ilæg_punktsamling(
         # ================= 2A. REDIGER EKSISTERENDE PUNKTGRUPPE =================
 
         try:
-            eksisterende_punktsamling = fire.cli.firedb.hent_punktsamling(punktgruppenavn)
+            eksisterende_punktsamling = find_punktsamling(jessenpunkt, punktgruppenavn)
         except NoResultFound:
             # Gør ikke noget. Gå videre til 2B for at oprette ny
             pass
         else:
-            fire.cli.print(
-                f"Punktgruppe {punktgruppenavn} findes i forvejen. \n"
-                f"Brug 'rediger-punktsamling' til at redigere oplysninger om punktsamlinger."
-            )
             # Læs punkter og opdater listen.
             punkter_i_eksisterende_punktsamling = set(eksisterende_punktsamling.punkter)
 
             punkter_til_tilføjelse = set(punkter_i_punktgruppe) - punkter_i_eksisterende_punktsamling
 
-            # Opdaterer eksisterende punktsamling med nye punkter
-            eksisterende_punktsamling.punkter.extend(punkter_til_tilføjelse)
-
-            flag = 0
-            if  eksisterende_punktsamling.formål != formål:
-                flag = 1
-                eksisterende_punktsamling.formål = formål
-            elif len(punkter_til_tilføjelse) > 0:
-                flag = 1
-
-            if flag == 1:
+            # Opdaterer eksisterende punktsamling med nyt formål og nye punkter
+            if  eksisterende_punktsamling.formål != formål or len(punkter_til_tilføjelse) > 0:
                 pktsamling_til_redigering.append(eksisterende_punktsamling)
-                antal_punkter_i_pktsamling_til_redigering += len(punkter_til_tilføjelse)
+
+            eksisterende_punktsamling.formål = formål
+            antal_punkter_i_pktsamling_til_redigering += len(punkter_til_tilføjelse)
+            eksisterende_punktsamling.punkter.extend(punkter_til_tilføjelse)
 
             continue
 
@@ -940,29 +935,17 @@ def ilæg_punktsamling(
         fire.cli.firedb.session.commit()
 
         # Skriver opdateret sagsgang til excel-ark
-        resultater = {"Sagsgang": sagsgang}
+
+        resultater = {
+            "Sagsgang": sagsgang,
+            "Punktgruppe": punktgruppe_ark,
+        }
         if skriv_ark(projektnavn, resultater):
             fire.cli.print(f"Punktsamlinger registreret.")
     else:
         fire.cli.firedb.session.rollback()
 
     return
-
-    # sagsevent_punktsamlinger = sag.ny_sagsevent(
-    #     punktsamlinger=ps,
-    #     beskrivelse="fire niv opret-punktsamling: Opret tom Punktsamling",
-    # )
-
-    # fire.cli.firedb.indset_sagsevent(sagsevent_punktsamlinger, commit=False)
-    # try:
-    #     fire.cli.firedb.session.flush()
-    # except IntegrityError as ex:
-    #     # Hvis man forsøger at indsætte Punktsamling med navn som findes i forvejen
-    #     fire.cli.firedb.session.rollback()
-    #     # fejlende_punkt = fire.cli.firedb.hent_punkt(ex.params["punktid"])
-    #     # TODO: Implementer bedre fejlrapportering.
-    #     fire.cli.print("Fejl ved indsættelse af Punktsamlinger.")
-
 
 
 @niv.command()
@@ -1003,7 +986,6 @@ def ilæg_tidsserie(
     # Læs arkene
     # punktgruppe_ark = find_faneblad(projektnavn, "Punktgruppe", arkdef.PUNKTGRUPPE)
     hts_ark = find_faneblad(projektnavn, "Højdetidsserier", arkdef.HØJDETIDSSERIE)
-
 
     # hent kotesystem. Lige nu understøttes kun jessen-system.
     # Mest pga. kolonnenavne i database (jessenkoordinat/kote).
