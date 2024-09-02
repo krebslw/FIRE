@@ -718,7 +718,6 @@ def ilæg_punktsamling(
     # Læs arkene
     punktgruppe_ark = find_faneblad(projektnavn, "Punktgruppe", arkdef.PUNKTGRUPPE)
     hts_ark = find_faneblad(projektnavn, "Højdetidsserier", arkdef.HØJDETIDSSERIE)
-    # hts_ark = hts_ark.set_index("Punktgruppenavn")
 
     # hent kotesystem. Lige nu understøttes kun jessen-system.
     # Mest pga. kolonnenavne i database (jessenkoordinat/kote).
@@ -776,52 +775,22 @@ def ilæg_punktsamling(
 
 
         # ================= 2B. OPRET NY PUNKTGRUPPE =================
-
-        try:
-            # Filterer med vilje ikke på RegistreringTil = None, idet jessenpunktet godt
-            # kan have tidsserier i andre punktsamlinger, hvis tidsserie-koordinater også
-            # har SRID'en TS:jessen.
-            # RegistreringTil = None vil kun finde det nyeste koord. som altså kan ændre
-            # kote.
-            # Der forventes kun ét resultat, men søgningen kan i edge-cases returnere
-            # flere koordinater med identisk z-værdi, hvorfor der bare tages den først
-            # fundne, som også burde være den første i tid.
-            jessenkoordinat = [k
-                        for k in jessenpunkt.koordinater
-                        if k.srid == kotesystem and k.z ==  angivet_jessenkote
-                        ][0]
-        except IndexError:
-            fire.cli.print(
-                f"BEMÆRK: Jessenkote ikke fundet i databasen. \n"
-                f"Forsøger at oprette nyt Jessenkoordinat med koten {angivet_jessenkote} [m]",
-                fg="black",
-                bg="yellow",
-            )
-
-            jessenkoordinat = Koordinat(
-                punkt = jessenpunkt,
-                srid = kotesystem,
-                # hvilket tidspunkt skal den nye jessenkote gælde fra?
-                # default er "current_timestamp"
-                # t=None,
-                z = angivet_jessenkote,
-                sz = 0,
-                )
-            koord_til_oprettelse.append(jessenkoordinat)
-        else:
-            jessenkote = jessenkoordinat.z
-
-        # Opretter ny ny punktsamling
         ny_punktsamling = PunktSamling(
             navn = punktgruppenavn,
             jessenpunkt = jessenpunkt,
-            jessenkoordinat = jessenkoordinat,
-            # TODO: Tidsserier oprettes med anden funktionalitet.
-            # Ellers tror jeg den her funktion bliver overloaded.
-            # tidsserier = None,
+            # jessenkoordinat = [], # Nyoprettede punktsamlinger har ikke nogen jessekote, hvilket skal tolkes som 0!
+            # tidsserier = [], # Tidsserier oprettes med ilæg-tidsserier
             formål = formål,
             punkter = punkter_i_punktgruppe,
         )
+
+        # Opret ny jessenkote
+        # TODO: Der er mulighed for at oprette ny jessenkote automatisk, men for nu er det udkommenteret.
+        # TODO: Dvs. at alle punktsamlinger oprettes med "0" som jessenkote.
+        # ny_punktsamling.jessenkoordinat = find_eller_opret_jessenkote(jessenpunkt, angivet_jessenkote, kotesystem)
+        # if fire.cli.firedb._is_new_object(ny_punktsamling.jessenkoordinat):
+            # hvis jessenkoordinaten er nyoprettet gemmer vi den så vi kan give brugeren besked senere
+            # koord_til_oprettelse.append(ny_punktsamling.jessenkoordinat)
 
         pktsamling_til_oprettelse.append(ny_punktsamling)
         antal_punkter_i_pktsamling_til_oprettelse += len(punkter_i_punktgruppe)
@@ -935,7 +904,6 @@ def ilæg_punktsamling(
         fire.cli.firedb.session.commit()
 
         # Skriver opdateret sagsgang til excel-ark
-
         resultater = {
             "Sagsgang": sagsgang,
             "Punktgruppe": punktgruppe_ark,
@@ -1004,27 +972,25 @@ def ilæg_tidsserie(
             punkt = fire.cli.firedb.hent_punkt(row["Punkt"])
             ps = fire.cli.firedb.hent_punktsamling(row["Punktgruppenavn"])
 
-
-            # Hvis punktet er jessenpunkt, så oprettes tidsserien med punktsamlingens jessenpunkt.
-            # Ellers er tidsserien bare tom
-            koordinat = []
-            if ps.jessenpunkt == punkt:
-                koordinat = [ps.jessenkoordinat,]
-
             ts = HøjdeTidsserie(
                 navn = row["Tidsserienavn"],
                 punkt = punkt,
                 punktsamling = ps,
                 formål = row["Formål"],
-                referenceramme = "Jessen",
                 srid = kotesystem,
-                # De her to behøves ikke
-                # tstype=2,
-                koordinater = koordinat,
             )
+
+            # Hvis punktet er jessenpunkt, så oprettes tidsserien med punktsamlingens
+            # jessenkote. Ellers er tidsserien bare tom
+            # Dog oprettes nye punktsamlinger uden jessenkote, så jessenpunktets
+            # tidsserie vil også være tom..
+            if ps.jessenpunkt == punkt and ps.jessenkoordinat is not None:
+                ts.koordinater = [ps.jessenkoordinat,]
+
             ts_til_oprettelse.append(ts)
-            pass
+
         else:
+            # Hvis vi fandt en tidsserie så redigerer vi formålet
             if ts.formål == row["Formål"]:
                 continue
             ts.formål == row["Formål"]
@@ -1110,6 +1076,40 @@ def ilæg_tidsserie(
 
     return
 
+def find_eller_opret_jessenkote(jessenpunkt: Punkt, jessenkote: float, kotesystem: Srid) -> Koordinat:
+    try:
+        # Filterer med vilje ikke på RegistreringTil = None, idet jessenpunktet godt
+        # kan have tidsserier i andre punktsamlinger, hvis tidsserie-koordinater også
+        # har SRID'en TS:jessen.
+        # RegistreringTil = None vil kun finde det nyeste koord. som altså kan ændre
+        # kote.f
+        # Der forventes kun ét resultat, men søgningen kan i edge-cases returnere
+        # flere koordinater med identisk z-værdi, hvorfor der bare tages den først
+        # fundne, som også burde være den første i tid.
+        jessenkoordinat = [k
+                    for k in jessenpunkt.koordinater
+                    if k.srid == kotesystem and k.z ==  jessenkote
+                    ][0]
+    except IndexError:
+
+        fire.cli.print(
+            f"BEMÆRK: Jessenkote ikke fundet i databasen. \n"
+            f"Opretter nyt Jessenkoordinat med koten {jessenkote} [m]",
+            fg="black",
+            bg="yellow",
+        )
+
+        jessenkoordinat = Koordinat(
+            punkt = jessenpunkt,
+            srid = kotesystem,
+            # hvilket tidspunkt skal den nye jessenkote gælde fra?
+            # default er "current_timestamp"
+            # t=None,
+            z = jessenkote,
+            sz = 0,
+            )
+
+    return jessenkoordinat
 
 def udled_jessenpunkt_fra_punktoversigt(punktoversigt: pd.DataFrame):
     """
