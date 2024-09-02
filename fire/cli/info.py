@@ -770,6 +770,9 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
 
     punktsamling = fire.cli.firedb.hent_punktsamling(punktsamlingsnavn)
 
+    # Håndtering af Null-værdier for Jessenkoordinat.
+    jessenkote = (punktsamling.jessenkoordinat.z if punktsamling.jessenkoordinat is not None else 0)
+
     fire.cli.print(
         "------------------------- PUNKTSAMLING -------------------------", bold=True
     )
@@ -777,7 +780,7 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
     fire.cli.print(f"  Formål        : {punktsamling.formål}")
     fire.cli.print(f"  Jessenpunkt   : {punktsamling.jessenpunkt.ident}")
     fire.cli.print(f"  Jessennummer  : {punktsamling.jessenpunkt.jessennummer}")
-    fire.cli.print(f"  Jessenkote    : {punktsamling.jessenkoordinat.z} m")
+    fire.cli.print(f"  Jessenkote    : {jessenkote} m")
     fire.cli.print(f"  Antal punkter : {len(punktsamling.punkter)}")
 
     fire.cli.print(f"--- Punkter i Punktsamling ---")
