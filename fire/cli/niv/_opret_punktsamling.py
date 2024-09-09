@@ -595,7 +595,12 @@ def udtræk_punktsamling(
     return
 
 def opret_ny_tidsserie(punkt: Punkt, punktsamling: PunktSamling, tidsserienavn: str = None) -> Tidsserie:
+    """
+    Opretter ny tidsserie
 
+    Hvis intet tidsserienavn angives, så bruges default-navnet: [IDENT]_HTS_[JESSENNR]. Hvis der findes
+    en tidsserie med samme navn i forvejen, vil funktionen fejle.
+    """
     if not tidsserienavn:
         tidsserienavn = f"{punkt.ident}_HTS_{punktsamling.jessenpunkt.jessennummer}" # Default navn
 
@@ -626,7 +631,6 @@ def opret_ny_tidsserie(punkt: Punkt, punktsamling: PunktSamling, tidsserienavn: 
 def opret_ny_punktsamling(jessenpunkt: Punkt, punkter: list[Punkt], punktsamlingsnavn: str = None) -> PunktSamling:
     """Genererer data til indsættelse i punktsamlings- og højdetidsseriearkene
 
-    Går ud fra
     """
     if not punktsamlingsnavn:
         punktsamlingsnavn = f"PUNKTSAMLING_{jessenpunkt.jessennummer}" # Default navn
