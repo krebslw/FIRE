@@ -778,22 +778,40 @@ def find_punktsamling(jessenpunkt: Punkt, punktsamlingsnavn: str = "", ) -> Punk
     type=str,
     help="Angiv andet brugernavn end den aktuelt indloggede",
 )
-@click.option(
-    "--punktsamlingsnavn",
-    default = "",
-    type=str,
-    help="Angiv punktsamlingens navn",
-)
 def ilæg_punktsamling(
-    # jessenpunkt_ident: str,
-    # navn: str,
-    # formål: str,
     projektnavn: str,
     sagsbehandler: str,
-    punktsamlingsnavn: str,
     **kwargs,
 ) -> None:
+    """
+    Registrer nye eller redigerede punktsamlinger i databasen.
 
+    Ændringer til sagsregnearkets Punktsamlinger, oprettet med ``fire niv
+    opret-punktsamling`` eller udtrukket med ``fire niv udtræk-punktsamling``, lægges i
+    databasen med dette program.
+
+    Under fanen "Punktgruppe" gennemgår programmet alle punktsamlingerne som
+    optræder i kolonnen "Punktgruppenavn" og gør følgende:
+
+        - Hvis der ikke findes en punktsamling med pågældende navn, oprettes en ny
+          punktsamling i databasen med alle de oplysninger som er givet i rækken
+
+        - Hvis punktsamlingen findes i forvejen, bliver databasen synkroniseret med
+          kolonnen "Formål"
+
+        - Finder alle rækker under fanen "Højdetidsserier", som matcher på kolonnen
+          "Punktgruppenavn"
+
+        - Tilføjer alle de tilsvarende punkter i kolonnen "Punkt", som ikke allerede er
+          medlem af punktsamlingen
+
+    Bemærk at dette program ignorerer "Højdetidsserier"-fanens kolonner "Er Jessenpunkt",
+    "Tidsserienavn", "Formål" og "System". Indholdet af disse kolonner ilægges databasen
+    med ``fire niv ilæg-tidsserier``.
+
+    Bemærk desuden at dette program ikke kan fjerne punkter fra en punktsamling. Til dette
+    bruges ``fire niv fjern-punkt-fra-punktsamling``.
+    """
     er_projekt_okay(projektnavn)
     sag = find_sag(projektnavn)
     sagsgang = find_sagsgang(projektnavn)
@@ -886,6 +904,7 @@ def ilæg_punktsamling(
         return
 
     # ================= 3A. SAGSEVENT REDIGER PUNKTSAMLING =================
+
     if pktsamling_til_redigering:
         psnavne = "'" + "', '".join([ps.navn for ps in pktsamling_til_redigering]) + "'"
         sagsevent_rediger_punktsamlinger = sag.ny_sagsevent(
@@ -910,8 +929,6 @@ def ilæg_punktsamling(
             "uuid": sagsevent_rediger_punktsamlinger.id,
         }
         sagsgang = frame.append(sagsgang, sagsgangslinje)
-
-
 
     # ================= 3B. SAGSEVENT OPRET PUNKTSAMLING =================
     # === DEL 3B.1: Opret Jessenkoordinat som ikke findes i forvejen ===
