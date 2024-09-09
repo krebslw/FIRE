@@ -44,7 +44,7 @@ from fire.cli.niv import (
 )
 
 
-def er_punktsamling_unik(punktsamling_A: PunktSamling) -> dict[list]:
+def er_punktsamling_unik(punktsamling_A: PunktSamling, punktsamlinger: list[PunktSamling] = []) -> dict[list]:
     """
     Undersøg om en Punktsamling A udgør en unik samling af punkter.
 
@@ -60,11 +60,12 @@ def er_punktsamling_unik(punktsamling_A: PunktSamling) -> dict[list]:
     # Mængde af punkter i Punktsamling A
     punkter_A = {pkt.ident for pkt in punktsamling_A.punkter}
 
-    alle_punktsamlinger = fire.cli.firedb.hent_alle_punktsamlinger()
+    if not punktsamlinger:
+        punktsamlinger = fire.cli.firedb.hent_alle_punktsamlinger()
 
     # Initialiser dict-over-list
     dol = {"Lig med": [], "Subset af": [], "Superset af": []}
-    for punktsamling_B in alle_punktsamlinger:
+    for punktsamling_B in punktsamlinger:
 
         # Lad være med at sammenligne Punktsamlingen med sig selv
         if punktsamling_A.navn == punktsamling_B.navn:
@@ -484,10 +485,7 @@ def opret_punktsamling(
 
     if skriv_ark(projektnavn, resultater):
         fire.cli.print(
-            f"Punktsamlings-ark oprettet. Udfyld nu Punktsamlingsnavn, Formål og Jessenkote "
-            f"eller kontrollér at oplysningerne er korrekte."
-            f"Punktsamlinger udtrukket. Rediger nu Formål og tilføj Tidsserier, "
-            f"eller kontrollér at oplysningerne er korrekte."
+            f"Punktsamlinger oprettet. Rediger nu Navne og Formål og tilføj Punkter og Tidsserier"
         )
         fire.cli.åbn_fil(f"{projektnavn}.xlsx")
 
@@ -635,6 +633,7 @@ def udtræk_punktsamling(
 
     return
 
+
 def opret_ny_tidsserie(punkt: Punkt, punktsamling: PunktSamling, tidsserienavn: str = None) -> Tidsserie:
     """
     Opretter ny højdetidsserie
@@ -668,6 +667,7 @@ def opret_ny_tidsserie(punkt: Punkt, punktsamling: PunktSamling, tidsserienavn: 
         )
 
     return tidsserie
+
 
 def opret_ny_punktsamling(jessenpunkt: Punkt, punkter: list[Punkt], punktsamlingsnavn: str = None) -> PunktSamling:
     """
@@ -805,6 +805,18 @@ def ilæg_punktsamling(
         - Tilføjer alle de tilsvarende punkter i kolonnen "Punkt", som ikke allerede er
           medlem af punktsamlingen
 
+    For hver af de oprettede eller redigerede punktsamlinger ("A") tjekker programmet inden ilægning, om "A" vil
+    komme til at ligne en anden punktsamling ("B"). Brugeren advares om følgende::
+
+        1. Er A lig med B
+        2. Er A en delmængde af B (Er A et "subset" af B)
+        3. Er B en delmængde af A (Er A et "superset" af B)
+
+    Brugeren har derefter mulighed for at fortsætte eller afbryde ilægningen af den
+    enkelte punktsamling. Dette fungerer som et sanity-check, så man ikke utilsigtet får
+    oprettet en samling af punkter som allerede eksisterer i databasen under et andet
+    navn.
+
     Bemærk at dette program ignorerer "Højdetidsserier"-fanens kolonner "Er Jessenpunkt",
     "Tidsserienavn", "Formål" og "System". Indholdet af disse kolonner ilægges databasen
     med ``fire niv ilæg-tidsserier``.
@@ -877,7 +889,6 @@ def ilæg_punktsamling(
 
             continue
 
-
         # ================= 2B. OPRET NY PUNKTGRUPPE =================
         ny_punktsamling = PunktSamling(
             navn = punktgruppenavn,
@@ -898,6 +909,48 @@ def ilæg_punktsamling(
 
         pktsamling_til_oprettelse.append(ny_punktsamling)
         antal_punkter_i_pktsamling_til_oprettelse += len(punkter_i_punktgruppe)
+
+
+    # Tjek om punktsamlingerne er unikke:
+    pktsamlinger_til_ilæggelse = pktsamling_til_oprettelse + pktsamling_til_redigering
+    for pktsamling in pktsamlinger_til_ilæggelse:
+
+        # Sammenlign med de andre punktsamlinger som er på vej til at blive lagt i db
+        dol = er_punktsamling_unik(pktsamling, pktsamlinger_til_ilæggelse)
+
+        # Sammenlign med alle andre punktsamlinger
+        dol_alle = er_punktsamling_unik(pktsamling)
+
+        ligmed = set(dol["Lig med"] + dol_alle["Lig med"])
+        subset = set(dol["Subset af"] + dol_alle["Subset af"])
+        superset = set(dol["Superset af"] + dol_alle["Superset af"])
+
+        if ligmed:
+            ligmed = ", ".join(ligmed)
+            advarsel_ligmed = f"Advarsel! {pktsamling.navn} indeholder de samme punkter som: {ligmed}"
+
+        if superset:
+            superset = ", ".join(superset)
+            advarsel_superset = f"Advarsel! Punkterne i {pktsamling.navn} er et superset af: {superset}"
+
+        if subset:
+            subset = ", ".join(subset)
+            advarsel_subset = f"Advarsel! Punkterne i {pktsamling.navn} er en delmængde af: {subset}"
+
+
+        fire.cli.print(advarsel_ligmed, fg = "black", bg = "yellow")
+        fire.cli.print(advarsel_superset, fg = "black", bg = "yellow")
+        fire.cli.print(advarsel_subset, fg = "black", bg = "yellow")
+
+        spørgsmål = click.style(f"Er du sikker på at du vil ilægge {pktsamling.navn}?", fg="white", bg="red")
+
+        if not bekræft(spørgsmål, gentag=False):
+            # Hvis brugeren siger Nej, så fjerner vi punktsamlingen fra de tidligere oprettede lister
+            for liste in (pktsamling_til_oprettelse, pktsamling_til_redigering, pktsamlinger_til_ilæggelse):
+                try:
+                    liste.remove(pktsamling)
+                except ValueError:
+                    pass
 
     if not (koord_til_oprettelse or pktsamling_til_redigering or pktsamling_til_oprettelse):
         fire.cli.print(f"Ingen punktsamlinger at oprette eller redigere. Afbryder!", fg="yellow", bold=True)
@@ -1033,12 +1086,8 @@ def ilæg_punktsamling(
     help="Angiv andet brugernavn end den aktuelt indloggede",
 )
 def ilæg_tidsserie(
-    # jessenpunkt_ident: str,
-    # navn: str,
-    # formål: str,
     projektnavn: str,
     sagsbehandler: str,
-    # punktsamlingsnavn: str,
     **kwargs,
 ) -> None:
     """
