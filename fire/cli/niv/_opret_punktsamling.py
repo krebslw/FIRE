@@ -485,6 +485,41 @@ def udtræk_punktsamling(
     punkter: str,
     **kwargs,
 ) -> None:
+    """
+    Udtræk en eller flere punktsamlinger fra databasen
+
+    Det primære formål med denne funktion er at udtrække oplysninger om en eksisterende
+    punktsamling og de tilhørende tidsserier. Oplysningerne kan redigeres, og man kan
+    tilføje punkter og tidsserier til punksamlingen.
+
+    Resultatet skrives til et eksisterende projekt-regneark i fanerne "Punktgruppe" og
+    "Højdetidsserier". Fanerne overskrives ikke, så man kan køre denne funktion flere
+    gange, for at udtrække og redigere flere punktsamlinger samtidig i samme regneark.
+
+    Oplysningerne udtrækkes ved at angive enten navnet på punktsamlingen::
+
+        fire niv udtræk-punktsamling SAG --punktsamlingsnavn PUNKTSAMLING_81001
+
+    eller punktsamlingens jessenpunkt::
+
+        fire niv udtræk-punktsamling SAG --jessenpunkt 81001
+
+    Hvis der findes flere punktsamlinger med samme jessenpunkt, trækkes alle
+    punktsamlingerne ud. Det er nødvendigt at angive enten ``--punktsamlingsnavn`` eller
+    ``--jessenpunkt``. Angives begge, ignoreres ``--jessenpunkt``.
+
+    For at lette opgaven med at tilføje punkter og tidsserier til tidsserien, kan man
+    angive en kommasepareret liste af punkter med ``--punkter`` som programmet automatisk
+    indsætter i arket. Punkterne indsættes da med default tidsserienavne og formål. Eks::
+
+        fire niv udtræk-punktsamling SAG --punktsamlingsnavn PUNKTSAMLING_81001 --punkter "SKEJ,RDIO,BUDP"
+
+    I tilfælde af at man har trukket flere punktsamlinger ud på én gang, bliver punkterne
+    tilføjet til alle punktsamlingerne.
+
+    Efter endt redigering kan ændringerne ilægges databasen med ``ilæg-punktsamling`` og
+    ``ilæg-tidsserie``.
+    """
     er_projekt_okay(projektnavn)
 
     # fjern whitespace og split streng op i liste
@@ -552,7 +587,7 @@ def udtræk_punktsamling(
 
     if skriv_ark(projektnavn, resultater):
         fire.cli.print(
-            f"Punktsamlings-ark oprettet. Udfyld nu Punktsamlingsnavn, Formål og Jessenkote "
+            f"Punktsamlinger udtrukket. Rediger nu Formål og tilføj Tidsserier, "
             f"eller kontrollér at oplysningerne er korrekte."
         )
         fire.cli.åbn_fil(f"{projektnavn}.xlsx")
