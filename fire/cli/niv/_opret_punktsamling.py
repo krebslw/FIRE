@@ -1091,9 +1091,31 @@ def ilæg_tidsserie(
     **kwargs,
 ) -> None:
     """
-    Ilæg en ny Højdetidsserie eller rediger en eksisterende (kan kun redigere "Formål")
+    Registrer nye eller redigerede højdetidsserier i databasen.
 
-    Anvender arket Højdetidsserier.
+    Ændringer til sagsregnearkets Højdetidsserier, oprettet med ``fire niv
+    opret-punktsamling`` eller udtrukket med ``fire niv udtræk-punktsamling``, lægges i
+    databasen med dette program.
+
+    **Bemærk at denne funktion IKKE bruges til at tilføje tidsserie-koter til tidsserierne.**
+    Se nedenfor for info om hvordan koter knyttes til en tidsserie.
+
+    Under fanen "Højdetidsserier" gennemgår programmet alle tidsserier og gør følgende::
+
+        - Hvis der ikke findes en tidsserie med pågældende navn, oprettes en ny
+          Højdetidsserie i databasen med alle de oplysninger som er givet i rækken
+
+        - Ellers, hvis tidsserien findes i forvejen, bliver databasen synkroniseret med
+          kolonnen "Formål"
+
+    **Bemærk at højdetidsserierne bliver oprettet uden tilknyttede koter.**
+
+    For at føje gamle koter, som allerede er beregnet og ilagt databasen, til en
+    tidsserie, brug: ``fire niv XXXXX``
+
+    For at føje nyberegnede koter, som ikke er ilagt databasen, til en tidsserie, kan
+    ``fire niv ilæg-nye-koter`` bruges til både at ilægge de nye koter og knytte dem til
+    tidsserien.
     """
 
     er_projekt_okay(projektnavn)
