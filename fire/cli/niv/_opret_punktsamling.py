@@ -348,12 +348,6 @@ def fjern_punkt_fra_punktsamling(
     help="Angiv kommasepareret liste over punkter som skal indgå i punktsamlingen",
 )
 @click.option(
-    "--alle",
-    default = False,
-    type=bool,
-    is_flag=True,
-)
-@click.option(
     "--punktoversigt",
     "anvend_punktoversigt",
     default = False,
@@ -371,9 +365,54 @@ def opret_punktsamling(
     """
     Opretter et Punktsamlings-ark på sagen, som efterfølgende kan redigeres.
 
-    Derefter kan punktsamlingen lægges i databasen med ilæg-punktsamling!
-    Flaget --punkter kan bruges til manuelt at angive en kommasepareret liste over hvilke
-    punkter som skal indgå i punktsamlingen
+    Det primære formål med denne funktion er at oprette en ny punktsamling og tilhørende
+    tidsserier. Oplysningerne kan efterfølgen redigeres, og man kan tilføje punkter og
+    tidsserier til punktsamlingen.
+
+    Resultatet skrives til et eksisterende projekt-regneark i fanerne "Punktgruppe" og
+    "Højdetidsserier". Fanerne overskrives ikke, så man kan køre denne funktion flere
+    gange, for at oprette flere punktsamlinger samtidig i samme regneark.
+
+    Programmet skal vide hvilket Jessenpunkt det skal bruge. Dette angives lettest med
+    ``--jessenpunkt``, som skal være jessenpunktets IDENT. Fx::
+
+        fire niv opret-punktsamling SAG --jessenpunkt 81005
+
+    Alternativt kan man med flaget ``--punktoversigt`` bede programmet om at bruge
+    "Punktoversigt"-fanens fastholdte punkt til at udlede jessenpunktet. Hertil kræves
+    det, at "Punktoversigt"-fanen er til stede i sags-regnearket, samt at der kun er
+    netop ét fastholdt punkt. Eks::
+
+        fire niv opret-punktsamling SAG --punktoversigt
+
+    Det er nødvendigt at anvende enten ``--jessenpunkt`` eller ``--punktoversigt``. Angives
+    begge, bliver ``--jessenpunkt`` brugt.
+
+    Punktsamlingens navn angives med ``--punktsamlingsnavn``. Udelades denne, anvendes
+    default-navnet "PUNKTSAMLING_[JESSENNR]".
+
+    Nye punktsamlinger oprettes altid med Jessenkoten 0, og dette bliver således
+    også referencekoten for nye tidsserier som kobles til punktsamlingen.
+
+    Jessenpunktet indsættes altid i arket som medlem af punktsamlingen. Derudover kan man, for at
+    lette opgaven med at tilføje flere punkter og tidsserier til arket, angive en kommasepareret
+    liste af punkter med ``--punkter`` som programmet automatisk indsætter i arket.
+    Punkterne indsættes da med default tidsserienavne og formål. Eks::
+
+        fire niv opret-punktsamling SAG --jessenpunkt 81005 --punkter "SKEJ,RDIO,BUDP"
+
+    Alternativt kan man igen anvende ``--punktoversigt``, som fortæller programmet at det
+    skal udvide listen af punkter valgt med ``--punkter``, med punkterne i
+    "Punktoversigt"-fanen. Eks::
+
+        fire niv opret-punktsamling SAG --jessenpunkt 81005 --punkter "SKEJ,RDIO,BUDP" --punktoversigt
+
+    Tidsserier oprettes med default-formålet: "Giv os et formål!". Punktsamlinger oprettes
+    med default-formålet: "I henter smør!". Det anbefales et rette disse til noget mere
+    passende.
+
+    Efter endt redigering kan oplysningerne ilægges databasen med ``ilæg-punktsamling`` og
+    ``ilæg-tidsserie``.
     """
     er_projekt_okay(projektnavn)
 
@@ -447,6 +486,8 @@ def opret_punktsamling(
         fire.cli.print(
             f"Punktsamlings-ark oprettet. Udfyld nu Punktsamlingsnavn, Formål og Jessenkote "
             f"eller kontrollér at oplysningerne er korrekte."
+            f"Punktsamlinger udtrukket. Rediger nu Formål og tilføj Tidsserier, "
+            f"eller kontrollér at oplysningerne er korrekte."
         )
         fire.cli.åbn_fil(f"{projektnavn}.xlsx")
 
@@ -490,7 +531,7 @@ def udtræk_punktsamling(
 
     Det primære formål med denne funktion er at udtrække oplysninger om en eksisterende
     punktsamling og de tilhørende tidsserier. Oplysningerne kan redigeres, og man kan
-    tilføje punkter og tidsserier til punksamlingen.
+    tilføje punkter og tidsserier til punktsamlingen.
 
     Resultatet skrives til et eksisterende projekt-regneark i fanerne "Punktgruppe" og
     "Højdetidsserier". Fanerne overskrives ikke, så man kan køre denne funktion flere
@@ -508,7 +549,7 @@ def udtræk_punktsamling(
     punktsamlingerne ud. Det er nødvendigt at angive enten ``--punktsamlingsnavn`` eller
     ``--jessenpunkt``. Angives begge, ignoreres ``--jessenpunkt``.
 
-    For at lette opgaven med at tilføje punkter og tidsserier til tidsserien, kan man
+    For at lette opgaven med at tilføje punkter og tidsserier til punktsamlingen, kan man
     angive en kommasepareret liste af punkter med ``--punkter`` som programmet automatisk
     indsætter i arket. Punkterne indsættes da med default tidsserienavne og formål. Eks::
 
@@ -596,7 +637,7 @@ def udtræk_punktsamling(
 
 def opret_ny_tidsserie(punkt: Punkt, punktsamling: PunktSamling, tidsserienavn: str = None) -> Tidsserie:
     """
-    Opretter ny tidsserie
+    Opretter ny højdetidsserie
 
     Hvis intet tidsserienavn angives, så bruges default-navnet: [IDENT]_HTS_[JESSENNR]. Hvis der findes
     en tidsserie med samme navn i forvejen, vil funktionen fejle.
@@ -629,8 +670,14 @@ def opret_ny_tidsserie(punkt: Punkt, punktsamling: PunktSamling, tidsserienavn: 
     return tidsserie
 
 def opret_ny_punktsamling(jessenpunkt: Punkt, punkter: list[Punkt], punktsamlingsnavn: str = None) -> PunktSamling:
-    """Genererer data til indsættelse i punktsamlings- og højdetidsseriearkene
+    """
+    Opretter ny punktsamling og tilhørende højdetidsserier
 
+    Hvis intet punktsamlingsnavn angives, så bruges default-navnet PUNKTSAMLING_[JESSENNR].
+    Hvis der findes en punktsamling med samme navn i forvejen, vil funktionen fejle.
+
+    Punkter som skal indgå i punktsamling angives med "punkter". Der oprettes også
+    højdetidsserier for alle disse punkter. Tidsserierne oprettes med default-navne.
     """
     if not punktsamlingsnavn:
         punktsamlingsnavn = f"PUNKTSAMLING_{jessenpunkt.jessennummer}" # Default navn
