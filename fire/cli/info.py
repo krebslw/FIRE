@@ -267,18 +267,12 @@ def observationsrapport(
     fire.cli.print("  " + 110 * "-")
 
 
-def prikprikprik(s: str, maxlen: int):
-    if len(s) > maxlen and maxlen > 0:
-        return s[: max(0, (maxlen - 3))] + "..."
-    return s
-
-
 def punktsamlingsrapport(punktsamlinger: list[PunktSamling], id: str = None):
     """
     Hjælpefunktion for funktionerne punkt_fuld_rapport og punktsamling.
     """
-    kolonnebredder = (34, 11, 13)
-    kolonnenavne = ("Navn", "Jessenpunkt", "Antal punkter")
+    kolonnebredder = (34, 11, 13, 16,)
+    kolonnenavne = ("Navn", "Jessenpunkt", "Antal punkter", "Antal tidsserier")
     header = "  ".join([str(n).ljust(w) for n, w in zip(kolonnenavne, kolonnebredder)])
     subheader = "  ".join(["-" * w for w in kolonnebredder])
 
@@ -293,10 +287,10 @@ def punktsamlingsrapport(punktsamlinger: list[PunktSamling], id: str = None):
         if ps.jessenpunkt.id == id:
             farve = "green"
 
-        kolonner = [ps.navn, ps.jessenpunkt.jessennummer, len(ps.punkter)]
+        kolonner = [ps.navn, ps.jessenpunkt.jessennummer, len(ps.punkter), len(ps.tidsserier)]
 
         linje = "  ".join(
-            [prikprikprik(str(c), w).ljust(w) for c, w in zip(kolonner, kolonnebredder)]
+            [textwrap.shorten(str(c), width=w, placeholder="...").ljust(w) for c, w in zip(kolonner, kolonnebredder)]
         )
         fire.cli.print(linje, fg=farve)
 
@@ -322,10 +316,13 @@ def tidsserierapport(tidsserier: list[Tidsserie]):
             return "Højde"
 
     for ts in tidsserier:
-        kolonner = [ts.navn, len(ts), tidsserietype(ts.tstype), ts.referenceramme]
-        linje = "  ".join(
-            [prikprikprik(str(c), w).ljust(w) for c, w in zip(kolonner, kolonnebredder)]
-        )
+        navn_ombrudt = textwrap.wrap(str(ts.navn),kolonnebredder[0])
+        for navn_del in navn_ombrudt[:-1]:
+            fire.cli.print(navn_del)
+
+        kolonner = [navn_ombrudt[-1], len(ts), tidsserietype(ts.tstype), ts.referenceramme]
+
+        linje = "  ".join([str(c).ljust(w) for c, w in zip(kolonner, kolonnebredder)])
         fire.cli.print(linje)
 
     return
@@ -784,7 +781,7 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
     fire.cli.print(f"  Jessenkote    : {jessenkote} m")
     fire.cli.print(f"  Antal punkter : {len(punktsamling.punkter)}")
 
-    fire.cli.print(f"--- Punkter i Punktsamling ---")
+    fire.cli.print(f"--- Punkter ---")
 
     if not punktsamling.punkter:
         fire.cli.print(f"  Der er ingen Punkter i Punktsamlingen !!!")
@@ -794,9 +791,11 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
             farve = "green"
         fire.cli.print(f"  {punkt.ident}", fg=farve)
 
-    fire.cli.print(f"--- Punktsamling i Tidsserier ---")
+    fire.cli.print(f"--- Tidsserier ---")
     if not punktsamling.tidsserier:
-        fire.cli.print(f"  Punktsamling har ingen tilknyttede tidsserier.")
+        fire.cli.print(f"  Punktsamlingen har ingen tilknyttede tidsserier.")
+        return
+
     tidsserierapport(punktsamling.tidsserier)
 
     return
