@@ -705,7 +705,11 @@ def sag(sagsid: str, **kwargs):
     Anføres **SAG** ikke sagsid listes alle aktive sager.
     """
     if sagsid:
-        sag = fire.cli.firedb.hent_sag(sagsid)
+        try:
+            sag = fire.cli.firedb.hent_sag(sagsid)
+        except NoResultFound:
+            fire.cli.print(f"Fejl! {sagsid} ikke fundet!", fg="red", err=True)
+            raise SystemExit(1)
 
         fire.cli.print(
             "------------------------- SAG -------------------------", bold=True
@@ -766,7 +770,11 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
 
         return
 
-    punktsamling = fire.cli.firedb.hent_punktsamling(punktsamlingsnavn)
+    try:
+        punktsamling = fire.cli.firedb.hent_punktsamling(punktsamlingsnavn)
+    except NoResultFound:
+        fire.cli.print(f"Fejl! {punktsamlingsnavn} ikke fundet!", fg="red", err=True)
+        raise SystemExit(1)
 
     # Håndtering af Null-værdier for Jessenkoordinat.
     jessenkote = (punktsamling.jessenkoordinat.z if punktsamling.jessenkoordinat is not None else 0)
