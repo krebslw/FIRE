@@ -205,9 +205,10 @@ def fjern_punkt_fra_punktsamling(
     ikke er historik-styret. Dvs. at man ikke umiddelbart kan bringe Punktsamlingen
     tilbage til tilstanden før denne kommando blev kørt. Brug den derfor varsomt!
 
-    I tilfælde af at man utilsigtet har fjernet et punkt kan det dog tilføjes igen med
-    ``fire niv rediger-punktsamling``. Databasen giver ingen hjælp til at huske hvilket
-    punkt man har fjernet så det skal man selv kunne huske.
+    I tilfælde af at man utilsigtet har fjernet et punkt kan det dog tilføjes igen ved at
+    kalde ``fire niv udtræk-punktsamling``, tilføje punktet i sags-regnearket, og lægge
+    punktet i databasen med ``fire niv ilæg-punktsamling``. Databasen giver ingen hjælp
+    til at huske hvilket punkt man har fjernet så det skal man selv kunne huske.
 
     For at kunne fjerne et punkt fra punktsamlingen, forudsættes det at punktet ikke har
     nogle tidsserier tilknyttet. Tidsserier kan lukkes med ``fire luk tidsserie``.
@@ -218,6 +219,9 @@ def fjern_punkt_fra_punktsamling(
     fx. ved udtræk som følgende:
 
     \b
+
+    .. code-block:: console
+
         SELECT ps.*
         FROM PUNKTSAMLING ps
         JOIN PUNKTINFO pi ON
@@ -354,6 +358,7 @@ def fjern_punkt_fra_punktsamling(
     default = False,
     type=bool,
     is_flag=True,
+    help="Angiver om punktoversigten skal anvendes til at indlæse punkter i punktsamlingen"
 )
 def opret_punktsamling(
     jessenpunkt_ident: str,
@@ -806,7 +811,7 @@ def ilæg_punktsamling(
           medlem af punktsamlingen
 
     For hver af de oprettede eller redigerede punktsamlinger ("A") tjekker programmet inden ilægning, om "A" vil
-    komme til at ligne en anden punktsamling ("B"). Brugeren advares om følgende::
+    komme til at ligne en anden punktsamling ("B"). Brugeren advares om følgende:
 
         1. Er A lig med B
         2. Er A en delmængde af B (Er A et "subset" af B)
@@ -1100,7 +1105,7 @@ def ilæg_tidsserie(
     **Bemærk at denne funktion IKKE bruges til at tilføje tidsserie-koter til tidsserierne.**
     Se nedenfor for info om hvordan koter knyttes til en tidsserie.
 
-    Under fanen "Højdetidsserier" gennemgår programmet alle tidsserier og gør følgende::
+    Under fanen "Højdetidsserier" gennemgår programmet alle tidsserier og gør følgende:
 
         - Hvis der ikke findes en tidsserie med pågældende navn, oprettes en ny
           Højdetidsserie i databasen med alle de oplysninger som er givet i rækken
@@ -1285,7 +1290,7 @@ def find_eller_opret_jessenkote(jessenpunkt: Punkt, jessenkote: float, kotesyste
 
     return jessenkoordinat
 
-def udled_jessenpunkt_fra_punktoversigt(punktoversigt: pd.DataFrame):
+def udled_jessenpunkt_fra_punktoversigt(punktoversigt: pd.DataFrame) -> tuple[float, Punkt]:
     """
     Udleder Jessenpunktet ud fra oplysningerne i Punktoversigten.
 
