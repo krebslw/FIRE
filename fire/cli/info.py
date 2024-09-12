@@ -753,15 +753,15 @@ def sag(sagsid: str, **kwargs):
 
 @info.command()
 @fire.cli.default_options()
-@click.argument("punktsamlingsnavn", required=False)
-def punktsamling(punktsamlingsnavn: str, **kwargs):
+@click.argument("punktsamling", required=False)
+def punktsamling(punktsamling: str, **kwargs):
     """
     Information om en punktsamling.
 
     Anføres **PUNKTSAMLING** ikke listes alle aktive punktsamlinger.
-    I listen over punkter i punktsamlingen, er Jessenpunktet highligtet.
+    I listen over punkter i punktsamlingen er Jessenpunktet highlightet.
     """
-    if not punktsamlingsnavn:
+    if not punktsamling:
         punktsamlinger = fire.cli.firedb.hent_alle_punktsamlinger()
         if not punktsamlinger:
             raise SystemExit("Der findes ingen punktsamlinger i databasen.")
@@ -771,9 +771,9 @@ def punktsamling(punktsamlingsnavn: str, **kwargs):
         return
 
     try:
-        punktsamling = fire.cli.firedb.hent_punktsamling(punktsamlingsnavn)
+        punktsamling = fire.cli.firedb.hent_punktsamling(punktsamling)
     except NoResultFound:
-        fire.cli.print(f"Fejl! {punktsamlingsnavn} ikke fundet!", fg="red", err=True)
+        fire.cli.print(f"Fejl! {punktsamling} ikke fundet!", fg="red", err=True)
         raise SystemExit(1)
 
     # Håndtering af Null-værdier for Jessenkoordinat.
