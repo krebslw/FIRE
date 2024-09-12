@@ -8,6 +8,8 @@ import pandas as pd
 import fire.cli
 from fire import uuid
 from fire.api.model import (
+    Punkt,
+    Tidsserie,
     Koordinat,
     Beregning,
 )
@@ -24,13 +26,17 @@ from . import (
     niv,
     skriv_ark,
     er_projekt_okay,
+    hent_relevante_tidsserier,
 )
+
+from ._opret_punktsamling import udled_jessenpunkt_fra_punktoversigt
 
 KOTESYSTEMER = {
     "DVR90": "EPSG:5799",
     "Jessen": "TS:jessen",
     "LRL": "TS:LRL",
 }
+
 
 def punktdata_ikke_skal_opdateres(punktdata: dict) -> bool:
     """
@@ -103,9 +109,6 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     )
     observationer = find_faneblad(projektnavn, "Observationer", arkdef.OBSERVATIONER)
 
-    # Prøv at hente Højdetidsserie-fanebladet
-    hts_ark = find_faneblad(projektnavn, "Højdetidsserier", arkdef.HØJDETIDSSERIE, ignore_failure=True)
-
     # Lav en kopi med de endelige resultater
     ny_punktoversigt = punktoversigt.copy()
 
@@ -122,6 +125,27 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     kotesystem = punktoversigt["System"][0]
 
     anvendt_srid = fire.cli.firedb.hent_srid(KOTESYSTEMER[kotesystem])
+
+    # Hvis vi er ved at ilægge nye tidsserie-koter, så skal alle punkter have en
+    # Højdetidsserie hvis jessenpunkt er det samme som det fastholdte punkt
+    if anvendt_srid.name == "TS:jessen":
+        # Højdetidsserie-fanebladet skal være til stede
+        hts_ark = find_faneblad(
+            projektnavn, "Højdetidsserier", arkdef.HØJDETIDSSERIE, ignore_failure=True
+        )
+        if hts_ark is None:
+            fire.cli.print(
+                f"FEJL: Fanebladet Højdetidsserier skal være til stede hvis du vil ilægge tidsserie-koter",
+                fg="white",
+                bg="red",
+                bold=True,
+            )
+            raise SystemExit(1)
+
+        fastholdt_kote, fastholdt_punkt = udled_jessenpunkt_fra_punktoversigt(
+            punktoversigt
+        )
+
     tid = gyldighedstidspunkt(projektnavn)
     ny_kote = partial(Koordinat, srid=anvendt_srid, t=tid)
 
@@ -144,61 +168,26 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         til_registrering.append(kote)
         ny_punktoversigt = frame.insert(ny_punktoversigt, index, punktdata)
 
-        # Hvis man har anvendt TS:jessen og Højdetidsserie arket er til stede,
-        # så forsøger vi at mappe den nye kote til en Højdetidsserie
-        if hts_ark is not None and anvendt_srid.name=="TS:jessen":
+        # Hvis man har anvendt TS:jessen så tilføjes den beregnede kote til en Tidsserie
+        # som brugeren skal have specificeret i Højdetidsserier-arket.
+        if anvendt_srid.name == "TS:jessen":
 
             # Gå igennem alle punktets tidsserier i arket
-            opdaterede_tidsserier = []
-            for index, htsdata in hts_ark[hts_ark["Punkt"]==punkt.ident].iterrows():
+            opdaterede_tidsserier = hent_relevante_tidsserier(
+                hts_ark, punkt, fastholdt_punkt, fastholdt_kote
+            )
 
-                # Den her fejler hvis man opgiver en tidsserie i HTS-fanen som ikke findes!
-                tidsserie = fire.cli.firedb.hent_tidsserie(htsdata["Tidsserienavn"])
-
-                # Den her fejler hvis den fundne tidsserie ikke har punkt som punkt
-                # Vil kun ske hvis man manuelt har tastet noget mærkeligt ind i arket.
-                if tidsserie.punkt != punkt:
-                    fire.cli.print(
-                        f"FEJL: Mismatch mellem punkt {punkt.ident} og tidsserie {tidsserie.navn}!",
-                        fg="white",
-                        bg="red",
-                        bold=True,
-                    )
-                    raise SystemExit(1)
-
-                # Samme som ovenstående, men for Punktgruppenavn
-                if tidsserie.punktsamling.navn != htsdata["Punktgruppenavn"]:
-                    fire.cli.print(
-                        f"FEJL: Mismatch mellem punktgruppe {htsdata['Punktgruppenavn']} og tidsserie {tidsserie.navn}!",
-                        fg="white",
-                        bg="red",
-                        bold=True,
-                    )
-                    raise SystemExit(1)
-
-                # NB! Her kan man komme til at opdatere flere tidsserier med den samme
-                # koordinat, hvis flere tidsserier er angivet i arket! Fx hvis arket ser således ud:
-
-                # Punktgruppenavn | Punkt | Er Jessenpunkt | Tidsserienavn  | Formål | System
-                # ----------------|-------|----------------|----------------|--------|----
-                # TEST_SPARRING   | THOR  |                | THOR_HTS_81666 | test 1 | Jessen
-                # TEST_TAST       | THOR  |                | THOR_HTS_81677 | test 2 | Jessen
-                #
-                # i dette tilfælde vil de to tidsserier THOR_HTS_81666, og THOR_HTS_81777 begge få tilknyttet
-                # det beregnede koordinat for punktet THOR.
-
-                opdaterede_tidsserier.append(tidsserie)
-                tidsserie.koordinater.append(kote)
+            for ts in opdaterede_tidsserier:
+                ts.koordinater.append(kote)
 
             if not opdaterede_tidsserier:
                 fire.cli.print(
-                        f"FEJL: Kan ikke indsætte en ny højdetidsserie-kote {kote.z} for punkt {punkt.ident}."
-                        f"Punktet er ikke tilknyttet nogle gyldige tidsserier!",
-                        fg="white",
-                        bg="red",
-                        bold=True,
-                    )
-
+                    f"FEJL: Kan ikke indsætte en ny højdetidsserie-kote {kote.z} for punkt {punkt.ident}."
+                    f"Punktet er ikke tilknyttet nogle gyldige tidsserier!",
+                    fg="white",
+                    bg="red",
+                    bold=True,
+                )
                 raise SystemExit(1)
 
             tidsserier_til_registrering.extend(opdaterede_tidsserier)
@@ -282,7 +271,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     fire.cli.print(sagseventtekst, fg="yellow", bold=True)
     fire.cli.print(f"Ialt {n_koter} koter bestemt ud fra {n_obs} observationer\n")
 
-    if hts_ark is not None and anvendt_srid.name=="TS:jessen":
+    if hts_ark is not None and anvendt_srid.name == "TS:jessen":
         tsnavne = [ts.navn for ts in tidsserier_til_registrering]
         tsnavne = forkort(tsnavne)
 
@@ -294,11 +283,11 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         fire.cli.firedb.indset_sagsevent(sagsevent_tidsserier, commit=False)
 
         sagsgangslinje = {
-        "Dato": pd.Timestamp.now(),
-        "Hvem": sagsbehandler,
-        "Hændelse": "Opdatering af tidsseriekoter",
-        "Tekst": sagsevent_tidsserier.sagseventinfos[0].beskrivelse,
-        "uuid": sagsevent_tidsserier.id,
+            "Dato": pd.Timestamp.now(),
+            "Hvem": sagsbehandler,
+            "Hændelse": "Opdatering af tidsseriekoter",
+            "Tekst": sagsevent_tidsserier.sagseventinfos[0].beskrivelse,
+            "uuid": sagsevent_tidsserier.id,
         }
         sagsgang = frame.append(sagsgang, sagsgangslinje)
 
@@ -311,9 +300,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         fire.cli.print(f"Mulig årsag: {ex}")
     else:
         spørgsmål = click.style("Du indsætter nu ", fg="white", bg="red")
-        spørgsmål += click.style(
-            f"{n_koter} kote(r) ", fg="white", bg="red", bold=True
-        )
+        spørgsmål += click.style(f"{n_koter} kote(r) ", fg="white", bg="red", bold=True)
         spørgsmål += click.style(f"i ", fg="white", bg="red")
         spørgsmål += click.style(
             f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True
