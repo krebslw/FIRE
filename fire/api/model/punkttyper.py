@@ -333,6 +333,10 @@ class PunktSamling(FikspunktregisterObjekt):
 
     tidsserier = relationship("Tidsserie", back_populates="punktsamling")
 
+    @property
+    def jessenkote(self) -> float:
+        return (self.jessenkoordinat.z if self.jessenkoordinat is not None else 0)
+
 
 class PunktInformation(FikspunktregisterObjekt):
     __tablename__ = "punktinfo"
