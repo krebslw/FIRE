@@ -718,7 +718,7 @@ def generer_arkdata(punktsamling: PunktSamling) -> tuple[list, list]:
             punktsamling.navn,
             punktsamling.jessenpunkt.ident,
             punktsamling.jessenpunkt.jessennummer,
-            (punktsamling.jessenkoordinat.z if punktsamling.jessenkoordinat is not None else 0),
+            punktsamling.jessenkote,
             punktsamling.formål,
         )
     ]
