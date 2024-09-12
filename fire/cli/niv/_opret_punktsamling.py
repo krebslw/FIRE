@@ -522,11 +522,20 @@ def opret_punktsamling(
     type=str,
     help="Angiv kommasepareret liste over punkter som skal tilføjes til punktsamlingen",
 )
+@click.option(
+    "--punktoversigt",
+    "anvend_punktoversigt",
+    default = False,
+    type=bool,
+    is_flag=True,
+    help="Angiver om punktoversigten skal anvendes til at indlæse punkter i punktsamlingen"
+)
 def udtræk_punktsamling(
     jessenpunkt_ident: str,
     projektnavn: str,
     punktsamlingsnavn: str,
     punkter: str,
+    anvend_punktoversigt: bool,
     **kwargs,
 ) -> None:
     """
@@ -557,6 +566,12 @@ def udtræk_punktsamling(
     indsætter i arket. Punkterne indsættes da med default tidsserienavne og formål. Eks::
 
         fire niv udtræk-punktsamling SAG --punktsamlingsnavn PUNKTSAMLING_81001 --punkter "SKEJ,RDIO,BUDP"
+
+    Derudover kan man anvende ``--punktoversigt``, der ligesom ``--punkter`` fortæller
+    programmet at det skal udvide listen af punkter med punkterne i "Punktoversigt"-fanen.
+    Eks::
+
+        fire niv udtræk-punktsamling SAG --punktsamlingsnavn PUNKTSAMLING_81001 --punktoversigt
 
     I tilfælde af at man har trukket flere punktsamlinger ud på én gang, bliver punkterne
     tilføjet til alle punktsamlingerne.
@@ -598,6 +613,13 @@ def udtræk_punktsamling(
     else:
         fire.cli.print(f"Hverken Jessenpunkt eller Punktsamling angivet. Afbryder...", fg = 'black', bg='yellow')
         raise SystemExit
+
+    # Hent Punktoversigten, hvis den er tilvalgt, og udvid punktlisten.
+    if anvend_punktoversigt:
+        punktoversigt = find_faneblad(projektnavn, "Punktoversigt", arkdef.PUNKTOVERSIGT)
+
+        # Udvid brugerspecificeret liste af punkter med punkter fra Punktoversigten.
+        punkter.extend(list(punktoversigt["Punkt"]))
 
     punkter = fire.cli.firedb.hent_punkt_liste(punkter, ignorer_ukendte = False)
 
