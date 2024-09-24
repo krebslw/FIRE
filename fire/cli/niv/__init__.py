@@ -10,6 +10,9 @@ from typing import (
 )
 
 import click
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+import numpy as np
 import pandas as pd
 from sqlalchemy.orm.exc import NoResultFound
 import packaging.version
@@ -18,6 +21,8 @@ from fire.api.model import (
     Punkt,
     PunktInformation,
     Sag,
+    Tidsserie,
+    HøjdeTidsserie,
 )
 from fire.io.regneark import arkdef
 from fire.ident import kan_være_gi_nummer
@@ -619,6 +624,124 @@ def er_projekt_okay(projektnavn: str) -> None:
         return
 
 
+def hent_relevante_tidsserier(
+    hts_ark: pd.DataFrame, punkt: Punkt, fastholdt_punkt: Punkt, fastholdt_kote: float
+) -> list[Tidsserie]:
+    """
+    Henter de relevante tidsserier fra Højdetidsserier-arket
+
+    Med "relevante" skal forstås tidsserier der har ``punkt`` som punkt, og som hører
+    under en punktsamling der har ``fastholdt_punkt`` og ``fastholdt_kote`` som fastholdt
+    punkt hhv. kote.
+
+    Derudover kontrolleres oplysningerne i Højdetidsserier-fanen. Hvis de er forkerte
+    udsendes fejlmeddelelser.
+    """
+    # Gå igennem alle punktets tidsserier i arket
+    tidsserier = []
+    for index, htsdata in hts_ark[hts_ark["Punkt"] == punkt.ident].iterrows():
+
+        # Den her fejler hvis man opgiver en tidsserie i HTS-fanen som ikke findes!
+        tidsserie = fire.cli.firedb.hent_tidsserie(htsdata["Tidsserienavn"])
+
+        # Den her fejler hvis den fundne tidsserie ikke har punkt som punkt
+        # Vil kun ske hvis man manuelt har tastet noget mærkeligt ind i arket.
+        if tidsserie.punkt != punkt:
+            fire.cli.print(
+                f"FEJL: Mismatch mellem punkt {punkt.ident} og tidsserie {tidsserie.navn}!",
+                fg="white",
+                bg="red",
+                bold=True,
+            )
+            raise SystemExit(1)
+
+        # Samme som ovenstående, men for Punktgruppenavn
+        if tidsserie.punktsamling.navn != htsdata["Punktgruppenavn"]:
+            fire.cli.print(
+                f"FEJL: Mismatch mellem punktgruppe {htsdata['Punktgruppenavn']} og tidsserie {tidsserie.navn}!",
+                fg="white",
+                bg="red",
+                bold=True,
+            )
+            raise SystemExit(1)
+
+        if (
+            tidsserie.punktsamling.jessenpunkt != fastholdt_punkt
+            or tidsserie.punktsamling.jessenkote != fastholdt_kote
+        ):
+            # Spring tidsserier over som ikke matcher det fastholdte punkt/kote
+            # Brugeren bliver nødt til at angive hvilke tidsserier der skal have opdateret
+            # koten.
+            continue
+
+        tidsserier.append(tidsserie)
+
+    if not tidsserier:
+        fire.cli.print(f"Fandt ingen relevante tidsserier for {punkt.ident}")
+
+    return tidsserier
+
+
+def plot_tidsserier(
+    titel: str, tidsserier: list[HøjdeTidsserie], fremhæv_nyeste_punkt: bool = False
+) -> None:
+    """
+    Et simpelt plot af en liste af Højdetidsserier
+
+    Tidsseriernes y-værdi normaliseres til det første punkt i serien.
+    Sættes ``fremhæv_nyeste_punkt=True``, så fremhæves det sidste punkt i tidsserien.
+    """
+
+    # Brug forskellige markør-typer. Og vi gider ikke have markørtypen "."/point med!
+    markers = [m for m in Line2D.filled_markers if m != "."]
+
+    fig = plt.figure()
+    plt.suptitle(titel)
+    for i, ts in enumerate(tidsserier):
+        x = np.array(ts.decimalår)
+        idx_sorted = np.argsort(x)
+        x = x[idx_sorted]
+
+        y = np.array(ts.kote) * 1e3
+        y = y[idx_sorted]
+        y = y - y[0]
+
+        p = plt.plot(
+            x,
+            y,
+            marker=markers[i % len(markers)],
+            markersize=6,
+            label=f"{ts.navn}",
+        )
+
+        # Plot det sidste "nye" punkt og fremhæv det
+        if fremhæv_nyeste_punkt:
+            # udregn koteændringen
+            delta = y[-1] - y[-2]
+
+            plt.plot(
+                x[-1],
+                y[-1],
+                marker="o",
+                mfc="none",
+                color=p[0].get_color(),
+                markersize=p[0].get_markersize() * 2,
+            )
+
+            plt.text(
+                x[-1] + 2e-1,
+                y[-1],
+                f"$\Delta$-kote {delta:.2f}",
+                color=p[0].get_color(),
+            )
+
+    plt.xlabel("År")
+    plt.ylabel("Normaliseret kote [mm]")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+
 """
 Modulnavne starter med `_` for at undgå konflikter,
 der i visse tilfælde kan opstå.
@@ -651,5 +774,4 @@ from ._opret_punktsamling import (
     ilæg_punktsamling,
     ilæg_tidsserie,
     fjern_punkt_fra_punktsamling,
-    udled_jessenpunkt_fra_punktoversigt,
 )
