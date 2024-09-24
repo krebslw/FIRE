@@ -27,9 +27,10 @@ from . import (
     skriv_ark,
     er_projekt_okay,
     hent_relevante_tidsserier,
+    udled_jessenpunkt_fra_punktoversigt,
+
 )
 
-from ._opret_punktsamling import udled_jessenpunkt_fra_punktoversigt
 
 KOTESYSTEMER = {
     "DVR90": "EPSG:5799",

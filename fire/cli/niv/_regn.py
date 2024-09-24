@@ -26,10 +26,10 @@ from . import (
     er_projekt_okay,
     hent_relevante_tidsserier,
     plot_tidsserier,
+    udled_jessenpunkt_fra_punktoversigt
 )
 
 from ._netoversigt import netanalyse
-from ._opret_punktsamling import udled_jessenpunkt_fra_punktoversigt
 
 
 @dataclass
