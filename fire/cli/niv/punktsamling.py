@@ -667,7 +667,7 @@ def ilæg_punktsamling(
             )
             raise SystemExit(1)
 
-        jessenpunkt = hent_jessenpunkt(punktgruppedata["Jessenpunkt"])
+        jessenpunkt = fire.cli.firedb.hent_punkt(punktgruppedata["Jessenpunkt"], sorter=True)
         valider_jessenpunkt(jessenpunkt)
 
         # Opdater arkets Jessennummer, i tilfælde af at brugeren har ændret jessenpunktet
