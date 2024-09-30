@@ -24,7 +24,6 @@ from fire.cli.niv import (
     niv,
     skriv_ark,
     er_projekt_okay,
-    hent_jessenpunkt,
     udled_jessenpunkt_fra_punktoversigt,
     valider_jessenpunkt,
 )
