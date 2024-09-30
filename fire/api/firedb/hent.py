@@ -25,11 +25,12 @@ from fire.api.model import (
     Srid,
     Koordinat,
     Tidsserie,
+    Ident,
 )
 
 
 class FireDbHent(FireDbBase):
-    def hent_punkt(self, ident: str) -> Punkt:
+    def hent_punkt(self, ident: str, sorter: bool = False) -> Punkt:
         """
         Returnerer det første punkt der matcher 'ident'
 
@@ -71,7 +72,7 @@ class FireDbHent(FireDbBase):
 
         return punkter
 
-    def hent_punkter(self, ident: str) -> List[Punkt]:
+    def hent_punkter(self, ident: str, sorter: bool = False) -> List[Punkt]:
         """
         Returnerer alle punkter der matcher 'ident'
 
@@ -97,9 +98,13 @@ class FireDbHent(FireDbBase):
                 .all()
             )
         else:
+            query = self.session.query(Punkt)
+
+            if sorter:
+                query = self.session.query(Punkt, PunktInformation)
+
             result = (
-                self.session.query(Punkt)
-                .options(
+                query.options(
                     joinedload(Punkt.geometriobjekter),
                     joinedload(Punkt.koordinater),
                 )
@@ -117,6 +122,11 @@ class FireDbHent(FireDbBase):
                 )
                 .all()
             )
+
+            if sorter:
+                result = [
+                    p for p, _ in sorted(result, key=lambda result: Ident(result[1]))
+                ]
 
         if not result:
             raise NoResultFound(f"Punkt med ident {ident} ikke fundet")
