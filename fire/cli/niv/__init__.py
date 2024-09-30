@@ -710,7 +710,7 @@ def udled_jessenpunkt_fra_punktoversigt(
     jessenpunkt_kote = fastholdte_koter.iloc[0]
 
     try:
-        jessenpunkt = hent_jessenpunkt(jessenpunkt_ident)
+        jessenpunkt = firedb.hent_punkt(jessenpunkt_ident, sorter=True)
     except NoResultFound:
         fire.cli.print(
             f"FEJL: Kunne ikke finde Jessenpunktet {jessenpunkt_ident} i databasen!",
