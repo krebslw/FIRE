@@ -631,28 +631,6 @@ def er_projekt_okay(projektnavn: str) -> None:
         return
 
 
-def hent_jessenpunkt(ident: str) -> Punkt:
-    """Returnér punkt som har jessennummer der matcher 'ident'
-
-    Hvis 'ident' ikke er et jessennummer, er denne funktion identisk med
-    hent_punkt('ident')
-    """
-    punkt = None
-    punkter = fire.cli.firedb.hent_punkter(ident)
-    for pkt in punkter:
-        if pkt.jessennummer == ident:
-            return pkt
-        elif punkt is None and ident in pkt.identer:
-            # gem det første punkt som matcher ident
-            punkt = pkt
-
-    if punkt is not None:
-        return punkt
-    else:
-        # Hvis intet punkt matcher 1:1 så returneres det første i listen
-        return punkter[0]
-
-
 def udled_jessenpunkt_fra_punktoversigt(
     punktoversigt: pd.DataFrame,
 ) -> tuple[float, Punkt]:
