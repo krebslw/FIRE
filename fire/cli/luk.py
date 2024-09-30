@@ -17,6 +17,7 @@ from fire.api.model import (
     Observation,
     PunktSamling,
     Tidsserie,
+    Grafik,
 )
 from fire.cli.niv import bekræft
 
@@ -407,3 +408,58 @@ def tidsserie(objektid: str, sagsbehandler, **kwargs) -> None:
         else:
             db.session.rollback()
             fire.cli.print(f"Tidsserie {objektid} IKKE lukket!")
+
+
+@luk.command()
+@click.argument("objektid", type=str)
+@click.option(
+    "--sagsbehandler",
+    default=getpass.getuser(),
+    type=str,
+    help="Angiv andet brugernavn end den aktuelt indloggede",
+)
+@fire.cli.default_options()
+def grafik(objektid: str, sagsbehandler, **kwargs) -> None:
+    db = fire.cli.firedb
+    sag = db.ny_sag(sagsbehandler, beskrivelse="Lukning af grafik med 'fire luk'")
+    db.session.add(sag)
+    db.session.flush()
+
+    try:
+        grafik = (
+            db.session.query(Grafik)
+            .filter(
+                Grafik.objektid == objektid,
+            )
+            .one()
+        )
+    except NoResultFound:
+        fire.cli.print(f"Grafik med objektid {objektid} ikke fundet!")
+        raise SystemExit
+
+    sagsevent = sag.ny_sagsevent(beskrivelse=f"'fire luk tidsserie {objektid}")
+
+    try:
+        # Indsæt alle objekter i denne session
+        db.luk_grafik(grafik, sagsevent, commit=False)
+        db.session.flush()
+        db.luk_sag(sag, commit=False)
+        db.session.flush()
+    except DatabaseError as e:
+        # rul tilbage hvis databasen smider en exception
+        db.session.rollback()
+        fire.cli.print(
+            f"Der opstod en fejl - grafik med objektid {objektid} IKKE lukket!"
+        )
+        print(e)
+    else:
+        tekst = f"""Er du sikker på at du vil lukke grafikken med {objektid}:
+
+        {repr(grafik)}
+"""
+        if bekræft(tekst):
+            db.session.commit()
+            fire.cli.print(f"Grafik {objektid} lukket!")
+        else:
+            db.session.rollback()
+            fire.cli.print(f"Grafik {objektid} IKKE lukket!")
