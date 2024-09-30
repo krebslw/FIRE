@@ -316,7 +316,7 @@ def opret_punktsamling(
     #   Gøres enten fra angivet ident, eller udledes fra Punktoversigten
     if jessenpunkt_ident:
         # Prioritér punkter som matcher på Jessennummer da dette er mest intuitivt.
-        jessenpunkt = hent_jessenpunkt(jessenpunkt_ident)
+        jessenpunkt = fire.cli.firedb.hent_punkt(jessenpunkt_ident, sorter=True)
     elif punktoversigt is not None:
         # Find jessenpunktet ud fra oplysningerne i Punktoversigt-arket
         jessenpunkt_kote, jessenpunkt = udled_jessenpunkt_fra_punktoversigt(
