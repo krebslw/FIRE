@@ -489,7 +489,7 @@ def udtræk_punktsamling(
     elif jessenpunkt_ident:
         # Udtræk alle punktsamlinger som har det valgte Jessenpunkt
         try:
-            jessenpunkt = hent_jessenpunkt(jessenpunkt_ident)
+            jessenpunkt = fire.cli.firedb.hent_punkt(jessenpunkt_ident, sorter=True)
         except NoResultFound:
             fire.cli.print(
                 f"FEJL! Jessenpunkt {jessenpunkt_ident} ikke fundet!",
