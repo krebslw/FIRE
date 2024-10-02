@@ -16,6 +16,7 @@ from fire.api.model.tidsserier import PolynomieRegression1D
 from fire.cli.ts.statistik_ts import (
     StatistikGnss,
     StatistikGnssSamlet,
+    StatistikHts,
 )
 
 TS_PLOTTING_LABELS = {
@@ -214,6 +215,69 @@ Std. af data fra alle tidsserier (samlet) = {statistik.std_samlet:.2f} mm"
     plt.figtext(0.55, 0.05, std_tekst)
 
     plt.show()
+
+def plot_hts_analyse(
+    label: str,
+    linreg: PolynomieRegression1D,
+    statistik: StatistikHts,
+    alpha: float = 0.05,
+):
+    """
+    Plot resultaterne af en Højdetidsserie-analyse.
+
+    ``alpha`` bestemmer signifikansniveauet for konfidensbånd til fittet.
+    """
+
+    # Prædiktioner og intervaller
+    x_præd = np.linspace(linreg.x[0], linreg.x[-1], 1000)
+    y_præd = linreg.beregn_prædiktioner(x_præd)
+
+    konfidensbånd = linreg.beregn_konfidensbånd(
+        x_præd,
+        y_præd,
+        alpha=alpha,
+        er_samlet=False,
+    )
+
+    # Plotting
+    plt.rcParams["figure.autolayout"] = True
+    plt.figure(figsize=(12, 9))
+    ax = plt.subplot(111)
+    ax.errorbar(x=linreg.x, y=linreg.y, yerr=np.sqrt(1/linreg._W),
+                fmt = "ko",
+                capsize=3,
+                label=f"Kote $\\pm$ std. afvigelse")
+
+    ax.plot(
+        x_præd,
+        y_præd,
+        "r",
+        label=f"Hældning af fit: {linreg.beta[1]:.3f} [mm/år]",
+    )
+
+    # Konfidensbånd
+    ax.plot(x_præd, konfidensbånd[0, :], color="green")
+    ax.plot(x_præd, konfidensbånd[1, :], color="green", label=f"{100*(1-alpha):g}% Konfidensbånd")
+
+    ax.set_title(
+        f"Tidsserie: {statistik.TidsserieID}    R$^2$ = {statistik.R2:.2f}   N = {statistik.N}"
+    )
+    ax.set_xlabel("År")
+    ax.set_ylabel(label)
+
+    ax.yaxis.set_major_formatter(FormatStrFormatter("%.3f"))
+
+    ax.grid()
+    ax.legend(
+        loc="upper center",
+        fancybox=True,
+        shadow=True,
+        ncol=1,
+    )
+
+    plt.show()
+
+
 
 def plot_data(x: list, y: list, **kwargs):
     plt.plot(
