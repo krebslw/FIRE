@@ -26,6 +26,7 @@ typer indhold i FIRE databasen.
   :prog: fire info obstype
   :nested: full
 
+.. _info_punktsamling:
 .. click:: fire.cli.info:punktsamling
   :prog: fire info punktsamling
   :nested: full
