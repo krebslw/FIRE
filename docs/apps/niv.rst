@@ -109,6 +109,7 @@ kommunal vedligeholdsopgave.
   :prog: fire niv ilæg-revision
   :nested: full
 
+.. _ilæg_nye_punkter:
 .. click:: fire.cli.niv:ilæg_nye_punkter
   :prog: fire niv ilæg-nye-punkter
   :nested: full
