@@ -2,11 +2,12 @@
 
 Arbejde med højdetidsserier og punktsamlinger i FIRE
 ====================================================
-En højdetidsserie er en samling af koter, som alle er målt til det samme punkt, og som er
-givet i det samme *højdesystem*. Når hver kote i tidsserien er beregnet ved fastholdelse
-af det samme punkt med samme kote kaldes koterne i tidsserien for *jessenkoter* og
-tidsseriens højdesystem siges at være et *lokalt højdesystem*. Det fastholdte punkt kaldes
-for *jessenpunktet* og jessenpunktets fastholdte kote kaldes *referencekoten*.
+En højdetidsserie er en samling af koter, som alle er målt til det samme punkt til
+forskellige tidspunkter, og som er givet i det samme *højdesystem*. Når hver kote i
+tidsserien er beregnet ved fastholdelse af det samme punkt og kote kaldes koterne i
+tidsserien for *jessenkoter* og tidsseriens højdesystem siges at være et *lokalt
+højdesystem*. Det fastholdte punkt kaldes for *jessenpunktet* og jessenpunktets fastholdte
+kote kaldes *referencekoten*.
 
 En samling af højdetidsserier, som alle har samme jessenpunkt og referencekote, kaldes en
 *punktsamling* eller *punktgruppe*.
@@ -16,21 +17,66 @@ En samling af højdetidsserier, som alle har samme jessenpunkt og referencekote,
     referencekoten ofte bare for *jessenkoten*!
 
 Arbejdet med højdetidsserier kan inddeles i kategorierne vedligehold og analyse.
-Tilsvarende findes der workflows i FIRE som understøtter disse arbejdsopgaver. De følgende
-afsnit gennemgår disse to kategorier.
+Vedligehold af tidsserier indebærer primært opmåling af punktgrupper og efterfølgende
+beregning af nye koter til tidsserierne. Når nye punkter etableres, fx fordi et andet
+punkt i punktgruppen er gået tabt eller en ny sikringsgruppe skal anlægges, vil der også
+ligge noget vedligehold i at indmåle punkterne og efterfølgende oprette nye tidsserier i
+databasen.
 
-Arbejdet med højdetidsserier ligger i FIREs ``niv``-modul.
+Højdetidsserieanalyse bruges som værktøj til at støtte op om beslutninger angående den
+geodætiske infrastruktur. Analyserne foretages på baggrund af det data som ligger i FIRE og
+gør det muligt at identificere lokale bevægelser af punkterne i punktgruppen. Dette
+bruges igen til fx at dokumentere stabiliteten af vores CORS-stationer, eller tage
+beslutninger om hvorvidt et 5D-punkt skal indgå i en geoidetilpasning.
 
+De følgende afsnit gennemgår nogle typiske vedligeholdelses- og analyseopgaver som FIRE nu
+understøtter, herunder:
 
-Vedligehold af punktsamling indebærer:
-- at oprette og lukke
-- beregn og indsætte nye koter til tidsserier
+- at oprette og lukke punktgrupper
+- tilføje nye punkter til punktgrupper
+- beregne og indsætte nye koter til tidsserier
+- plotte og analysere højdetidsserier
+
+.. note::
+
+    Der er ikke ændret noget ved det almindelige nivellement-workflow. Det er altså ikke
+    nødvendigt at læse videre hvis man ikke har brug for at arbejde med tidsserier!
 
 .. _ts_vedligehold:
 Vedligehold af punktsamlinger og tidsserier
 -------------------------------------------
+Vedligehold og opdatering af punktgrupper og højdetidsserier er indbygget i
+:ref:`kommandolinjeprogrammer_niv`-modulet. Før man begiver sig ud i at vedligeholde
+tidsserier i FIRE, anbefales det derfor at man er bekendt med den almindelige
+funktionalitet som **niv**-modulet tilbyder. Det vil bl.a. sige at man bør være
+komfortabel med at arbejde med nivellement-sager i **niv**-modulets sagsregneark.
 
-Vedligehold vil sige at
+Funktionaliteten i sagsregnearket er blevet udvidet med fanerne **Punktgruppe** og
+**Højdetidsserier**. Disse faner oprettes først ved kald af én af kommandoerne ``fire niv
+opret-punktsamling`` eller ``fire niv udtræk-punktsamling``.
+
+
+En oversigt og forklaring af de to faners indhold ses nedenfor. Bemærk venligst, at
+indholdet i tabellerne blot er test-eksempler.
+
+  .. image:: images/eksempel_punktgruppe.png
+
+| **Punktgruppenavn**: Punktgruppens navn. Skal være unikt.
+| **Jessenpunkt**: Punkgruppens jessenpunkt, angivet med dets kanoniske ident.
+| **Jessennummer**: Punkgruppens jessenpunkt, angivet med dets Jessennummer.
+| **Jessenkote**: Punktgruppens referencekote.
+| **Formål**: Fritekstfelt, som angiver punktgruppens formål.
+
+  .. image:: images/eksempel_højdetidsserie.png
+
+| **Punktgruppenavn**: Punktgruppen, som højdetidsserien hører under.
+| **Punkt**: Højdetidsseriens punkt.
+| **Er Jessenpunkt**: Angiver om tidsserien tilhører punktgruppens jessenpunkt. Denne
+  kolonne er til ren information og kan hjælpe med at danne overblik, når listen af
+  højdetidsserier er lang.
+| **Tidsserienavn**: Højdetidsseriens navn. Skal være unikt. Default-formen er ``<ident>_HTS_<jessennr>``.
+| **Formål**: Fritekstfelt, som angiver højdetidsserierns formål.
+| **System**: Tidsseriens højdesystem.
 
 
 .. _opret_ps:
@@ -376,7 +422,7 @@ Dette skal ligge under Workshop!
     schema = fire_adm
 
   Kør FIRE-kommandoen ``fire config`` for at tjekke, at FIRE kan finde din
-  konfigurationsfil. Konrollér at oplysningerne står som beskrevet ovenfor.
+  konfigurationsfil. Kontrollér at oplysningerne står som beskrevet ovenfor.
 
   Når du er færdig med denne demo kan du, hvis du vil, rette default-forbindelsen tilbage
   til ``prod``.
