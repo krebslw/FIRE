@@ -24,9 +24,9 @@ from fire.api.model import (
     ObservationstypeID,
     GeometriskKoteforskel,
     TrigonometriskKoteforskel,
+    Srid,
 )
 from fire.api.niv.enums import NivMetode
-from fire.srid import SRID
 from fire.io.regneark import arkdef
 import fire.io.dataframe as frame
 from fire.api.model.geometry import (
@@ -115,7 +115,6 @@ def observationsrække(
 
 PUNKTOVERSIGT_KONSTANTE_FELTER = {
     "Fasthold": "",
-    "System": "DVR90",
     "Udelad publikation": "",
 }
 
@@ -131,11 +130,9 @@ def punkt_data(punkt: Punkt) -> dict:
     }
 
 
-def gældende_DVR90_koordinat(punkt: Punkt) -> Optional[Koordinat]:
+def gældende_koordinat(punkt: Punkt, srid: Srid) -> Optional[Koordinat]:
     koordinatsæt = [
-        k
-        for k in punkt.koordinater
-        if k.srid.name == SRID.DVR90 and k.registreringtil is None
+        k for k in punkt.koordinater if k.srid == srid and k.registreringtil is None
     ]
     if not koordinatsæt:
         return
@@ -143,18 +140,19 @@ def gældende_DVR90_koordinat(punkt: Punkt) -> Optional[Koordinat]:
     return koordinatsæt[0]
 
 
-def kote_data(punkt: Punkt) -> Koordinat:
-    koordinater = gældende_DVR90_koordinat(punkt)
+def kote_data(punkt: Punkt, srid: Srid) -> Koordinat:
+    koordinater = gældende_koordinat(punkt, srid)
     if koordinater is None:
         return {}
     return {
         "Hvornår": koordinater.t,
         "Kote": koordinater.z,
         "σ": koordinater.sz,
+        "System": (srid.kortnavn or srid.name),
     }
 
 
-def punktrække(punkt: Punkt) -> dict:
+def punktrække(punkt: Punkt, srid: Srid) -> dict:
     """
     Oversætter atributter på en observationstype til en post,
     der kan bruges som række i et punktoversigtsregneark til
@@ -165,7 +163,7 @@ def punktrække(punkt: Punkt) -> dict:
         **basisrække(arkdef.PUNKTOVERSIGT),
         **PUNKTOVERSIGT_KONSTANTE_FELTER,
         **punkt_data(punkt),
-        **kote_data(punkt),
+        **kote_data(punkt, srid),
     }
 
 
@@ -180,12 +178,13 @@ def til_nyt_ark(
     arkdefinition: arkdef.ArkDefinitionType,
     rækkemager: Callable,
     sorter_efter: Union[str, List[str]] = None,
+    **kwargs,
 ) -> pd.DataFrame:
     """
     Konverterer poster af en given entitet til rækker i en `pandas.DataFrame` (et ark).
 
     """
-    data_dict = (rækkemager(entitet) for entitet in entiteter)
+    data_dict = (rækkemager(entitet, **kwargs) for entitet in entiteter)
     data_df = pd.DataFrame(data_dict, columns=arkdefinition.keys())
     ark = frame.append_df(nyt_ark(arkdefinition), data_df)
     if sorter_efter is not None:
