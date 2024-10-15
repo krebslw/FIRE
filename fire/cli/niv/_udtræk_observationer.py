@@ -48,6 +48,7 @@ from fire.cli.niv import (
     er_projekt_okay,
     skriv_observationer_geojson,
     skriv_punkter_geojson,
+    skriv_ark,
     KOTESYSTEMER,
 )
 from fire.typologi import (
@@ -327,10 +328,10 @@ def udtræk_observationer(
     # --------------
 
     # Regneark
+    srid = fire.cli.firedb.hent_srid(kotesystem)
     fire.cli.print("Gem observationer og punkter i projekt-regnearket")
     ark_observationer = til_nyt_ark_observationer(observationer)
-    ark_punktoversigt = til_nyt_ark_punktoversigt(punkter)
-    ark_punktoversigt["System"] = kotesystem
+    ark_punktoversigt = til_nyt_ark_punktoversigt(punkter, srid=srid)
 
     # Forbered ark-skrivning
     faner = {
