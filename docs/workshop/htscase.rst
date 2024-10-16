@@ -138,7 +138,7 @@ Læg punktet i databasen. Luk sagsarket og kør følgende::
 
     fire niv ilæg-nye-punkter HTS_DEMO
 
-Åbn sagsarket igen og se at punktet nu lagt i databasen og har fået tildelt et
+Åbn sagsarket igen og se at punktet nu er lagt i databasen og har fået tildelt et
 landsnummer. Træk punktinfo ud via det nye landsnummer, og se at punktet også har fået et
 nyt GI-nummer. Vi vil fremover bruge GI-nummeret frem for landsnummeret.
 
@@ -189,7 +189,7 @@ Vælg et nyt jessennummer, som ikke fremgår af listen (kolonnen "Jessenpunkt"),
 
 .. image:: figures/nyt_jessennr.PNG
 
-Husk at slette "x" fra kolonnen **Ikke besøgt**. Luk revision- og sagsarket, og ilæg de nye attributter::
+Husk at slette "x" fra kolonnen **Ikke besøgt**. Luk revisions- og sagsarket, og ilæg de nye attributter::
 
     fire niv ilæg-revision HTS_DEMO
 
@@ -208,6 +208,7 @@ Tjek at punktet har fået tildelt jessennummer og har attributterne ``NET:jessen
 
 Opret sikringspunkter
 ......................
+
 Nu opretter vi 4 sikringspunkter omkring det nye 5D-punkt. Du kan gøre som før, ved selv
 at indtaste nogle tilfældige koordinater ind i fanen **Nyetablerede punkter**. Alternativt
 burde følgende tabel kunne kopieres ind i arket:
@@ -225,7 +226,7 @@ burde følgende tabel kunne kopieres ind i arket:
     * - =C$2-0.001
       - =D$2-0.001
 
-Dette gør se de 4 punkter oprettes NV, NØ, SV og SØ for jessenpunktet.
+Dette gør så de 4 punkter oprettes NV, NØ, SV og SØ for jessenpunktet.
 
 .. image:: figures/nyetableret_sikringsgruppe.PNG
 
@@ -233,16 +234,164 @@ Ilæg punkterne::
 
     fire niv ilæg-nye-punkter HTS_DEMO
 
+Tjek at punkterne er oprettet korrekt. Du kan fx gøre flg:
 
-Opret punktgruppe og tidsserier:
+* Find de nye landsnumre i sagsarket
+* Slå punkterne op med ``fire info punkt``
+* Kør ``fire niv læs-observationer HTS_DEMO`` Der er selvfølgelig ikke nogen observationer
+  endnu, men denne kommando laver også nogle geojson-filer som vi kan trække ind i QGIS.
+* Find den oprettede geojson-fil, fx ``HTS_DEMO-punkter.geojson`` og træk den ind i QGIS::
+
+.. image:: figures/indtræk_geojson.gif
+
+
+
+Første opmåling
+................
+Der laves nu den første opmåling af vores punktgruppe. Først laver vi nogle indledende
+øvelser for at simulere nogle nivellement-observationer.
+
+Hent de 4 test-observationsfiler og gem dem i din test-mappe. I filerne er gemt de
+observationer vi skal bruge til at udjævne og generere tidsserier i FIRE. Når du har
+hentet filerne, skulle din mappestruktur gerne se nogenlunde sådan ud:
+
+.. image:: figures/mappestruktur.PNG
+
+Åbn gerne nogle af mgl-filerne. Læg mærke til de generiske punktnavne som indgår::
+
+    Jessenpunkt, Punkt-A, Punkt-D, Punkt-C, Punkt-D
+
+
+Disse vil vi i det følgende, via lidt søg-og-erstat gymnastik, erstatte med identerne for
+de punkter vi lige har oprettet.
+
+Her er skabelonen for søg-og-erstat kommandoerne. Kør alle kommandoerne, hvor du erstatter
+punktnavnene med dine egne punkter::
+
+    sed -i 's/Jessenpunkt/<MitJessenpunkt>/g' test_obs_*.mgl
+    sed -i 's/Punkt-A/<MitFørstePunkt>/g' test_obs_*.mgl
+    sed -i 's/Punkt-B/<MitAndetPunkt>/g' test_obs_*.mgl
+    sed -i 's/Punkt-C/<MitTredjePunkt>/g' test_obs_*.mgl
+    sed -i 's/Punkt-D/<MitFjerdePunkt>/g' test_obs_*.mgl
+
+Her et eksempel på hvordan søg-og-erstat kommandoerne kan se ud::
+
+    sed -i 's/Jessenpunkt/G.I.2406/g' test_obs_*.mgl
+    sed -i 's/Punkt-A/12-01-09158/g' test_obs_*.mgl
+    sed -i 's/Punkt-B/12-01-09159/g' test_obs_*.mgl
+    sed -i 's/Punkt-C/12-01-09160/g' test_obs_*.mgl
+    sed -i 's/Punkt-D/12-01-09161/g' test_obs_*.mgl
+
+Indlæs nu observationerne fra den første mgl-fil. Under fanen **Filoversigt** i sagsarket skriver du følgende:
+
+.. image:: figures/filoversigt_2000.PNG
+
+.. warning::
+
+    Pga. en mindre, ikke-fatal fejl/uhensigtsmæssighed, som netop er opdaget i FIRE, så
+    skal du lige slette indholdet af fanen **Nyetablerede punkter** , med undtagelse af
+    overskrifterne.
+
+    Fejlen gør så Punktoversigten bliver oprettet med dubletter af de nyoprettede punkter,
+    hvis kanoniske ident er forskellig fra landsnummeret, dvs. vores nye GI-punkt.
+
+
+Luk arket og indlæs observationerne med::
+
+    fire niv læs-observationer HTS_DEMO --kotesystem Jessen
+
+Parameteren ``--Jessen``, gør så programmet forsøger at finde punkternes seneste
+jessenkote samt udfylder kolonnen **System** for dig. Hvis du glemmer at bruge denne
+parameter kan du altid bare indtaste det i arket manuelt.
+
+Tjek at punkterne nu står i fanen **Punktoversigt**. Du er nu klar til at oprette en punktgruppe og tidsserier.
+
+.. image:: figures/punktoversigt_1.PNG
+
+Opret punktgruppe og tidsserier
 ................................
 
+ Kør følgende kommando. Dette opretter fanerne **Punktgruppe** og **Højdetidsserie** i
+ sagsarket.
+
+ ::
+
+    fire niv opret-punktsamling HTS_DEMO --jessenpunkt 81800 --punktoversigt
+
+Åbn sagsarket og rediger formål for punktsamlingen og de 5 tidsserier. Formålene er
+fritekst-felter som man kan bruge til fx at give information om hvad punktgruppen og
+tidsserierne skal bruges til. De må ikke lades være tomme, men må gerne være kortfattede:
+
+.. image:: figures/punktgruppe_fane_1.PNG
+.. image:: figures/højdetidsserier_fane_1.PNG
+
+Læg mærke til, at referencekoten for punktsamlingens jessenpunkt (kolonnen **Jessenkote**)
+er angivet til 0. Denne kolonne er kun til info, og ignoreres ved ilægning af
+punktsamlingen. Nye punktsamlinger oprettes altid med referencekoten 0.
+
+Ilæg Punktsamlingen og Højdetidsserierne::
+
+    fire niv ilæg-punktsamling HTS_DEMO
+    fire niv ilæg-tidsserie HTS_DEMO
+
+Tjek at punktsamlingen og dens tidsserier er lagt i databasen::
+
+    fire info punktsamling PUNKTSAMLING_81800
+    >>
+    ------------------------- PUNKTSAMLING -------------------------
+    Navn          : PUNKTSAMLING_81800
+    Formål        : Stabilitetskontrol
+    Jessenpunkt   : G.I.2406
+    Jessennummer  : 81800
+    Jessenkote    : 0 m
+    Antal punkter : 5
+    --- Punkter ---
+    G.I.2406
+    12-01-09158
+    12-01-09159
+    12-01-09160
+    12-01-09161
+    --- Tidsserier ---
+    Navn                                      Antal datapunkter  Type    Referenceramme
+    ----------------------------------------  -----------------  ------  ------------------
+    G.I.2406_HTS_81800                        0                  Højde   Jessen
+    12-01-09161_HTS_81800                     0                  Højde   Jessen
+    12-01-09160_HTS_81800                     0                  Højde   Jessen
+    12-01-09159_HTS_81800                     0                  Højde   Jessen
+    12-01-09158_HTS_81800                     0                  Højde   Jessen
 
 
+Ret formål
+..........
+Du har indset, at "Stabilitetskontrol" var en lidt for intetsigende beskrivelse, og beslutter dig for at rette det.
 
+Gå ind i sagsarket og ret punktsamlingens formål til noget andet. Derefter kører du samme kommandoer som før::
 
+    fire niv ilæg-punktsamling HTS_DEMO
+    fire info punktsamling PUNKTSAMLING_81800
+    >>
+    ------------------------- PUNKTSAMLING -------------------------
+    Navn          : PUNKTSAMLING_81800
+    Formål        : Kontrol af stabilitet
+    Jessenpunkt   : G.I.2406
+    Jessennummer  : 81800
+    Jessenkote    : 0 m
+    ...
 
-En ny CORS station er blevet anlagt, sikringspunkter er etablereret og indmålt. Nu skal observationerne lægges i databasen.
+Beregn første opmåling
+......................
+Som ved en normal beregning skal man vælge et fastholdt punkt og kote. Når du beskæftiger dig med
+tidsserier skal dette svare til en punktsamlings jessenpunkt og referencekote. I
+**Punktoversigt** og sætter du et "x" i kolonnen **Fasthold** ud for jessenpunktet, og i
+kolonnen **Kote** skriver du 0 som vist:
+
+.. image:: figures/punktoversigt_2.PNG
+
+Beregn nu nye koter::
+
+    fire niv regn HTS_DEMO
+    fire niv regn HTS_DEMO
+
 
 
 

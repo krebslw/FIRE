@@ -321,10 +321,10 @@ jessenpunkt. *Denne tidsserie trækkes simpelthen bare fra de andre tidsserier i
 punktsamlingen*. Dette kræver at tidsserierne er beregnet til de samme tidspunkter som det
 nye jessenpunkt.
 
- Denne operation er faktisk ikke *så* dirty, idet det faktisk giver de samme koter som
- hvis man lavede en genberegning med et nyt fastholdt jessenpunkt. Dog vil de estimerede
- spredninger ikke blive transformeret, hvorfor denne metode ikke bør (eller kan) anvendes til
- tidsserier som skal lægges i databasen.
+Denne operation er faktisk ikke *så* dirty, idet det faktisk giver de samme koter som
+hvis man lavede en genberegning med et nyt fastholdt jessenpunkt. Dog vil de estimerede
+spredninger ikke blive transformeret, hvorfor denne metode ikke bør (eller kan) anvendes til
+tidsserier som skal lægges i databasen.
 
 .. note::
 
