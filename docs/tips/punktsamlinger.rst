@@ -29,13 +29,18 @@ gør det muligt at identificere lokale bevægelser af punkterne i punktgruppen. 
 bruges igen til fx at dokumentere stabiliteten af vores CORS-stationer, eller tage
 beslutninger om hvorvidt et 5D-punkt skal indgå i en geoidetilpasning.
 
-De følgende afsnit gennemgår nogle typiske vedligeholdelses- og analyseopgaver som FIRE nu
+Man bruger programmet :ref:`fire_ts_analyse_hts` til at analysere Højdetidsserier.
+Programmet fungerer i høj grad på samme måde som programmet til GNSS-tidsserier. For
+detaljer om beregningen af lineære fit og statistiske parametre henvises derfor til
+beskrivelsen af :ref:`fire_ts_analyse-gnss`.
+
+
+De følgende afsnit gennemgår nogle typiske vedligeholdelsesopgaver som FIRE nu
 understøtter, herunder:
 
 - at oprette og lukke punktgrupper
 - tilføje nye punkter til punktgrupper
 - beregne og indsætte nye koter til tidsserier
-- plotte og analysere højdetidsserier
 
 .. note::
 
@@ -82,7 +87,7 @@ tabellerne blot er test-eksempler.
 .. _opret_ps:
 Opret ny punktsamling
 ---------------------
-* Opret ny sag og tilhørende sagsark
+* Opret ny sag og tilhørende sagsark:
 
 .. code-block::
 
@@ -125,7 +130,7 @@ Oplysningerne i de to faner redigeres indtil man er klar til at lægge dem i dat
 
 .. tip::
     | For at spare lidt tid med at indtaste værdierne i højdetidsserier-fanen kan man med
-      fordel bruge ``--punkter`` valgmuligheden:
+      fordel bruge parameteren ``--punkter``:
 
     .. code-block::
 
@@ -157,16 +162,27 @@ gøres ved at indsætte attributten ``NET:jessen`` og angive det nye jessennumme
 
   Bemærk at jessennummeret skal være unikt (der må ikke være andre punkter med samme
   jessennummer). Som det er nu skal man selv indtaste det nye jessennummer. En oversigt
-  over alle punktsamlinger og de tilhørende jessennumre som er i brug kan fås med
+  over alle punktsamlinger og de tilhørende jessennumre som allerede er i brug kan fås med
   :ref:`info_punktsamling`.
 
+.. _opret_ts:
 Opret ny tidsserie i en punktsamling
 ------------------------------------
 For at oprette en ny tidsserie i en punktsamling gøres følgende::
 
     fire niv udtræk-punktsamling MIN_SAG --punktsamlingsnavn PUNKTSAMLING_81999 --punkter G.I.1703
 
-hvor ``--punkter`` angiver en kommasepareret liste, af de punkter som skal have en ny tidsserie.
+hvor ``--punkter`` angiver en kommasepareret liste, af de punkter som skal have en ny
+tidsserie.
+
+.. note::
+
+  Hvis man i sagsarket allerede har indlæst punkter med ``læs-observationer`` eller
+  ``udtræk-observationer``, således at fanen **Punktoversigt** er til stede, så kan man
+  med parameteren ``--punktoversigt`` fortælle programmet, at det skal oprette nye
+  tidsserier for alle punkterne i punktoversigten. Fx::
+
+    fire niv udtræk-punktsamling MIN_SAG --punktsamlingsnavn PUNKTSAMLING_81999 --punktoversigt
 
 .. image:: images/udtræk_højdetidsserie_før.png
 
@@ -221,7 +237,8 @@ opløft, når man har lavet en beregning.
   Her skal man lige være opmærksom. Det er nemlig muligt for et punkt at indgå i flere
   Punktsamlinger (med forskellige jessenpunkter) og dermed have flere Højdetidsserier. *Den viste kote er den nyeste
   jessenkote iblandt alle punktets Højdetidsserier.* Dette kan lede til at koteændring og
-  opløft senere kan komme til at se lidt underlige ud. Dette er ikke grund til bekymring og kan ignoreres.
+  opløft senere kan komme til at se lidt underlige ud. Der er senere, i ``regn``, mulighed for at få
+  plottet tidsserierne med de nyberegnede koter vist i forlængelse.
 
   Det kan desuden ske, at man har opmålt nogle punkter, som slet ikke har en
   Højdetidsserie. I dette tilfælde vil de se ud på samme måde som nyetablerede punkter,
@@ -258,10 +275,10 @@ Når man har valgt et fastholdt jessenpunkt og referencekote, kører man beregni
     fire niv regn
 
 Hvis man vil, er der tilføjet parameteren ``--plot`` til ``regn`` kommandoen. Denne
-giver mulighed for at se de et plot af de tidsserier man har udtrukket, med de nyberegnede
+giver mulighed for at se et plot af de tidsserier man har udtrukket, med de nyberegnede
 koter vist i forlængelse. Det skal understreges, at kun de tidsserier som fremgår af fanen
-"Højdetidsserier" vil blive plottet. Punkter i beregningen, som ikke har en
-højdetidsserie, og som derfor ikke fremgår af fanen "Højdetidsserier", vil altså ikke
+**Højdetidsserier** vil blive plottet. Punkter i beregningen, som ikke har en
+højdetidsserie, og som derfor ikke fremgår af fanen **Højdetidsserier**, vil altså ikke
 blive plottet.
 
 Beregningen afsluttes også som man plejer::
@@ -271,13 +288,13 @@ Beregningen afsluttes også som man plejer::
 
 Der er ikke nye inputs til disse to kommandoer.
 
-**Vigtigt:** ``ilæg-nye-koter`` kigger nu på kolonnen "System". Hvis der her står "Jessen", så
-prøver den at finde en Højdetidsserie ovre i den tilsvarende fane, som koten skal knyttes
+**Vigtigt:** ``ilæg-nye-koter`` kigger nu på kolonnen **System** i fanen **Endelig beregning**. Hvis der her står "Jessen", så
+prøver programmet at finde en Højdetidsserie ovre i **Højdetidsserier**-fanen, som koten skal knyttes
 til. Hvis der ikke kan findes en højdetidsserie for et punkt, vil programmet brokke sig. Man kan
 derefter gøre én af to ting:
 
   - Oprette tidsserier for de punkter som ikke har én, i den korrekte punktsamling. (Se
-    beskrivelse i :ref:`opret_ps`. Brug i ``udtræk-punktsamling`` med fordel
+    beskrivelse i :ref:`opret_ts`. Brug i ``udtræk-punktsamling`` med fordel
     parameteren ``--punktoversigt``.)
 
   - Udelade publikation. Sæt "x" i kolonnen ud for de pågældende punkter
@@ -306,7 +323,7 @@ nye jessenpunkt.
 
  Denne operation er faktisk ikke *så* dirty, idet det faktisk giver de samme koter som
  hvis man lavede en genberegning med et nyt fastholdt jessenpunkt. Dog vil de estimerede
- spredninger ikke blive transformeret, hvorfor denne metode ikke bør anvendes til
+ spredninger ikke blive transformeret, hvorfor denne metode ikke bør (eller kan) anvendes til
  tidsserier som skal lægges i databasen.
 
 .. note::
@@ -343,93 +360,10 @@ har været opmålt i de samme kampagner som det gamle jessenpunkt.
 #. For hver tidspunkt i de gamle tidsserier:
     - Udtræk relevante observationer
     - Følg det gængse niv-workflow for beregning og ilægning af tidsseriekoter, som
-      beskrevet i **INDSÆT REFERENCE**
+      beskrevet i :ref:`opdater_ts`
 
 .. tip::
 
     Step 2-3 gøres nemmest ved at udtrække den gamle punktsamling med ``fire niv
     udtræk-punktsamling`` og derefter redigere jessenpunkt, punktsamlingsnavn og formål og ilægge
     med ``fire niv ilæg-punktsamling``
-
-
-.. list-table:: Opmålingstidsspunkt
-   :widths: 25 25 50
-   :header-rows: 1
-
-   * - Heading row 1, column 1
-     - Heading row 1, column 2
-     - Heading row 1, column 3
-   * - Row 1, column 1
-     -
-     - Row 1, column 3
-   * - Row 2, column 1
-     - Row 2, column 2
-     - Row 2, column 3
-Jessenpunkt  x
-A            - - - - - - - - -
-B
-
-
-
-
-Analyse af højdetidsserier
---------------------------
-Man bruger programmet :ref:`fire_ts_analyse-gnss` til at analysere GNSS-tidsserier.
-Programmet kan blabla
-
-
-CASE:
-...........
-Dette skal ligge under Workshop!
-
-.. warning::
-
-  Inden du begynder, er det vigtigt at sørge for, at du ikke forbinder til
-  produktionsdatabasen ved et uheld. Gør derfor følgende::
-
-  Find din FIRE-konfigurationsfil ``fire.ini`` og ret default databaseforbindelsen til
-  ``test`` i stedet for ``prod``. **Dette gør så du slipper for at skrive** ``--db test``
-  efter hver eneste kommando i denne demo case.
-  I toppen af filen skal der stå::
-
-    [general]
-    default_connection = test
-    ...
-
-  Kontrollér desuden længere nede i ``fire.ini`` at test-databaseforbindelsen er som følger
-  (med password og username udfyldt)::
-
-    [test_connection]
-    password = ***
-    username = ***
-    hostname = exa-x10-r2-c1-scan.prod.sitad.dk
-    service = FIRETEST.prod.sitad.dk
-    schema = fire_adm
-
-  Kør FIRE-kommandoen ``fire config`` for at tjekke, at FIRE kan finde din
-  konfigurationsfil. Kontrollér at oplysningerne står som beskrevet ovenfor.
-
-  Når du er færdig med denne demo kan du, hvis du vil, rette default-forbindelsen tilbage
-  til ``prod``.
-
-
-Tjek at du har FIRE version ``1.8.0`` eller højere installeret. Skriv ``fire --version``.
-
-En case hvor man gennemgår anlægningen, vedligeholdelsen og til sidst sløjfningen af en punktgruppe nær en CORS station.
-
-
-En ny CORS station er blevet anlagt, sikringspunkter er etablereret og indmålt. Nu skal observationerne lægges i databasen.
-
-
-
-Et punkt i en punktgruppe er tabtgået. Der er derfor etableret et nyt punkt som erstatning og
-det er blevet indmålt i den eksisterende punkgruppe.
-
-Følgende er blevet gjort i databasen:
-
-- Det gamle punkt er meldt tabtgået (se :ref:`tabsmelding`)
-- Det nye punkt er oprettet i FIRE (se :ref:`ilæg_nye_punkter`)
-
-Derefter skal observationerne udjævnes og de beregnede koter tidsseriekoter skal lægges i
-FIRE. For at lægge jessenkoten for det nyoprettede punkt i FIRE, skal der imidlertid først
-oprettes en tidsserie som koten kan knyttes til.
