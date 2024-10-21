@@ -216,6 +216,7 @@ Std. af data fra alle tidsserier (samlet) = {statistik.std_samlet:.2f} mm"
 
     plt.show()
 
+
 def plot_hts_analyse(
     label: str,
     linreg: PolynomieRegression1D,
@@ -243,10 +244,14 @@ def plot_hts_analyse(
     plt.rcParams["figure.autolayout"] = True
     plt.figure(figsize=(12, 9))
     ax = plt.subplot(111)
-    ax.errorbar(x=linreg.x, y=linreg.y, yerr=np.sqrt(1/linreg._W),
-                fmt = "ko",
-                capsize=3,
-                label=f"Kote $\\pm$ std. afvigelse")
+    ax.errorbar(
+        x=linreg.x,
+        y=linreg.y,
+        yerr=np.sqrt(1 / linreg._W),
+        fmt="ko",
+        capsize=3,
+        label=f"Kote $\\pm$ std. afvigelse",
+    )
 
     ax.plot(
         x_præd,
@@ -257,11 +262,14 @@ def plot_hts_analyse(
 
     # Konfidensbånd
     ax.plot(x_præd, konfidensbånd[0, :], color="green")
-    ax.plot(x_præd, konfidensbånd[1, :], color="green", label=f"{100*(1-alpha):g}% Konfidensbånd")
-
-    ax.set_title(
-        f"Tidsserie: {statistik.TidsserieID}    R$^2$ = {statistik.R2:.2f}   N = {statistik.N}"
+    ax.plot(
+        x_præd,
+        konfidensbånd[1, :],
+        color="green",
+        label=f"{100*(1-alpha):g}% Konfidensbånd",
     )
+
+    ax.set_title(f"Tidsserie: {statistik.TidsserieID}    N = {statistik.N}")
     ax.set_xlabel("År")
     ax.set_ylabel(label)
 
@@ -271,12 +279,35 @@ def plot_hts_analyse(
     ax.legend(
         loc="upper center",
         fancybox=True,
-        shadow=True,
         ncol=1,
+    )
+    tekst = f"Std. af residualer = {statistik.std_0:.2f} mm\n"
+
+    if not statistik.er_bevægelse_signifikant:
+        tekst += f"H$_{{0}}$ accepteret ved {statistik.alpha_bevægelse_signifikant*100}% signifikansniveau"
+    else:
+        tekst += f"H$_{{0}}$ forkastet ved {statistik.alpha_bevægelse_signifikant*100}% signifikansniveau"
+
+    # Standardafvigelse data til visning
+
+    ax.text(
+        0.5,
+        0.05,
+        tekst,
+        transform=ax.transAxes,
+        fontsize=10,
+        bbox={
+            "facecolor": "white",
+            "alpha": 0.8,
+            "edgecolor": (0.8,) * 3,
+            "pad": 0.4,
+            "boxstyle": "round",
+        },
+        ha="center",
+        va="center",
     )
 
     plt.show()
-
 
 
 def plot_data(x: list, y: list, **kwargs):
