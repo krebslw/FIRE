@@ -1,3 +1,5 @@
+.. _kommandolinjeprogrammer_info:
+
 fire info
 ##############
 

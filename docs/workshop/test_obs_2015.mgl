@@ -5,7 +5,7 @@ efter man har erstattet punktnavnene med eksisterende identer.
 # Punkt-A Jessenpunkt 01.01.2015 10.00 30.00 -0.002 999001.2 5.0 1
 
 # Punkt-A Punkt-B 01.01.2015 10.00 30.00 -0.002 999002.1 5.0 1
-# Punkt-B Punkt-A 01.01.2015 10.00 30.00 0.0002 999002.2 5.0 1
+# Punkt-B Punkt-A 01.01.2015 10.00 30.00 0.002 999002.2 5.0 1
 
 # Punkt-B Jessenpunkt 01.01.2015 10.00 30.00 0.000 999003.1 5.0 1
 # Jessenpunkt Punkt-B 01.01.2015 10.00 30.00 0.000 999003.2 5.0 1

@@ -24,10 +24,10 @@ ligge noget vedligehold i at indmåle punkterne og efterfølgende oprette nye ti
 databasen.
 
 Højdetidsserieanalyse bruges som værktøj til at støtte op om beslutninger angående den
-geodætiske infrastruktur. Analyserne foretages på baggrund af det data som ligger i FIRE og
-gør det muligt at identificere lokale bevægelser af punkterne i punktgruppen. Dette
-bruges igen til fx at dokumentere stabiliteten af vores CORS-stationer, eller tage
-beslutninger om hvorvidt et 5D-punkt skal indgå i en geoidetilpasning.
+geodætiske infrastruktur. Analyserne foretages på baggrund af det data som ligger i FIRE
+og gør det muligt at identificere lokale bevægelser af punkterne i punktgruppen. Dette
+bruges igen til fx at dokumentere stabiliteten af vores CORS-stationer, eller træffe
+beslutning om hvorvidt et 5D-punkt skal indgå i en geoidetilpasning.
 
 Man bruger programmet :ref:`fire_ts_analyse_hts` til at analysere Højdetidsserier.
 Programmet fungerer i høj grad på samme måde som programmet til GNSS-tidsserier. For

@@ -4,44 +4,33 @@ Case: Højdetidsserier
 ---------------------
 
 Velkommen til denne lille case, hvor du vil blive klogere på at arbejde med
-højdetidsserier i FIRE. Undervejs vil vi gennemgå den database-relaterede livscyklus for
-et opdigtet 5D-punkt. Herunder bl.a. etablering, vedligeholdelsen og til sidst
-sløjfningen af en punktgruppe nær et 5D-punkt. Vi kommer udover højdetidsserier, også
-igennem oprettelse af nyetablerede punkter, lukning af punkter og bla bla.
+højdetidsserier i FIRE. Undervejs vil vi gennemgå en tænkt livscyklus for et opdigtet
+5D-punkt i FIRE. Herunder bl.a. etablering af punkter og vedligeholdelsen af tidsserier
+for en punktgruppe nær 5D-punktet.
+
+Det er en fordel hvis du er bekendt med det eksisterende nivellement-workflow, som udføres
+ved hjælp af et sagsregneark i Excel. Dog er vejledningen forholdsvist udførlig, så det
+burde være muligt at kunne følge med alligevel.
+
+Hvis du undervejs har brug for yderligere hjælp eller forklaring, så er der under
+:ref:`punktsamlinger` beskrevet mange af de samme processer som vi kommer til at gennemgå
+her. Det anbefales at man starter med at læse indledningen dér, som gør det klart hvad der
+menes med mange af de begreber der bruges.
+
+Derudover kan du altid prøve at kigge i de enkelte kommandoers hjælpetekst med flaget
+``--help`` eller slå op under :ref:`kommandolinjeprogrammer_niv` eller
+:ref:`kommandolinjeprogrammer_info`.
 
 Hent seneste version af FIRE
 ++++++++++++++++++++++++++++
 
-For at følge trinnene i casen skal du have den nødvendige version af FIRE.
+For at følge trinnene i casen skal du minimum have version ``1.8.0`` af FIRE. Følg
+vejledningen om :ref:`opdatering` af FIRE til ny version, og kom tilbage hertil når du er
+færdig.
+Tjek bagefter, at du har FIRE-version ``1.8.0`` eller højere installeret::
 
-I terminalen stiller du dig i mappen hvor din FIRE-installation ligger. Den kunne fx hedde
-``FIRE``::
-
-    C:\> cd FIRE
-
-Aktiver dit FIRE-miljø::
-
-    C:\FIRE> mamba activate fire
-
-
-Hent nyeste version af FIRE ned, og aktiver version ``1.8.0``::
-
-    (fire) C:\FIRE>git checkout master
-    (fire) C:\FIRE>git pull origin master --tags
-    (fire) C:\FIRE>git checkout fire-1.8.0
-
-Tjek at du har FIRE-version ``1.8.0`` eller højere installeret::
-
-    fire --version
-
-Opdater FIRE-miljø
-++++++++++++++++++++++++++++
-
-Sørg for at dit ``fire``-miljø er aktiveret, hvis det ikke allerede er aktiveret. Dernæst
-skal vi have opdateret miljøet, da der i opgraderingen til FIRE version ``1.8.0`` er
-kommet enkelte tilføjelser::
-
-    (fire) C:\FIRE>mamba env update --file environment.yml --prune
+    (fire) C:\FIRE>fire --version
+    fire, version 1.8.0
 
 .. _ret_default_db:
 Ret default databaseforbindelsen
@@ -77,11 +66,13 @@ Ret default databaseforbindelsen
   Når du er færdig med denne demo kan du, hvis du vil, rette default-forbindelsen tilbage
   til ``prod``.
 
-Så går vi i gang
-++++++++++++++++++++++++++++
+Så går vi i gang!
+
+Opret sag
+++++++++++
 Opret en mappe et passende sted til denne case, og stil dig i den. Kald den fx ``HTS_DEMO``.
 
-Opret en sag, og giv den et kort og godt navn. Giv den evt. også en beskrivelse::
+Opret en sag, og kald også den for ``HTS_DEMO``. Giv den evt. også en beskrivelse::
 
     fire niv opret-sag HTS_DEMO "En sag til min demo-case om Højdetidsserier"
 
@@ -120,7 +111,7 @@ forrige kommando, eller i sagsarket under fanen **Sagsgang**)::
 
 
 Opret dit eget 5D-punkt
-........................
++++++++++++++++++++++++
 Som det første, skal vi have oprettet jessenpunktet for vores nye punktgruppe. Dette gør
 vi ved først at oprette det som et almindeligt punkt, og derefter tildele det et jessennummer.
 
@@ -130,11 +121,11 @@ kan det gøres med et enkelt højreklik på kortet:
 .. image:: figures/qgis_ny5d.PNG
 
 Skriv koordinaterne ind i sagsarkets fane **Nyetablerede punkter**. Udfyld
-**Fikspunktstype** og **Afmærkning** som vist. I de andre felter kan du skrive hvad du vil.
+**Fikspunktstype** og **Afmærkning** som vist. I de andre felter **Foreløbigt navn** og **Beskrivelse** kan du skrive hvad du vil.
 
 .. image:: figures/nyetableret_5d.PNG
 
-Læg punktet i databasen. Luk sagsarket og kør følgende::
+Læg punktet i databasen, ved at lukke sagsarket og køre følgende::
 
     fire niv ilæg-nye-punkter HTS_DEMO
 
@@ -162,7 +153,7 @@ nyt GI-nummer. Vi vil fremover bruge GI-nummeret frem for landsnummeret.
     --- KOORDINATER ---
 
 Tildel Jessennummer
-...................
++++++++++++++++++++
 Nu skal punktet oprettes som jessenpunkt og tildeles et jessennummer. Udtræk
 revisions-arket for punktet via det nye GI-nummer::
 
@@ -207,7 +198,7 @@ Tjek at punktet har fået tildelt jessennummer og har attributterne ``NET:jessen
     ...
 
 Opret sikringspunkter
-......................
++++++++++++++++++++++
 
 Nu opretter vi 4 sikringspunkter omkring det nye 5D-punkt. Du kan gøre som før, ved selv
 at indtaste nogle tilfældige koordinater ind i fanen **Nyetablerede punkter**. Alternativt
@@ -247,13 +238,14 @@ Tjek at punkterne er oprettet korrekt. Du kan fx gøre flg:
 
 
 Første opmåling
-................
++++++++++++++++
 Der laves nu den første opmåling af vores punktgruppe. Først laver vi nogle indledende
-øvelser for at simulere nogle nivellement-observationer.
+øvelser for at simulere nogle nivellement-observationer, foretaget igennem 2 årtier.
 
-Hent de 4 test-observationsfiler og gem dem i din test-mappe. I filerne er gemt de
-observationer vi skal bruge til at udjævne og generere tidsserier i FIRE. Når du har
-hentet filerne, skulle din mappestruktur gerne se nogenlunde sådan ud:
+Hent de 4 test-observationsfiler og gem dem i din test-mappe: :download:`test_obs_mgl.zip <test_obs_mgl.zip>`
+
+I filerne er gemt de observationer vi skal bruge til at udjævne og generere tidsserier i
+FIRE. Når du har hentet filerne, skulle din mappestruktur gerne se nogenlunde sådan ud:
 
 .. image:: figures/mappestruktur.PNG
 
@@ -268,11 +260,11 @@ de punkter vi lige har oprettet.
 Her er skabelonen for søg-og-erstat kommandoerne. Kør alle kommandoerne, hvor du erstatter
 punktnavnene med dine egne punkter::
 
-    sed -i 's/Jessenpunkt/<MitJessenpunkt>/g' test_obs_*.mgl
-    sed -i 's/Punkt-A/<MitFørstePunkt>/g' test_obs_*.mgl
-    sed -i 's/Punkt-B/<MitAndetPunkt>/g' test_obs_*.mgl
-    sed -i 's/Punkt-C/<MitTredjePunkt>/g' test_obs_*.mgl
-    sed -i 's/Punkt-D/<MitFjerdePunkt>/g' test_obs_*.mgl
+    sed -i 's/Jessenpunkt/MitJessenpunkt/g' test_obs_*.mgl
+    sed -i 's/Punkt-A/MitFørstePunkt/g' test_obs_*.mgl
+    sed -i 's/Punkt-B/MitAndetPunkt/g' test_obs_*.mgl
+    sed -i 's/Punkt-C/MitTredjePunkt/g' test_obs_*.mgl
+    sed -i 's/Punkt-D/MitFjerdePunkt/g' test_obs_*.mgl
 
 Her et eksempel på hvordan søg-og-erstat kommandoerne kan se ud::
 
@@ -289,18 +281,17 @@ Indlæs nu observationerne fra den første mgl-fil. Under fanen **Filoversigt** 
 .. warning::
 
     Pga. en mindre, ikke-fatal fejl/uhensigtsmæssighed, som netop er opdaget i FIRE, så
-    skal du lige slette indholdet af fanen **Nyetablerede punkter** , med undtagelse af
-    overskrifterne.
+    skal du inden du fortsætter slette indholdet af fanen **Nyetablerede punkter**
+    med undtagelse af overskrifterne.
 
     Fejlen gør så Punktoversigten bliver oprettet med dubletter af de nyoprettede punkter,
     hvis kanoniske ident er forskellig fra landsnummeret, dvs. vores nye GI-punkt.
-
 
 Luk arket og indlæs observationerne med::
 
     fire niv læs-observationer HTS_DEMO --kotesystem Jessen
 
-Parameteren ``--Jessen``, gør så programmet forsøger at finde punkternes seneste
+Parameteren ``--kotesystem Jessen``, gør så programmet forsøger at finde punkternes seneste
 jessenkote samt udfylder kolonnen **System** for dig. Hvis du glemmer at bruge denne
 parameter kan du altid bare indtaste det i arket manuelt.
 
@@ -309,12 +300,12 @@ Tjek at punkterne nu står i fanen **Punktoversigt**. Du er nu klar til at opret
 .. image:: figures/punktoversigt_1.PNG
 
 Opret punktgruppe og tidsserier
-................................
++++++++++++++++++++++++++++++++
 
- Kør følgende kommando. Dette opretter fanerne **Punktgruppe** og **Højdetidsserie** i
- sagsarket.
+Kør følgende kommando. Dette opretter fanerne **Punktgruppe** og **Højdetidsserie** i
+sagsarket.
 
- ::
+::
 
     fire niv opret-punktsamling HTS_DEMO --jessenpunkt 81800 --punktoversigt
 
@@ -362,7 +353,7 @@ Tjek at punktsamlingen og dens tidsserier er lagt i databasen::
 
 
 Ret formål
-..........
+++++++++++
 Du har indset, at "Stabilitetskontrol" var en lidt for intetsigende beskrivelse, og beslutter dig for at rette det.
 
 Gå ind i sagsarket og ret punktsamlingens formål til noget andet. Derefter kører du samme kommandoer som før::
@@ -378,8 +369,10 @@ Gå ind i sagsarket og ret punktsamlingens formål til noget andet. Derefter kø
     Jessenkote    : 0 m
     ...
 
+.. _forste_opmaling:
 Beregn første opmåling
-......................
+++++++++++++++++++++++
+
 Som ved en normal beregning skal man vælge et fastholdt punkt og kote. Når du beskæftiger dig med
 tidsserier skal dette svare til en punktsamlings jessenpunkt og referencekote. I
 **Punktoversigt** og sætter du et "x" i kolonnen **Fasthold** ud for jessenpunktet, og i
@@ -392,17 +385,213 @@ Beregn nu nye koter::
     fire niv regn HTS_DEMO
     fire niv regn HTS_DEMO
 
+Læg mærke til om fanerne "Hvornår" og "Ny kote" ser ud som vist efter den endelige beregning:
+
+.. image:: figures/endelig_beregning_1.PNG
+
+Ilæg observationer og nyberegnede koter::
+
+    fire niv ilæg-observationer HTS_DEMO
+    fire niv ilæg-nye-koter HTS_DEMO
+
+Tjek at tidsserierne har fået nye koter ved at at trække punktsamlingsinformationen ud igen::
+
+    fire info punktsamling PUNKTSAMLING_81800
+    >>
+    ------------------------- PUNKTSAMLING -------------------------
+    Navn          : PUNKTSAMLING_81800
+    Formål        : Kontrol af stabilitet
+    Jessenpunkt   : G.I.2406
+    Jessennummer  : 81800
+    Jessenkote    : 0 m
+    Antal punkter : 5
+    --- Punkter ---
+    G.I.2406
+    12-01-09158
+    12-01-09159
+    12-01-09160
+    12-01-09161
+    --- Tidsserier ---
+    Navn                                      Antal datapunkter  Type    Referenceramme
+    ----------------------------------------  -----------------  ------  ------------------
+    G.I.2406_HTS_81800                        0                  Højde   Jessen
+    12-01-09161_HTS_81800                     1                  Højde   Jessen
+    12-01-09160_HTS_81800                     1                  Højde   Jessen
+    12-01-09159_HTS_81800                     1                  Højde   Jessen
+    12-01-09158_HTS_81800                     1                  Højde   Jessen
+
+Læg mærke til antallet af datapunkter i tidsserierne er steget med 1.
+
+Flere opmålinger
+++++++++++++++++
+Nu simulerer vi at der er gået en årrække med gentagne opmålinger, så her gentager vi
+nogle af de samme skridt som før, men for nye observationsfiler. For at spare lidt tid så
+springer vi oprettelsen af nye sager for hver opmåling over.
+
+.. note::
+
+    Under normale omstændigheder så skal man efter ilægning af koter og observationer
+    huske at lukke sagen med ``fire niv luk-sag``. Dette gør så man via FIRE kan holde
+    styr på hvilke sager som mangler endelig beregning og ilægning. Derudover gør det
+    bl.a. også så sagsarket gemmes i FIRE.
+
+#. Slet fanerne **Resultat, Endelig beregning** og **Kontrolberegning**.
+   Hvis du vil, kan du gemme en kopi af sagsarket, så det er muligt at vende tilbage til
+   dette punkt i demoen. Sæt fx årstallet på som endelse: ``HTS_DEMO_2000.xlsx``
+
+#. Gå ind i arket og skriv navnet på den næste observationsfil ind:
+
+   .. image:: figures/filoversigt_2010.PNG
+
+#. Indlæs observationerne::
+
+    fire niv læs-observationer HTS_DEMO --kotesystem Jessen
+
+#. Fasthold jessenpunkt og referencekote på samme måde som under :ref:`forste_opmaling`
+
+#. Udjævn og ilæg observationerne og beregnede koter::
+
+    fire niv regn HTS_DEMO
+    fire niv regn HTS_DEMO
+    fire niv ilæg-observationer HTS_DEMO
+    fire niv ilæg-nye-koter HTS_DEMO
+
+#. Tjek at koterne er ilagt::
+
+    fire info punktsamling PUNKTSAMLING_81800
+
+#. Gentag trinnene 1-6 for de to andre observationsfiler, i kronologisk rækkefølge. Når du
+   beregner nye koter, så prøv at bruge parameteren ``--plot``::
+
+    fire niv regn HTS_DEMO --plot
+
+   Dette laver et plot i stil med nedenstående, der viser tidsserierne som er ved at blive
+   beregnet. De fremhævede koter med ring om er de nyberegnede koter som endnu ikke er
+   lagt i databasen. De andre punkter er dem, som allerede ligger i databasen.
+
+   .. image:: figures/regn_plot.PNG
+
+Udtræk, plot og analyse af tidsserier
++++++++++++++++++++++++++++++++++++++
+Til sidst skal vi se på, hvordan man trækker data om tidsserier ud af FIRE, og laver nogle
+simple plots og standardiserede analyser på dem. Prøv at køre nogle af nedenstående
+kommandoer.
+
+**Udtræk punktinformation**
+::
+    (fire) C:\FIRE\HTS_DEMO>fire info punkt 12-01-09161
+    >>
+    --------------------------------------------------------------------------------
+    PUNKT 12-01-09161
+    --------------------------------------------------------------------------------
+    Lokation                    POINT (12.3934 55.982371)
+    Oprettelsesdato             2024-10-16 18:14:19.628235
+    AFM:2950                    Skruepløk
+    ATTR:beskrivelse            Et firkantet fikspunkt.
+    REGION:DK
+    ATTR:bemærkning             Nyetb. 2024 B294041
+    ATTR:højdefikspunkt
+    IDENT:landsnr               12-01-09161
+
+    --- KOORDINATER ---
 
 
+    --- PUNKTSAMLINGER ---
+    Navn                                Jessenpunkt  Antal punkter  Antal tidsserier
+    ----------------------------------  -----------  -------------  ----------------
+    PUNKTSAMLING_81800                  81800        5              5
 
-Et punkt i en punktgruppe er tabtgået. Der er derfor etableret et nyt punkt som erstatning og
-det er blevet indmålt i den eksisterende punkgruppe.
+    --- TIDSSERIER ---
+    Navn                                      Antal datapunkter  Type    Referenceramme
+    ----------------------------------------  -----------------  ------  ------------------
+    12-01-09161_HTS_81800                     4                  Højde   Jessen
 
-Følgende er blevet gjort i databasen:
 
-- Det gamle punkt er meldt tabtgået (se :ref:`tabsmelding`)
-- Det nye punkt er oprettet i FIRE (se :ref:`ilæg_nye_punkter`)
+**Udtræk information om punktsamlinger**
 
-Derefter skal observationerne udjævnes og de beregnede koter tidsseriekoter skal lægges i
-FIRE. For at lægge jessenkoten for det nyoprettede punkt i FIRE, skal der imidlertid først
-oprettes en tidsserie som koten kan knyttes til.
+::
+
+    (fire) C:\FIRE\HTS_DEMO>fire info punktsamling PUNKTSAMLING_81800
+    >>
+    ------------------------- PUNKTSAMLING -------------------------
+    Navn          : PUNKTSAMLING_81800
+    Formål        : Kontrol af stabilitet
+    Jessenpunkt   : G.I.2406
+    Jessennummer  : 81800
+    Jessenkote    : 0 m
+    Antal punkter : 5
+    --- Punkter ---
+    G.I.2406
+    12-01-09158
+    12-01-09159
+    12-01-09160
+    12-01-09161
+    --- Tidsserier ---
+    Navn                                      Antal datapunkter  Type    Referenceramme
+    ----------------------------------------  -----------------  ------  ------------------
+    G.I.2406_HTS_81800                        0                  Højde   Jessen
+    12-01-09161_HTS_81800                     4                  Højde   Jessen
+    12-01-09160_HTS_81800                     4                  Højde   Jessen
+    12-01-09159_HTS_81800                     4                  Højde   Jessen
+    12-01-09158_HTS_81800                     4                  Højde   Jessen
+
+
+**Udtræk højdetidsserie**
+
+Prøv at udtrække en af dine højdetidsserier::
+
+    (fire-dev) C:\FIRE\HTS_DEMO>fire ts hts 12-01-09161_HTS_81800
+    >>
+
+    t                     decimalår   kote     sz
+    ───────────────────────────────────────────────────
+    2000-01-01 10:00:00   2000.0011   0.0020   0.0000
+    2010-01-01 10:00:00   2010.0011   0.0000   0.0000
+    2015-01-01 10:00:00   2015.0011   0.0020   0.3000
+    2020-01-01 10:00:00   2020.0011   0.0000   0.0000
+
+Det er også muligt at gemme til regneark::
+
+    fire ts hts 12-01-09161_HTS_81800 -f "12-01-09161_HTS_81800.xlsx"
+
+På denne måde kan du trække data ud og lave dine egne analyser af data.
+
+**Plot højdetidsserie**
+
+Lav nogle helt simple plots af dine højdetidsserier::
+
+    fire ts plot-hts 12-01-09161_HTS_81800
+    fire ts plot-hts 12-01-09161_HTS_81800 -t fit
+    fire ts plot-hts 12-01-09161_HTS_81800 -t konf
+
+
+**Analyse af højdetidsserier**
+
+Analysér dine højdetidsserier. En simpel analyse der beregner et lineært fit og beretter
+om hældningen af fittet samt forskellige statistiske egenskaber ved fittet. Vigtigst er
+hypotesetesten, som fortæller om der er belæg for at sige, om punktet er stabilt eller ej.
+
+Analysér én tidsserie::
+
+    fire ts analyse-hts 12-01-09161_HTS_81800
+
+Analysér flere tidsserier::
+
+    fire ts analyse-hts "12-01-09161_HTS_81800,12-01-09160_HTS_81800"
+
+Analysér alle tidsserier i punktsamlingen::
+
+    fire ts analyse-hts PUNKTSAMLING_81800
+
+Gem statistik-resultater::
+
+    fire ts analyse-hts PUNKTSAMLING_81800 -f PUNKTSAMLING_81800_statistik.csv
+
+.. note::
+
+    Alle ovenstående ``ts``-kommandoer til udtræk, plot og analyse af højdetidsserier har
+    tilsvarende kommandoer til GNSS-tidsserier. Udskift blot ``hts`` med ``gnss``::
+
+        fire ts gnss
+        fire ts plot-gnss
+        fire ts analyse-gnss
