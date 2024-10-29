@@ -768,6 +768,12 @@ def sag(
                 str(sagsevent.eventtype).replace("EventType.", "").replace("OE", "Ø")
             )
             fire.cli.print(f"[{sagsevent.registreringfra}] {eventtype}: {beskrivelse}")
+            if sagsevent.eventtype.name == "PUNKT_OPRETTET":
+                [print(p.ident) for p in sagsevent.punkter]
+            elif sagsevent.eventtype.name == "PUNKTINFO_TILFOEJET":
+                punktinforapport(sagsevent.punktinformationer, historik=False)
+            elif sagsevent.eventtype.name == "PUNKTINFO_SLETTET":
+                punktinforapport(sagsevent.punktinformationer, historik=True)
 
         return
 
