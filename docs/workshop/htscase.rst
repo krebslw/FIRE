@@ -280,12 +280,13 @@ Indlæs nu observationerne fra den første mgl-fil. Under fanen **Filoversigt** 
 
 .. warning::
 
-    Pga. en mindre, ikke-fatal fejl/uhensigtsmæssighed, som netop er opdaget i FIRE, så
-    skal du inden du fortsætter slette indholdet af fanen **Nyetablerede punkter**
-    med undtagelse af overskrifterne.
+    Pga. en mindre fejl i FIRE, så skal du inden du fortsætter slette indholdet af fanen
+    **Nyetablerede punkter** med undtagelse af overskrifterne.
 
     Fejlen gør så Punktoversigten bliver oprettet med dubletter af de nyoprettede punkter,
-    hvis kanoniske ident er forskellig fra landsnummeret, dvs. vores nye GI-punkt.
+    hvis den kanoniske ident er forskellig fra landsnummeret, dvs. vores nye GI-punkt.
+
+    **NB! Dette er fikset i FIRE version 1.8.2**
 
 Luk arket og indlæs observationerne med::
 
