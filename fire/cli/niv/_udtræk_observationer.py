@@ -16,6 +16,7 @@ import click
 
 from fire.enumtools import (
     enum_names,
+    enum_values,
     selected_or_default,
 )
 from fire.ident import klargør_identer_til_søgning
@@ -27,6 +28,10 @@ from fire.io.regneark import (
 from fire.srid import SRID
 from fire.api.model.punkttyper import (
     Punkt,
+)
+from fire.api.model.observationer import (
+    Observation,
+    GeometriskKoteforskel,
 )
 from fire.api.niv.enums import (
     NivMetode,
@@ -162,6 +167,12 @@ Er metode ikke angivet, søger programmet blandt begge observationstyper.
     type=click.Choice(KOTESYSTEMER.keys()),
     help="Angiv andet kotesystem end DVR90",
 )
+@click.option(
+    "--præc",
+    "-P",
+    type=int,
+    help="Angiv hvilket præcisionsnivellement observationerne skal have indgået i.",
+)
 @fire.cli.default_options()
 def udtræk_observationer(
     projektnavn: str,
@@ -173,6 +184,7 @@ def udtræk_observationer(
     til: dt.datetime,
     alle_obs: bool,
     kotesystem: str,
+    præc: int,
     # These `kwargs` can be ignored for now, since they refer to default
     # CLI options that are already in effect by use of call-back functions.
     **kwargs,
@@ -315,6 +327,21 @@ def udtræk_observationer(
     fire.cli.print("Filtrér observationer")
     observationer = list(observationer_inden_for_spredning(resultatsæt, spredning))
 
+    if præc:
+        observationer = filtrer_præcisionsnivellement(observationer, præc)
+
+    breakpoint()
+    # if 1 in metoder:
+    # Filtrer på præcisionsnivellement
+    #
+    #     # if 1 in enum_values(metoder):
+
+
+        # if o.observationstypeid == 1
+        # print(o.observationstypeid)
+
+
+    breakpoint()
     fire.cli.print("Indsaml opstillings- og sigtepunkter fra observationer")
     opstillings_punkter = db.hent_punkter_fra_uuid_liste(
         o.opstillingspunktid for o in observationer
@@ -353,3 +380,16 @@ def udtræk_observationer(
         ark_observationer,
         infiks=f"-{timestamp()}",
     )
+
+
+def filtrer_præcisionsnivellement(
+    observationer: list[Observation], præcisionsnivellement: int
+) -> list[Observation]:
+    """Filtrer observationer på præcisionsnivellement hvis de er af typen GeometriskKoteforskel"""
+
+    return [
+        o
+        for o in observationer
+        if not isinstance(o, GeometriskKoteforskel) or
+            o.præcisionsnivellement == præcisionsnivellement
+    ]
