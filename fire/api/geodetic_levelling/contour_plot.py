@@ -105,6 +105,7 @@ def contour_plot_recalc_vs_dvr90(
 
     # DataFrame with height differences of DVR90 defining points
     # (adjusted heights - database heights)
+    # KREBSLW: fire niv regn beregner allerede en Delta kote, mon ikke den kan bruges?
     points_df = extract_heights_from_fire_project(fire_project, excel_inputfolder)
 
     # Generation of contour plot

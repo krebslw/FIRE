@@ -69,6 +69,17 @@ def apply_geodetic_corrections_to_height_diffs(
 
     Output file:
     Fire project/excel file with corrected/converted height differences
+
+    KREBLSW: Fra FIRE sagsark bruges:
+      - Observationer
+        - ΔH
+        - Fra
+        - Til
+        - Hvornår
+      - Punktoversigt
+        - Nord
+        - Øst
+
     """
     # Make sure that the output folder exists
     outputfolder.mkdir(parents=True, exist_ok=True)
@@ -93,6 +104,7 @@ def apply_geodetic_corrections_to_height_diffs(
         # Geographic coordinates of point_from and point_to
         # If no information on geographic coordinates is available the observation is skipped
         try:
+            # KREBSLW: her kan vi bruge FIREs punkt-objekter
             # fmt: off
             point_from_lat = points_df.loc[points_df["Punkt"] == point_from, "Nord"].values[0]
             point_from_long = points_df.loc[points_df["Punkt"] == point_from, "Øst"].values[0]
@@ -183,6 +195,7 @@ def apply_geodetic_corrections_to_height_diffs(
 
         observations_df.at[index, "ΔH"] = height_diff
 
+    # KREBSLW: fedt du bruger parameter arket, som ellers er lidt "dødt"
     # DataFrame with parameters of output fire project
     parameters_df = pd.read_excel(excel_inputfile, sheet_name="Parametre")
 

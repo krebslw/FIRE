@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
+# KREBSLW : den her har vi også i FIRE
 def datetime_to_decimalyear(datetime: datetime.datetime | pd.Timestamp) -> np.float64:
     """Convert a datetime to decimal year.
 
@@ -99,4 +99,5 @@ def generate_histogram_temporal_distr_levelling_obs(
         outputfolder / f"Histogram_observation_epochs_{fire_project}.png",
         dpi=400,
     )
-    plt.close(fig)
+    plt.show()
+    # plt.close(fig)

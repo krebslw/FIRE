@@ -101,6 +101,7 @@ def convert_metric_height_diff_to_geopotential_height_diff(
     """
     # Point_from and point_to gravity in units of m/s^2
     # Flyt til overfunktionen delta_h_corr?
+    # KREBSLW: her bør interpolate_gravity vel bruges?
     transformer = pyproj.Transformer.from_pipeline(
         f"+proj=vgridshift +grids={gravitymodel}"
     )
