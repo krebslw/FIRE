@@ -227,13 +227,14 @@ def calculate_perm_tidal_potential(
 
     return perm_tidal_potential
 
+# KREBSLW: Der er meget overlap imellem calculate_perm_tidal_potential og calculate_perm_tidal_gravitation
+
 
 def calculate_perm_tidal_deformation_geoid(
     latitude: float,
     longitude: float,
     celestial_body: str,
-    grid_inputfolder: Path,
-    gravitymodel: str,
+    **kwargs,
 ) -> float:
     """Calculate the permanent tidal deformation of the geoid assuming a rigid Earth.
 
@@ -265,7 +266,7 @@ def calculate_perm_tidal_deformation_geoid(
     Giver det mening at bruge tyngden ved jordoverfladen?
     Burde det være tyngden på geoiden?
     """
-    gravity = interpolate_gravity(latitude, longitude, grid_inputfolder, gravitymodel)
+    gravity = interpolate_gravity(latitude, longitude, **kwargs)
 
     # Permanent tidal potential
     perm_tidal_potential = calculate_perm_tidal_potential(latitude, celestial_body)
@@ -341,8 +342,7 @@ def transform_height_from_tidal_system_to_tidal_system(
     latitude: float,
     longitude: float,
     transformation: str,
-    grid_inputfolder: Path,
-    gravitymodel: str,
+    **kwargs,
 ) -> float:
     """Transform a geophysical height from one tidal system to another tidal system.
 
@@ -379,16 +379,14 @@ def transform_height_from_tidal_system_to_tidal_system(
         latitude,
         longitude,
         "moon",
-        grid_inputfolder,
-        gravitymodel,
+        **kwargs,
     )
 
     perm_tidal_deformation_geoid_sun = calculate_perm_tidal_deformation_geoid(
         latitude,
         longitude,
         "sun",
-        grid_inputfolder,
-        gravitymodel,
+        **kwargs,
     )
 
     perm_tidal_deformation_geoid = (
@@ -431,8 +429,7 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
     point_to_lat: float,
     point_to_long: float,
     transformation: str,
-    grid_inputfolder: Path,
-    gravitymodel: str,
+    **kwargs,
 ) -> float:
     """Transform a geophysical height difference from one tidal system to another tidal system.
 
@@ -476,16 +473,14 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
             point_to_lat,
             point_to_long,
             transformation,
-            grid_inputfolder,
-            gravitymodel,
+            **kwargs,
         )
         - transform_height_from_tidal_system_to_tidal_system(
             0,
             point_from_lat,
             point_from_long,
             transformation,
-            grid_inputfolder,
-            gravitymodel,
+            **kwargs,
         )
     )
 

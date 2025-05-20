@@ -20,6 +20,7 @@ def interpolate_gravity(
     longitude: float,
     grid_inputfolder: Path,
     gravitymodel: str,
+    gravitymodel2: str,
 ) -> float:
     """Interpolate in gravity model.
 
