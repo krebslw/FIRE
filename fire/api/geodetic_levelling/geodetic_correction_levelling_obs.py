@@ -19,9 +19,8 @@ from fire.api.geodetic_levelling.metric_to_gpu_transformation import (
 
 
 def apply_geodetic_corrections_to_height_diffs(
-    fire_project: str,
-    excel_inputfolder: Path,
-    outputfolder: Path,
+    observations_df: pd.DataFrame,
+    points_df: pd.DataFrame,
     grid_inputfolder: Path = None,
     tidal_system: str = None,
     epoch_target: pd.Timestamp = None,
@@ -81,15 +80,8 @@ def apply_geodetic_corrections_to_height_diffs(
         - Øst
 
     """
-    # Make sure that the output folder exists
-    outputfolder.mkdir(parents=True, exist_ok=True)
 
     pyproj.datadir.append_data_dir(grid_inputfolder)
-
-    excel_inputfile = excel_inputfolder / f"{fire_project}.xlsx"
-
-    observations_df = pd.read_excel(excel_inputfile, sheet_name="Observationer")
-    points_df = pd.read_excel(excel_inputfile, sheet_name="Punktoversigt")
 
     # TO DO: Flyt if-sætningerne, der kontrollerer hvilke korrektioner der foretages,
     # foran for-loopet over observations_df.index og loop i stedet op til 3 gange over
@@ -145,9 +137,9 @@ def apply_geodetic_corrections_to_height_diffs(
                 tidal_system,
             )
 
-            observations_df.at[
-                index, f"ΔH tidal correction (tidal system: {tidal_system}) [m]"
-            ] = tidal_corr
+            # observations_df.at[
+            #     index, f"ΔH tidal correction (tidal system: {tidal_system}) [m]"
+            # ] = tidal_corr
 
         # The metric height differences of a FIRE project are propagated to a target epoch if
         # the function apply_geodetic_corrections_to_height_diffs is called with arguments for
@@ -168,9 +160,9 @@ def apply_geodetic_corrections_to_height_diffs(
                 deformationmodel,
             )
 
-            observations_df.at[
-                index, f"ΔH epoch correction (target epoch: {epoch_target}) [m]"
-            ] = epoch_corr
+            # observations_df.at[
+            #     index, f"ΔH epoch correction (target epoch: {epoch_target}) [m]"
+            # ] = epoch_corr
 
         # The metric height differences of a FIRE project are converted to geopotential units if
         # the function apply_geodetic_corrections_to_height_diffs is called with arguments for
@@ -188,12 +180,18 @@ def apply_geodetic_corrections_to_height_diffs(
                 )
             )
 
-            observations_df.at[
-                index,
-                f"ΔH m2gpu multiplication factor (tidal system: {tidal_system}) [m/s^2]",
-            ] = m2gpu_factor
+            # observations_df.at[
+            #     index,
+            #     f"ΔH m2gpu multiplication factor (tidal system: {tidal_system}) [m/s^2]",
+            # ] = m2gpu_factor
 
         observations_df.at[index, "ΔH"] = height_diff
+
+    # KREBSLW: her springer jeg bare ud af funktionen og returnerer obs-dataframen som
+    # fire niv regn kan arbejde videre med.
+    # Kan godt lide den del nedenfor hvor detaljerne omkring korrektionerne bliver gemt.
+    # Så kunne være smart hvis det stadig bliver gemt.
+    return observations_df
 
     # KREBSLW: fedt du bruger parameter arket, som ellers er lidt "dødt"
     # DataFrame with parameters of output fire project

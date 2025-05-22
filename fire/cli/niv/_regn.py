@@ -20,6 +20,8 @@ from fire.cli.ts.plot_ts import (
     plot_tidsserier,
 )
 
+from fire.api.geodetic_levelling.geodetic_correction_levelling_obs import (apply_geodetic_corrections_to_height_diffs)
+
 from . import (
     find_faneblad,
     gyldighedstidspunkt,
@@ -34,6 +36,8 @@ from . import (
 
 from ._netoversigt import netanalyse
 
+# den her skal være fire\data\grids når vi får lagt gridsne derover
+DEFAULT_STI_GRIDS = Path(__file__).parents[3] / Path("geodetic-levelling/grids")
 
 @dataclass
 class Observationer:
@@ -87,7 +91,66 @@ class Arbejdssæt:
     default=False,
     help="Angiv om beregnede koter skal plottes som forlængelse af en tidsserie",
 )
-def regn(projektnavn: str, plot: bool, **kwargs) -> None:
+@click.option(
+    "--tidal-system",
+    type=str,
+    default="non",
+    required=False,
+    help="Angiv tidesystem",
+)
+@click.option(
+    "-t0",
+    "--epoch-target",
+    type=Timestamp,
+    callback = (lambda ctx, param, val: Timestamp(val)),
+    default = None,
+    required=False,
+    help="Angiv target epoke",
+)
+@click.option(
+    "--gravity-model",
+    type = str,
+    default = "dk-g-direkte-fra-gri-thokn.tif",
+    # Kan også gøre sådan her, men så skal funktionerne i geodetic_levelling ændres til at håndtere Path i stedet for en str
+    # type=click.Path(writable=False),
+    # default = DEFAULT_STI_GRIDS / Path("dk-g-direkte-fra-gri-thokn.tif"),
+    required=False,
+    help="Angiv sti til tyngdemodel",
+)
+@click.option(
+    "--deformation-model",
+    type = str,
+    default = "absg_DTU2016_PK.tif",
+    # Kan også gøre sådan her, men så skal funktionerne i geodetic_levelling ændres til at håndtere Path i stedet for en str
+    # type=click.Path(writable=False),
+    # default = DEFAULT_STI_GRIDS / Path("absg_DTU2016_PK.tif"),
+    required=False,
+    help="Angiv sti til deformationsmodel",
+)
+@click.option(
+    "--grid-input-folder",
+    type = str,
+    default = DEFAULT_STI_GRIDS,
+    help="Angiv mappe med input grids",
+)
+@click.option(
+    "-KO",
+    "--korriger-observationer",
+    type = bool,
+    default = False,
+    help="Angiv om observationer skal korrigeres inden udjævning",
+)
+def regn(
+    projektnavn: str,
+    plot: bool,
+    grid_input_folder: Path,
+    tidal_system: str,
+    epoch_target: Timestamp,
+    deformation_model: str,
+    gravity_model: str,
+    korriger_observationer: bool,
+    **kwargs,
+) -> None:
     """Beregn nye koter.
 
     Forudsat nivellementsobservationer allerede er indlæst i sagsregnearket
@@ -202,6 +265,19 @@ def regn(projektnavn: str, plot: bool, **kwargs) -> None:
     observationer = find_faneblad(projektnavn, "Observationer", arkdef.OBSERVATIONER)
     punktoversigt = find_faneblad(projektnavn, "Punktoversigt", arkdef.PUNKTOVERSIGT)
     arbejdssæt = find_faneblad(projektnavn, aktuelt_faneblad, arkdef.PUNKTOVERSIGT)
+
+    # Korriger observationer
+    if korriger_observationer:
+        print("Laver geodætiske korrektioner inden udjævning")
+        observationer = apply_geodetic_corrections_to_height_diffs(
+            observationer,
+            arbejdssæt,
+            Path(grid_input_folder),
+            tidal_system,
+            epoch_target,
+            deformation_model,
+            gravity_model,
+        )
 
     # Til den endelige beregning skal vi bruge de oprindelige observationsdatoer
     if not kontrol:
