@@ -1,0 +1,36 @@
+name: fire-dev-geod-lev
+channels:
+  - conda-forge
+dependencies:
+  - black
+  - click
+  - cx_oracle
+  - fiona
+  - gama
+  - graphviz
+  - matplotlib
+  - numpy
+  - openpyxl
+  - pandas
+  - pyarrow
+  - pip
+  - pre-commit
+  - pylint
+  - pyproj
+  - pytest-cov
+  - pytest-freezegun
+  - pytest-mock
+  - pytest
+  - python=3.11.*
+  - rich
+  - scipy
+  - shapely=1.8.*
+  - sphinx-click
+  - sphinx
+  - sphinx_rtd_theme
+  - sphinxcontrib-programoutput
+  - sqlalchemy=1.4.*
+  - xmltodict
+  - astropy
+  - jplephem
+  - cartopy
