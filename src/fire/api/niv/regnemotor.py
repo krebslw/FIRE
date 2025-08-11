@@ -30,6 +30,10 @@ from fire.api.niv.lukkesum import (
     aggreger_multidigraf,
     lukkesum_af_polygon,
 )
+from fire.api.model import (
+    Observation,
+    Koordinat,
+)
 
 
 class UdjævningFejl(Exception):
@@ -137,6 +141,53 @@ class RegneMotor(ABC):
     @property
     def gamle_koter(self):
         return self._gamle_koter.values()
+
+    @classmethod
+    def fra_query(
+        cls,
+        observationer: list[Observation],
+        koter: list[Koordinat],
+        fastholdte: list[str],
+        **kwargs,
+    ) -> Self:
+        """Oversæt fra en liste af sqlalchemy objekter til internt format"""
+
+        _observationer = []
+        for obs in observationer:
+            spredning = _spredning(
+                obs.observationstype.name,
+                obs.nivlængde,
+                obs.antal_opstillinger,
+                obs.spredning_afstand,
+                obs.spredning_centrering,
+            )
+
+            o = InternNivObservation(
+                obs.opstillingspunkt.ident,
+                obs.sigtepunkt.ident,
+                obs.observationstidspunkt,
+                obs.antal_opstillinger,
+                obs.nivlængde,
+                obs.koteforskel,
+                spredning,
+                obs.id,
+            )
+            _observationer.append(o)
+
+        _koter = []
+        for kote in koter:
+            k = InternKote(
+                kote.punkt.ident,
+                kote.z,
+                kote.t,
+                kote.sz,
+                True if kote.punkt.ident in fastholdte else False,
+                kote.punkt.geometri.koordinater.y,
+                kote.punkt.geometri.koordinater.x,
+            )
+            _koter.append(k)
+
+        return cls(observationer=_observationer, koter=_koter, **kwargs)
 
     @classmethod
     def fra_dataframe(
