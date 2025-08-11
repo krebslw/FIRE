@@ -34,6 +34,10 @@ from fire.api.model import (
     Observation,
     Koordinat,
 )
+from fire.api.model.observationer import (
+    GeometriskKoteforskel,
+    TrigonometriskKoteforskel,
+)
 
 
 class UdjævningFejl(Exception):
@@ -145,7 +149,7 @@ class RegneMotor(ABC):
     @classmethod
     def fra_query(
         cls,
-        observationer: list[Observation],
+        observationer: list[GeometriskKoteforskel | TrigonometriskKoteforskel],
         koter: list[Koordinat],
         fastholdte: list[str],
         **kwargs,
@@ -154,10 +158,18 @@ class RegneMotor(ABC):
 
         _observationer = []
         for obs in observationer:
+            match obs.observationstype.name:
+                case "geometrisk_koteforskel":
+                    otype = "MGL"
+                case "trigonometrisk_koteforskel":
+                    otype = "MTL"
+                case _:
+                    otype = None
+
             spredning = _spredning(
-                obs.observationstype.name,
+                otype,
                 obs.nivlængde,
-                obs.antal_opstillinger,
+                obs.opstillinger,
                 obs.spredning_afstand,
                 obs.spredning_centrering,
             )
@@ -166,7 +178,7 @@ class RegneMotor(ABC):
                 obs.opstillingspunkt.ident,
                 obs.sigtepunkt.ident,
                 obs.observationstidspunkt,
-                obs.antal_opstillinger,
+                obs.opstillinger,
                 obs.nivlængde,
                 obs.koteforskel,
                 spredning,
@@ -182,12 +194,12 @@ class RegneMotor(ABC):
                 kote.t,
                 kote.sz,
                 True if kote.punkt.ident in fastholdte else False,
-                kote.punkt.geometri.koordinater.y,
-                kote.punkt.geometri.koordinater.x,
+                kote.punkt.geometri.koordinater[1],
+                kote.punkt.geometri.koordinater[0],
             )
             _koter.append(k)
 
-        return cls(observationer=_observationer, koter=_koter, **kwargs)
+        return cls(observationer=_observationer, gamle_koter=_koter, **kwargs)
 
     @classmethod
     def fra_dataframe(
