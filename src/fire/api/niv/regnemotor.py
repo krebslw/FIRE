@@ -155,7 +155,7 @@ class RegneMotor(ABC):
         **kwargs,
     ) -> Self:
         """Oversæt fra en liste af sqlalchemy objekter til internt format"""
-
+        print(f"bygger observationer")
         _observationer = []
         for obs in observationer:
             match obs.observationstype.name:
@@ -186,6 +186,7 @@ class RegneMotor(ABC):
             )
             _observationer.append(o)
 
+        print(f"bygger koter")
         _koter = []
         for kote in koter:
             k = InternKote(
