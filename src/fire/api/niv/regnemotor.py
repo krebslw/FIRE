@@ -151,11 +151,14 @@ class RegneMotor(ABC):
         cls,
         observationer: list[GeometriskKoteforskel | TrigonometriskKoteforskel],
         koter: list[Koordinat],
-        fastholdte: list[str],
+        fastholdte: list[PunktNavn],
         **kwargs,
     ) -> Self:
-        """Oversæt fra en liste af sqlalchemy objekter til internt format"""
-        print(f"bygger observationer")
+        """
+        Oversæt fra en liste af sqlalchemy objekter til internt format
+
+        Der er en antagelse at fastholdte indeholder punkt-uuid'er og ikke identer.
+        """
         _observationer = []
         for obs in observationer:
             match obs.observationstype.name:
@@ -174,9 +177,12 @@ class RegneMotor(ABC):
                 obs.spredning_centrering,
             )
 
+            # Det er ret dyrt at hente ident, da vi først skal hente selve punktet og dernæst loopes over alle punktets punktinfos
             o = InternNivObservation(
-                obs.opstillingspunkt.ident,
-                obs.sigtepunkt.ident,
+                # obs.opstillingspunkt.ident,
+                # obs.sigtepunkt.ident,
+                obs.opstillingspunktid, # Så det er langt nemmere at bruge punktid'et som allerede er direkte tilknyttet observationen.
+                obs.sigtepunktid,
                 obs.observationstidspunkt,
                 obs.opstillinger,
                 obs.nivlængde,
@@ -186,16 +192,16 @@ class RegneMotor(ABC):
             )
             _observationer.append(o)
 
-        print(f"bygger koter")
         _koter = []
         for kote in koter:
             k = InternKote(
-                kote.punkt.ident,
+                # kote.punkt.ident,
+                kote.punktid,
                 kote.z,
                 kote.t,
                 kote.sz,
-                True if kote.punkt.ident in fastholdte else False,
-                kote.punkt.geometri.koordinater[1],
+                True if kote.punktid in fastholdte else False, # her antages det at fastholdte er liste af punktid og ikke punkt.ident.
+                kote.punkt.geometri.koordinater[1], # de her er også dyre at hente...
                 kote.punkt.geometri.koordinater[0],
             )
             _koter.append(k)
