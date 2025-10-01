@@ -3,6 +3,7 @@ import webbrowser
 
 import click
 from pandas import DataFrame
+from matplotlib import pyplot as plt
 
 from fire.api.model import (
     HøjdeTidsserie,
@@ -13,6 +14,7 @@ from fire.api.niv.regnemotor import (
     GamaRegn,
     DumRegn,
     ValideringFejl,
+    FastholdtIkkeObserveret,
     UdjævningFejl,
 )
 
@@ -189,58 +191,101 @@ def regn(projektnavn: str, plot: bool, MotorKlasse: type[RegneMotor], **kwargs) 
     # Inden regnemotoren sættes i gang tages der højde for slukkede observationer
     observationer_uden_slukkede = observationer[observationer["Sluk"] != "x"]
 
-    # Start regnemotoren!
-    motor = MotorKlasse.fra_dataframe(
-        observationer_uden_slukkede, arbejdssæt, projektnavn=projektnavn
-    )
+    alle_år = sorted(set(observationer_uden_slukkede["Hvornår"].dt.year))
 
-    # Tilføj "-kontrol" eller "-endelig" til alle filnavne
-    motor.filer = [
-        str(Path(fn).with_stem(f"{Path(fn).stem}-{beregningstype}"))
-        for fn in motor.filer
-    ]
+    import pandas as pd
+    from collections import defaultdict
+    hts = defaultdict(list)
 
-    try:
-        motor.valider_fastholdte()
-    except ValideringFejl as fejl:
-        fire.cli.print(f"FEJL: {fejl}", bg="red", fg="white")
-        raise SystemExit(1)
 
-    # Analyser net
-    net_uden_ensomme, ensomme_subnet, estimerbare_punkter = motor.netanalyse()
-    if ensomme_subnet:
-        fire.cli.print(
-            f"ADVARSEL: Manglende fastholdt punkt i mindst et subnet! Forslag til fastholdte punkter i hvert subnet:",
-            bg="yellow",
-            fg="black",
+    # Plot observationer
+    fig = plt.figure()
+    for idx, row in observationer_uden_slukkede.iterrows():
+
+        plt.scatter(row["Hvornår"], row["Fra"])
+        plt.scatter(row["Hvornår"], row["Til"])
+
+    # ud fra dette plot skal man kunne vælge tidsperioder som observationerne skal opdeles i. Manuelt eller automatisk? Eller lidt af hver?
+    plt.title("Observationsplot")
+    plt.grid()
+    plt.show()
+
+    breakpoint()
+    for år in alle_år:
+        obs_år = observationer_uden_slukkede[observationer_uden_slukkede["Hvornår"].dt.year == år]
+
+        # Start regnemotoren!
+        motor = MotorKlasse.fra_dataframe(
+            obs_år, arbejdssæt, projektnavn=projektnavn
         )
-        for i, subn in enumerate(ensomme_subnet):
-            fire.cli.print(f"  Subnet {i}: {subn[0]}", fg="red")
-    resultater = byg_netgeometri_og_singulære(net_uden_ensomme, ensomme_subnet)
 
-    # Beregn nye koter for de ikke-fastholdte punkter...
-    fire.cli.print(
-        f"Fastholder {len(motor.fastholdte)} og beregner nye koter for {len(estimerbare_punkter)} punkter"
-    )
+        # Tilføj "-kontrol" eller "-endelig" til alle filnavne
+        motor.filer = [
+            str(Path(fn).with_stem(f"{Path(fn).stem}-{beregningstype}"))
+            for fn in motor.filer
+        ]
 
-    try:
-        motor.udjævn()
-    except UdjævningFejl as fejl:
+        try:
+            motor.valider_fastholdte()
+        except FastholdtIkkeObserveret as fejl:
+            fire.cli.print(f"Advarsel: {fejl}", bg="yellow", fg="white")
+            fire.cli.print(f"Springer år {år} over", bg="yellow", fg="white")
+            continue
+        except ValideringFejl as fejl:
+            fire.cli.print(f"FEJL: {fejl}", bg="red", fg="white")
+            raise SystemExit(1)
+
+        # Analyser net
+        net_uden_ensomme, ensomme_subnet, estimerbare_punkter = motor.netanalyse()
+        if ensomme_subnet:
+            fire.cli.print(
+                f"ADVARSEL: Manglende fastholdt punkt i mindst et subnet! Forslag til fastholdte punkter i hvert subnet:",
+                bg="yellow",
+                fg="black",
+            )
+            for i, subn in enumerate(ensomme_subnet):
+                fire.cli.print(f"  Subnet {i}: {subn[0]}", fg="red")
+        resultater = byg_netgeometri_og_singulære(net_uden_ensomme, ensomme_subnet)
+
+        # Beregn nye koter for de ikke-fastholdte punkter...
         fire.cli.print(
-            f"FEJL: {fejl}",
-            bg="red",
-            fg="white",
+            f"Fastholder {len(motor.fastholdte)} og beregner nye koter for {len(estimerbare_punkter)} punkter"
         )
-        raise SystemExit(1)
 
-    # Generer ny dataframe med resultaterne.
-    nye_punkter_df = motor.til_dataframe()
+        try:
+            motor.udjævn()
+        except UdjævningFejl as fejl:
+            fire.cli.print(
+                f"FEJL: {fejl}",
+                bg="red",
+                fg="white",
+            )
+            raise SystemExit(1)
 
-    # Opdater arbejdssæt med udjævningsresultat
-    beregning = opdater_arbejdssæt(arbejdssæt, nye_punkter_df)
-    beregning = beregning.reset_index()
-    resultater[næste_faneblad] = beregning
+        # Generer ny dataframe med resultaterne.
+        nye_punkter_df = motor.til_dataframe()
 
+        # Opdater arbejdssæt med udjævningsresultat
+        beregning = opdater_arbejdssæt(arbejdssæt, nye_punkter_df)
+        beregning = beregning.reset_index()
+        resultater[år] = beregning
+
+        for idx,row in beregning.iterrows():
+            if pd.isna(row["Ny kote"]):
+                continue
+            hts[row["Punkt"]].append((row["Hvornår"], row["Ny kote"]))
+
+    fig = plt.figure()
+    for k,v in hts.items():
+        x,y = zip(*v)
+        plt.plot(x, [1e3*(yy-y[0]) for yy in y], label=k)
+
+    plt.ylabel("mm")
+    plt.xlabel("dato")
+    plt.grid()
+    plt.legend()
+    plt.show()
+    breakpoint()
     # Plot tidsserier forlænget med de nyberegnede koter.
     if plot == True:
         kotesystem = fire.cli.firedb.hent_srid(beregning["System"][0])
