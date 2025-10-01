@@ -506,7 +506,7 @@ class GamaRegn(RegneMotor):
         # Konverter til liste i tilfælde af der kun er blevet udjævnet ét punkt.
         if isinstance(koteliste, dict):
             koteliste = [koteliste]
-        if isinstance(varliste, dict):
+        if not isinstance(varliste, list): # STKRE gammel bug som jeg troede var fixet. Opstår når der kun er ét udjævnet punkt.
             varliste = [varliste]
 
         assert len(koteliste) == len(
