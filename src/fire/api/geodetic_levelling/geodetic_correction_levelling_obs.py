@@ -18,16 +18,15 @@ from fire.api.geodetic_levelling.metric_to_gpu_transformation import (
 
 
 def apply_geodetic_corrections_to_height_diffs(
-    fire_project: str,
-    excel_inputfolder: Path,
-    outputfolder: Path,
+    observations_df: pd.DataFrame,
+    points_df: pd.DataFrame,
     grid_inputfolder: Path = None,
     height_diff_unit: str = "metric",
     tidal_system: str = None,
     epoch_target: pd.Timestamp = None,
     deformationmodel: str = None,
     gravitymodel: str = None,
-) -> None:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Apply various geodetic corrections to the height differences of a FIRE project.
 
     Applies various geodetic corrections to the height differences of a FIRE project.
@@ -76,23 +75,38 @@ def apply_geodetic_corrections_to_height_diffs(
 
     TO DO: Samle "underparametre" i en eller flere dicts, fx tidal_parameters: dict = {},
     """
-    # Make sure that the output folder exists
-    outputfolder.mkdir(parents=True, exist_ok=True)
-
-    excel_inputfile = excel_inputfolder / f"{fire_project}.xlsx"
-
-    observations_df = pd.read_excel(excel_inputfile, sheet_name="Observationer")
-    points_df = pd.read_excel(excel_inputfile, sheet_name="Punktoversigt")
 
     # TO DO: Flyt if-sætningerne, der kontrollerer hvilke korrektioner der foretages,
     # foran for-loopet over observations_df.index og loop i stedet op til 3 gange over
     # observations_df.index?
+
+    # print(observations_df)
+    # print(type(observations_df))
+    # print(points_df)
+    # print(type(points_df))
+    # print(grid_inputfolder)
+    # print(type(grid_inputfolder))
+    # print(height_diff_unit)
+    # print(type(height_diff_unit))
+    # print(tidal_system)
+    # print(type(tidal_system))
+    # print(epoch_target)
+    # print(type(epoch_target))
+    # print(deformationmodel)
+    # print(type(deformationmodel))
+    # print(gravitymodel)
+    # print(type(gravitymodel))
+
+    # DataFrame for applied geodetic corrections
+    corrections_df = observations_df[["Journal", "Fra", "Til"]].copy()
 
     for index in observations_df.index:
         height_diff = observations_df.at[index, "ΔH"]
         point_from = observations_df.at[index, "Fra"]
         point_to = observations_df.at[index, "Til"]
         epoch_obs = observations_df.at[index, "Hvornår"]
+
+        # print(height_diff)
 
         # Geographic coordinates of point_from and point_to
         # If no information on geographic coordinates is available the observation is skipped
@@ -138,8 +152,12 @@ def apply_geodetic_corrections_to_height_diffs(
                 grid_inputfolder=grid_inputfolder,
                 gravitymodel=gravitymodel,
             )
+            # print(height_diff)
+            # observations_df.at[
+            #     index, f"ΔH tidal correction (tidal system: {tidal_system}) [m]"
+            # ] = tidal_corr
 
-            observations_df.at[
+            corrections_df.at[
                 index, f"ΔH tidal correction (tidal system: {tidal_system}) [m]"
             ] = tidal_corr
 
@@ -162,8 +180,12 @@ def apply_geodetic_corrections_to_height_diffs(
                 grid_inputfolder,
                 deformationmodel,
             )
+            # print(height_diff)
+            # observations_df.at[
+            #     index, f"ΔH epoch correction (target epoch: {epoch_target}) [m]"
+            # ] = epoch_corr
 
-            observations_df.at[
+            corrections_df.at[
                 index, f"ΔH epoch correction (target epoch: {epoch_target}) [m]"
             ] = epoch_corr
 
@@ -189,7 +211,12 @@ def apply_geodetic_corrections_to_height_diffs(
                 )
             )
 
-            observations_df.at[
+            # observations_df.at[
+            #     index,
+            #     f"ΔH m2gpu multiplication factor (tidal system: {tidal_system}) [m/s^2]",
+            # ] = m2gpu_factor
+
+            corrections_df.at[
                 index,
                 f"ΔH m2gpu multiplication factor (tidal system: {tidal_system}) [m/s^2]",
             ] = m2gpu_factor
@@ -202,9 +229,11 @@ def apply_geodetic_corrections_to_height_diffs(
                 "Function apply_geodetic_corrections_to_height_diffs: Wrong arguments for\n\
             parameter height_diff_unit and/or gravitymodel and/or grid_inputfolder."
             )
-
+        # print(height_diff)
         # Update of observations_df with corrected height difference
         observations_df.at[index, "ΔH"] = height_diff
+
+    return (observations_df, corrections_df)
 
     # DataFrame with parameters of output fire project
     parameters_df = pd.read_excel(excel_inputfile, sheet_name="Parametre")

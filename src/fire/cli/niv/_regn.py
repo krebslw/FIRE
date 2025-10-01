@@ -2,7 +2,7 @@ from pathlib import Path
 import webbrowser
 
 import click
-from pandas import DataFrame
+from pandas import DataFrame, Timestamp, to_datetime
 
 from fire.api.model import (
     HøjdeTidsserie,
@@ -27,6 +27,14 @@ from fire.cli.ts.plot_ts import (
     plot_tidsserier,
 )
 
+from fire.api.geodetic_levelling.geodetic_correction_levelling_obs import (
+    apply_geodetic_corrections_to_height_diffs,
+)
+
+from fire.api.geodetic_levelling.metric_to_gpu_transformation import (
+    convert_geopotential_heights_to_metric_heights,
+)
+
 from fire.cli.niv import (
     find_faneblad,
     niv,
@@ -37,6 +45,8 @@ from fire.cli.niv import (
 )
 
 from fire.cli.niv._netoversigt import byg_netgeometri_og_singulære
+
+DEFAULT_STI_GRIDS = Path(__file__).parents[2] / Path("data/")
 
 motorvælger = {
     "gama": GamaRegn,
@@ -64,8 +74,82 @@ motorvælger = {
     default=False,
     help="Angiv om beregnede koter skal plottes som forlængelse af en tidsserie",
 )
-def regn(projektnavn: str, plot: bool, MotorKlasse: type[RegneMotor], **kwargs) -> None:
+@click.option(
+    "--tidal-system",
+    type=str,
+    default=None,
+    required=False,
+    help="Angiv tidesystem - non, mean eller zero",
+)
+@click.option(
+    "-t0",
+    "--epoch-target",
+    type=Timestamp,
+    default=None,
+    required=False,
+    help="Angiv epoke - fx 1990-01-01",
+)
+@click.option(
+    "--height-diff-unit",
+    type=str,
+    default="metric",
+    required=False,
+    help="Angiv ønsket enhed for højdeforskelle, der skal udjævnes - metric eller gpu",
+)
+@click.option(
+    "--output-height",
+    type=str,
+    default="helmert",
+    required=False,
+    help="Angiv output højde - helmert eller normal - kun relevant, hvis height-diff-unit er gpu",
+)
+@click.option(
+    "--deformationmodel",
+    type=str,
+    default="DKup24geo_DTU2024_PK.tif",
+    # Kan også gøre sådan her, men så skal funktionerne i geodetic_levelling ændres til at håndtere Path i stedet for en str
+    # type=click.Path(writable=False),
+    # default = DEFAULT_STI_GRIDS / Path("absg_DTU2016_PK.tif"),
+    required=False,
+    help="Angiv deformationsmodel",
+)
+@click.option(
+    "--gravitymodel",
+    type=str,
+    default="dk-g-direkte-fra-gri-thokn.tif",
+    # Kan også gøre sådan her, men så skal funktionerne i geodetic_levelling ændres til at håndtere Path i stedet for en str
+    # type=click.Path(writable=False),
+    # default = DEFAULT_STI_GRIDS / Path("dk-g-direkte-fra-gri-thokn.tif"),
+    required=False,
+    help="Angiv tyngdemodel",
+)
+@click.option(
+    "--grid-inputfolder",
+    type=str,
+    default=DEFAULT_STI_GRIDS,
+    help="Angiv mappe med deformations- og/eller tyngdemodel",
+)
+def regn(
+    projektnavn: str,
+    MotorKlasse: type[RegneMotor],
+    plot: bool,
+    tidal_system: str,
+    epoch_target: Timestamp,
+    height_diff_unit: str,
+    output_height: str,
+    deformationmodel: str,
+    gravitymodel: str,
+    grid_inputfolder: Path,
+    **kwargs,
+) -> None:
     """Beregn nye koter.
+
+    Forudsætninger vedr. geodætisk korrektion/konvertering:
+    Input højder ("Højde" i fanebladet "Punktoversigt") er altid Helmert-højder,
+    output højder ("Ny højde" i fanebladene "Kontrolberegning" samt "Endelig beregning") skal enten
+    være Helmert-højder eller normalhøjder. Især sidstnævnte forudsætning skyldes, at det umiddelbart
+    ville blive for "kringlet" at håndetere, hvis output højder også skulle kunne være geopotentielle
+    højder.
 
     Forudsat nivellementsobservationer allerede er indlæst i sagsregnearket
     kan der beregnes nye koter på baggrund af disse observationer. Beregning
@@ -177,10 +261,101 @@ def regn(projektnavn: str, plot: bool, MotorKlasse: type[RegneMotor], **kwargs) 
         infiks = ""
         beregningstype = "endelig"
 
-    # Håndter fastholdte punkter og slukkede observationer.
+    # Indlæsning af observationer, punktoversigt samt parametre
     observationer = find_faneblad(projektnavn, "Observationer", arkdef.OBSERVATIONER)
     punktoversigt = find_faneblad(projektnavn, "Punktoversigt", arkdef.PUNKTOVERSIGT)
     arbejdssæt = find_faneblad(projektnavn, aktuelt_faneblad, arkdef.PUNKTOVERSIGT)
+    parametre = find_faneblad(projektnavn, "Parametre", arkdef.PARAM)
+
+    # Hvis der skal foretages en kontrolberegning gemmes parametre vedr. geodætisk korrektion/konvertering
+    if kontrol:
+        [
+            parametre.loc[parametre["Navn"] == "Tidesystem", "Værdi"],
+            parametre.loc[parametre["Navn"] == "Epoke", "Værdi"],
+            parametre.loc[parametre["Navn"] == "Enhed højdedifferencer", "Værdi"],
+            parametre.loc[parametre["Navn"] == "Output højde", "Værdi"],
+            parametre.loc[parametre["Navn"] == "Deformationsmodel", "Værdi"],
+            parametre.loc[parametre["Navn"] == "Tyngdemodel", "Værdi"],
+        ] = [
+            tidal_system,
+            epoch_target,
+            height_diff_unit,
+            output_height,
+            deformationmodel,
+            gravitymodel,
+        ]
+
+    # I modsat fald kontrolleres at parametrene er konsistente med kontrolberegningen
+    # Pt. fejler kontrollen fejlagtigt, hvis ingen parametre angives i kontrolberegningen/den endelige beregning
+    else:
+        # fmt: off
+        if (
+            [
+                parametre.loc[parametre["Navn"] == "Tidesystem", "Værdi"].item(),
+                to_datetime(parametre.loc[parametre["Navn"] == "Epoke", "Værdi"]).item(),
+                parametre.loc[parametre["Navn"] == "Enhed højdedifferencer", "Værdi"].item(),
+                parametre.loc[parametre["Navn"] == "Output højde", "Værdi"].item(),
+                parametre.loc[parametre["Navn"] == "Deformationsmodel", "Værdi"].item(),
+                parametre.loc[parametre["Navn"] == "Tyngdemodel", "Værdi"].item(),
+            ]
+        ) != (
+            [
+                tidal_system,
+                epoch_target,
+                height_diff_unit,
+                output_height,
+                deformationmodel,
+                gravitymodel,
+            ]
+        ):
+        # fmt: on
+            fire.cli.print(
+                "Fejl: Beregningsparametrene for den endelige beregning skal være konsistente med kontrolberegningen"
+            )
+            raise SystemExit(1)
+
+    # Observationer påføres geodætiske korrektioner
+    # Pt. korrigeres observationerne både ifm. kontrolberegningen og den endelige beregning - det er min
+    # plan, at de korrigerede observationer ifm. den endelige beregning istedet skal læses fra
+    # fanebladet "Korrigerede observationer"
+    if (
+        tidal_system is not None
+        or epoch_target is not None
+        or height_diff_unit == "gpu"
+    ):
+        print("Højdeforskelle påføres geodætiske korrektioner inden udjævning")
+
+        (observationer, korrektioner) = apply_geodetic_corrections_to_height_diffs(
+            observationer,
+            arbejdssæt,
+            Path(
+                grid_inputfolder
+            ),  # Nødvendigt med Path? Hvis der manuelt angives en sti?
+            height_diff_unit,
+            tidal_system,
+            epoch_target,
+            deformationmodel,
+            gravitymodel,
+        )
+
+    # Hvis udjævningen skal foretages i gpu konverteres Helmert-højder til geopotentielle højder
+    # Pt. foretages konverteringen til geopotentielle højder både ifm. kontrolberegning og ifm.
+    # den endelige beregning - det er min plan i stedet at gemme de konverterede højder i et faneblad
+    # mhp. genbrug ifm. den endelige beregning
+    if height_diff_unit == "gpu":
+        print(
+            "Højder konverteres fra Helmert-højder til geopotentielle højder inden udjævning"
+        )
+
+        arbejdssæt = convert_geopotential_heights_to_metric_heights(
+            arbejdssæt,
+            "helmert_to_geopot",
+            Path(
+                grid_inputfolder
+            ),  # Nødvendigt med Path? Hvis der manuelt angives en sti?
+            gravitymodel,
+            tidal_system,
+        )
 
     # Til den endelige beregning skal vi bruge de oprindelige observationsdatoer
     if not kontrol:
@@ -239,7 +414,47 @@ def regn(projektnavn: str, plot: bool, MotorKlasse: type[RegneMotor], **kwargs) 
     # Opdater arbejdssæt med udjævningsresultat
     beregning = opdater_arbejdssæt(arbejdssæt, nye_punkter_df)
     beregning = beregning.reset_index()
+
+    # Geopotentielle højder fra udjævningen konverteres til Helmert- eller normalhøjder
+    if height_diff_unit == "gpu":
+        print(
+            "Højder konverteres fra geopotentielle højder til Helmert-højder (eller normalhøjder) efter udjævning"
+        )
+
+        beregning = convert_geopotential_heights_to_metric_heights(
+            beregning,
+            f"geopot_to_{output_height}",
+            Path(
+                grid_inputfolder
+            ),  # Nødvendigt med Path? Hvis der manuelt angives en sti?
+            gravitymodel,
+            tidal_system,
+        )
+
+        # Endvidere genindføres oprindelige Helmert-højder
+        beregning["Kote"] = punktoversigt["Kote"]
+
+    # Beregningsresultater gemmes
     resultater[næste_faneblad] = beregning
+
+    # Hvis der er tale om en kontrolberegning gemmes endvidere parametre vedr. geodætisk
+    # korrektion/konvertering
+    if kontrol:
+        resultater["Parametre"] = parametre
+        # Hvis endvidere observationerne er påført geodætiske korrektioner gemmes de korrigerede
+        # observationer samt korrektionerne
+        if (
+            tidal_system is not None
+            or epoch_target is not None
+            or height_diff_unit == "gpu"
+        ):
+            korrigerede_observationer = observationer[["ΔH"]].copy()
+            korrigerede_observationer = korrigerede_observationer.join(korrektioner)
+            resultater["Korrigerede observationer"] = korrigerede_observationer
+
+        # korrigerede_observationer = korrektioner.insert(
+        #     3, "ΔH", korrigerede_observationer
+        # )
 
     # Plot tidsserier forlænget med de nyberegnede koter.
     if plot == True:

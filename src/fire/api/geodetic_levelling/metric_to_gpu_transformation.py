@@ -467,9 +467,10 @@ def convert_geopotential_height_to_helmert_height(
 
 
 def convert_geopotential_heights_to_metric_heights(
-    fire_project: str,
-    excel_inputfolder: Path,
-    outputfolder: Path,
+    points_df: pd.DataFrame,
+    # fire_project: str,
+    # excel_inputfolder: Path,
+    # outputfolder: Path,
     conversion: str,
     grid_inputfolder: Path = None,
     gravitymodel: str = None,
@@ -530,13 +531,13 @@ def convert_geopotential_heights_to_metric_heights(
     TO DO: Håndtering manglende a priori værdi?
     TO DO: Håndtering manglende inputhøjde?
     """
-    # Make sure that the output folder exists
-    outputfolder.mkdir(parents=True, exist_ok=True)
+    # # Make sure that the output folder exists
+    # outputfolder.mkdir(parents=True, exist_ok=True)
 
-    excel_inputfile = excel_inputfolder / f"{fire_project}.xlsx"
+    # excel_inputfile = excel_inputfolder / f"{fire_project}.xlsx"
 
-    # DataFrame with heights etc. from input fire project
-    points_df = pd.read_excel(excel_inputfile, sheet_name="Kontrolberegning")
+    # # DataFrame with heights etc. from input fire project
+    # points_df = pd.read_excel(excel_inputfile, sheet_name="Kontrolberegning")
 
     if conversion == "geopot_to_normal":
         for index in points_df.index:
@@ -554,9 +555,9 @@ def convert_geopotential_heights_to_metric_heights(
                 )
             )
             points_df.at[index, "Ny kote"] = height_converted
-            points_df.at[index, "Average normal gravity [10 m/s^2]"] = (
-                average_normal_gravity
-            )
+            # points_df.at[index, "Average normal gravity [10 m/s^2]"] = (
+            #     average_normal_gravity
+            # )
 
     elif conversion == "normal_to_geopot":
         for index in points_df.index:
@@ -570,10 +571,10 @@ def convert_geopotential_heights_to_metric_heights(
                     "normal_to_geopot",
                 )
             )
-            points_df.at[index, "Ny kote"] = height_converted
-            points_df.at[index, "Average normal gravity [10 m/s^2]"] = (
-                average_normal_gravity
-            )
+            points_df.at[index, "Kote"] = height_converted
+            # points_df.at[index, "Average normal gravity [10 m/s^2]"] = (
+            #     average_normal_gravity
+            # )
 
     elif (
         conversion == "geopot_to_helmert"
@@ -600,7 +601,7 @@ def convert_geopotential_heights_to_metric_heights(
                 )
             )
             points_df.at[index, "Ny kote"] = height_converted
-            points_df.at[index, "Conversion factor [10 m/s^2]"] = conversion_factor
+            # points_df.at[index, "Conversion factor [10 m/s^2]"] = conversion_factor
 
     elif (
         conversion == "helmert_to_geopot"
@@ -623,14 +624,16 @@ def convert_geopotential_heights_to_metric_heights(
                     tidal_system=tidal_system,
                 )
             )
-            points_df.at[index, "Ny kote"] = height_converted
-            points_df.at[index, "Conversion factor [10 m/s^2]"] = conversion_factor
+            points_df.at[index, "Kote"] = height_converted
+            # points_df.at[index, "Conversion factor [10 m/s^2]"] = conversion_factor
 
     else:
         exit(
             "Function convert_geopotential_heights_to_metric_heights: Wrong arguments for\n\
         parameter conversion and/or grid_inputfolder and/or gravitymodel."
         )
+
+    return points_df
 
     # DataFrame with parameters of output fire project
     parameters_df = pd.read_excel(excel_inputfile, sheet_name="Parametre")

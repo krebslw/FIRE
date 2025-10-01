@@ -162,7 +162,16 @@ def opret_sag(projektnavn: str, beskrivelse: str, sagsbehandler: str, **kwargs) 
     filoversigt = nyt_ark(arkdef.FILOVERSIGT)
     param = pd.DataFrame(
         columns=["Navn", "Værdi"],
-        data=[("Version", fire.__version__), ("Database", fire.cli.firedb.db)],
+        data=[
+            ("Version", fire.__version__),
+            ("Database", fire.cli.firedb.db),
+            ("Tidesystem", None),
+            ("Epoke", None),
+            ("Enhed højdedifferencer", None),
+            ("Output højde", None),
+            ("Deformationsmodel", None),
+            ("Tyngdemodel", None),
+        ],
     )
 
     resultater = {
