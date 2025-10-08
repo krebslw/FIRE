@@ -864,6 +864,95 @@ class DumRegn(RegneMotor):
         return None
 
 
+class SmartRegn(RegneMotor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _, _ , self.estimerbare_punkter = self.netanalyse()
+
+    def udjævn(self):
+        """Jævn ud"""
+
+        print("opsætter ligningssystem")
+        N = len(self.observationer) + len(self.fastholdte)         # antal målinger
+        M = len(self.estimerbare_punkter)   + len(self.fastholdte) # antal parametre
+
+
+        alle_punkter = tuple(sorted(self.estimerbare_punkter)) + tuple(self.fastholdte.keys())
+        # estim_ptuple(self.estimerbare_punkter)
+
+        A = np.zeros((N,M))
+        B = np.zeros((N))
+        C = np.zeros((N,N))
+
+        # Observationer
+        i = 0
+        for fra in self.digraf:
+            if not fra in alle_punkter:
+                continue
+            for til in self.digraf[fra]:
+                if not til in alle_punkter:
+                    continue
+                for obskey in self.digraf[fra][til]:
+                    obs = self._observationer[obskey]
+                    j_fra =  alle_punkter.index(fra)
+                    j_til =  alle_punkter.index(til)
+
+                    A[i,j_fra] = -1
+                    A[i,j_til] = 1
+                    B[i] = obs.deltaH
+                    C[i,i] = (1/(obs.spredning*1000))**2 # gang med 1000 for at få spredning fra mm til m
+
+                    i +=1
+
+
+        # Fastholdte
+        for pkt, kote in self.fastholdte.items():
+            j = alle_punkter.index(pkt)
+
+            # korriger observationer for fastholdte og fjern fastholdt som estimeret punkt
+            B = B-A[:,j]*kote
+            A[:,j] = 0
+
+            # Indsæt ny "ligning"
+            A[i,j] = 1
+            B[i] = kote
+            C[i,i] = 1
+            i += 1
+
+        breakpoint()
+        print("inverterer!!!")
+        udjævnede_koter = np.linalg.inv(A.T@C@A)@A.T@C@B
+        udj = list(udjævnede_koter)
+
+
+        breakpoint()
+        print("post-inversion")
+        nye_koter = []
+        for j, punkt in enumerate(alle_punkter):
+            if punkt in self.fastholdte:
+                continue
+
+            nye_koter.append(
+                InternKote(
+                    punkt=punkt,
+                    dato=self.gyldighedstidspunkt,
+                    H=udj[j],
+                    spredning=1,
+                )
+            )
+
+        self.nye_koter=nye_koter
+
+    @property
+    def filer(self) -> list:
+        """En liste af filer som SmartRegn producerer"""
+        return []
+    @filer.setter
+    def filer(self, nye_filnavne):
+        """Sæt nye filnavne"""
+        pass
+
+
 def _spredning(
     observationstype: str,
     afstand_i_m: float,

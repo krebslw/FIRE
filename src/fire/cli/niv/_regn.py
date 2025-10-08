@@ -11,6 +11,7 @@ from fire.api.niv.regnemotor import (
     RegneMotor,
     GamaRegn,
     DumRegn,
+    SmartRegn,
     ValideringFejl,
     UdjævningFejl,
     skriv_polygoner_geojson,
@@ -41,6 +42,7 @@ from fire.cli.niv._netoversigt import byg_netgeometri_og_singulære
 motorvælger = {
     "gama": GamaRegn,
     "dum": DumRegn,
+    "smart": SmartRegn,
 }
 
 
@@ -194,6 +196,7 @@ def regn(projektnavn: str, plot: bool, MotorKlasse: type[RegneMotor], **kwargs) 
         observationer_uden_slukkede, arbejdssæt, projektnavn=projektnavn
     )
 
+
     # Tilføj "-kontrol" eller "-endelig" til alle filnavne
     motor.filer = [
         str(Path(fn).with_stem(f"{Path(fn).stem}-{beregningstype}"))
@@ -221,7 +224,7 @@ def regn(projektnavn: str, plot: bool, MotorKlasse: type[RegneMotor], **kwargs) 
     resultater = byg_netgeometri_og_singulære(net_uden_ensomme, ensomme_subnet)
 
     # Måske skal lukkesum bygges ind i netoversigt i stedet...
-    cykler = motor.lukkesum()
+    cykler = motor.lukkesum(min_længde=100, metode='cb')
 
     filnavn =f"{projektnavn}-{beregningstype}-polygoner.geojson"
     skriv_polygoner_geojson(filnavn, motor._gamle_koter, cykler)
