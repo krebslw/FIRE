@@ -247,6 +247,7 @@ class RegneMotor(ABC):
 
         return df_out
 
+    # KREBSLW: kan være den her ikke skal være cached_property når vi nu laver konvertering af koterne
     @cached_property
     def fastholdte(self) -> dict[PunktNavn, float]:
         """Find fastholdte punkter og koter til en beregning"""
@@ -563,7 +564,53 @@ class DumRegn(RegneMotor):
     @property
     def filer(self) -> list:
         """En liste af filer som DumRegn producerer"""
-        return None
+        return []
+
+    @property
+    def parametre(self) -> dict:
+        """En dict af parametre brugt i DumRegn"""
+        return dict()
+
+
+class GeodætiskRegn(GamaRegn):
+    """
+    En geodætisk regnemotor
+
+    Her ville være et godt sted at dokumentere hvad GeodætiskRegn kan, i stil med det som
+    er lavet for den overordnede RegneMotor.
+
+    """
+    def __init__(
+        self,
+        tidal_system: str,
+        epoch_target: pd.Timestamp,
+        height_diff_unit: str,
+        output_height: str,
+        deformationmodel: str,
+        gravitymodel: str,
+        grid_inputfolder: Path,
+        **kwargs,
+    ):
+        # intitialiser parametre
+        self.tidal_system = tidal_system
+        self.epoch_target = epoch_target
+        self.height_diff_unit = height_diff_unit
+        self.output_height = output_height
+        self.deformationmodel = deformationmodel
+        self.gravitymodel = gravitymodel
+        self.grid_inputfolder = grid_inputfolder
+
+        # do some stuff
+
+        # start GamaRegn med de resterende parametre
+        super().__init__(**kwargs)
+
+
+    @property
+    def parametre(self):
+
+        return dict()
+
 
 
 def _spredning(

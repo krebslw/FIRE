@@ -9,6 +9,8 @@ from fire.api.model import (
     Koordinat,
 )
 from fire.api.niv.regnemotor import (
+    GeodætiskRegn,
+    DVR90Regn,
     RegneMotor,
     GamaRegn,
     DumRegn,
@@ -44,6 +46,8 @@ DEFAULT_STI_GRIDS = Path(__file__).parents[2] / Path("data/")
 motorvælger = {
     "gama": GamaRegn,
     "dum": DumRegn,
+    "geod": GeodætiskRegn,
+    "dvr90": DVR90Regn,
 }
 
 
@@ -67,72 +71,19 @@ motorvælger = {
     default=False,
     help="Angiv om beregnede koter skal plottes som forlængelse af en tidsserie",
 )
+# KREBSLW: option taget fra Evers' PR. har slettet de andre
 @click.option(
-    "--tidal-system",
-    type=str,
-    default=None,
-    required=False,
-    help="Angiv tidesystem - non, mean eller zero",
-)
-@click.option(
-    "-t0",
-    "--epoch-target",
-    type=Timestamp,
-    default=None,
-    required=False,
-    help="Angiv epoke - fx 1990-01-01",
-)
-@click.option(
-    "--height-diff-unit",
-    type=str,
-    default="metric",
-    required=False,
-    help="Angiv ønsket enhed for højdeforskelle, der skal udjævnes - metric eller gpu",
-)
-@click.option(
-    "--output-height",
-    type=str,
-    default="helmert",
-    required=False,
-    help="Angiv output højde - helmert eller normal - kun relevant, hvis height-diff-unit er gpu",
-)
-@click.option(
-    "--deformationmodel",
-    type=str,
-    default="DKup24geo_DTU2024_PK.tif",
-    # Kan også gøre sådan her, men så skal funktionerne i geodetic_levelling ændres til at håndtere Path i stedet for en str
-    # type=click.Path(writable=False),
-    # default = DEFAULT_STI_GRIDS / Path("absg_DTU2016_PK.tif"),
-    required=False,
-    help="Angiv deformationsmodel",
-)
-@click.option(
-    "--gravitymodel",
-    type=str,
-    default="dk-g-direkte-fra-gri-thokn.tif",
-    # Kan også gøre sådan her, men så skal funktionerne i geodetic_levelling ændres til at håndtere Path i stedet for en str
-    # type=click.Path(writable=False),
-    # default = DEFAULT_STI_GRIDS / Path("dk-g-direkte-fra-gri-thokn.tif"),
-    required=False,
-    help="Angiv tyngdemodel",
-)
-@click.option(
-    "--grid-inputfolder",
-    type=str,
-    default=DEFAULT_STI_GRIDS,
-    help="Angiv mappe med deformations- og/eller tyngdemodel",
+    "-r",
+    "--regneparameter",
+    "regneparametre",
+    multiple=True,
+    help="Regnemotorspecifikke parametre. Sættes på formen 'parameter=værdi'. Flere parametre kan sættes i samme kommando."
 )
 def regn(
     projektnavn: str,
     MotorKlasse: type[RegneMotor],
     plot: bool,
-    tidal_system: str,
-    epoch_target: Timestamp,
-    height_diff_unit: str,
-    output_height: str,
-    deformationmodel: str,
-    gravitymodel: str,
-    grid_inputfolder: Path,
+    regneparametre: tuple[str],
     **kwargs,
 ) -> None:
     """Beregn nye koter.
@@ -260,50 +211,22 @@ def regn(
     arbejdssæt = find_faneblad(projektnavn, aktuelt_faneblad, arkdef.PUNKTOVERSIGT)
     parametre = find_faneblad(projektnavn, "Parametre", arkdef.PARAM)
 
-    # Hvis der skal foretages en kontrolberegning gemmes parametre vedr. geodætisk korrektion/konvertering
-    if kontrol:
-        [
-            parametre.loc[parametre["Navn"] == "Tidesystem", "Værdi"],
-            parametre.loc[parametre["Navn"] == "Epoke", "Værdi"],
-            parametre.loc[parametre["Navn"] == "Enhed højdedifferencer", "Værdi"],
-            parametre.loc[parametre["Navn"] == "Output højde", "Værdi"],
-            parametre.loc[parametre["Navn"] == "Deformationsmodel", "Værdi"],
-            parametre.loc[parametre["Navn"] == "Tyngdemodel", "Værdi"],
-        ] = [
-            tidal_system,
-            epoch_target,
-            height_diff_unit,
-            output_height,
-            deformationmodel,
-            gravitymodel,
-        ]
 
-    # I modsat fald kontrolleres at parametrene er konsistente med kontrolberegningen
-    # Pt. fejler kontrollen fejlagtigt, hvis ingen parametre angives i kontrolberegningen/den endelige beregning
-    else:
-        # fmt: off
-        if (
-            [
-                parametre.loc[parametre["Navn"] == "Tidesystem", "Værdi"].item(),
-                to_datetime(parametre.loc[parametre["Navn"] == "Epoke", "Værdi"]).item(),
-                parametre.loc[parametre["Navn"] == "Enhed højdedifferencer", "Værdi"].item(),
-                parametre.loc[parametre["Navn"] == "Output højde", "Værdi"].item(),
-                parametre.loc[parametre["Navn"] == "Deformationsmodel", "Værdi"].item(),
-                parametre.loc[parametre["Navn"] == "Tyngdemodel", "Værdi"].item(),
-            ]
-        ) != (
-            [
-                tidal_system,
-                epoch_target,
-                height_diff_unit,
-                output_height,
-                deformationmodel,
-                gravitymodel,
-            ]
-        ):
-        # fmt: on
+    # KREBSLW: Taget fra Ever's PR.
+    # Tjek om der er parametre til regnemotoren. Parametre der ikke kan læses
+    # springes over.
+    motorkwargs = {}
+    for regneparameter in regneparametre:
+        try:
+            parameter, værdi = regneparameter.split("=")
+        except ValueError:
             fire.cli.print(
-                "Fejl: Beregningsparametrene for den endelige beregning skal være konsistente med kontrolberegningen"
+                (
+                    f"ADVARSEL: regneparameteren '{regneparameter} kan ikke tolkes. "
+                    "Skal være på formen 'parameter=værdi'."
+                ),
+                bold=True,
+                bg="yellow",
             )
             raise SystemExit(1)
 
@@ -331,24 +254,63 @@ def regn(
             gravitymodel,
         )
 
-    # Hvis udjævningen skal foretages i gpu konverteres Helmert-højder til geopotentielle højder
-    # Pt. foretages konverteringen til geopotentielle højder både ifm. kontrolberegning og ifm.
-    # den endelige beregning - det er min plan i stedet at gemme de konverterede højder i et faneblad
-    # mhp. genbrug ifm. den endelige beregning
-    if height_diff_unit == "gpu":
-        print(
-            "Højder konverteres fra Helmert-højder til geopotentielle højder inden udjævning"
-        )
+        # konverter til float hvis der er givet en talværdi
+        try:
+            værdi = float(værdi)
+        except ValueError:
+            pass
 
-        arbejdssæt = convert_geopotential_heights_to_metric_heights(
-            arbejdssæt,
-            "helmert_to_geopot",
-            Path(
-                grid_inputfolder
-            ),  # Nødvendigt med Path? Hvis der manuelt angives en sti?
-            gravitymodel,
-            tidal_system,
-        )
+        motorkwargs[parameter] = værdi
+
+    # KREBSLW : Hmm tror det her kommer til at blive besværligt også for brugeren.
+    # Hvis man gerne vil lave mange kontrol-beregninger i træk, så skal man huske at slette/omdøbe Fanebladet "Kontrolberegning", da den ellers vil brokke sig
+
+    # Hvis der skal foretages en kontrolberegning gemmes parametre vedr. geodætisk korrektion/konvertering
+    # if kontrol:
+    #     [
+    #         parametre.loc[parametre["Navn"] == "Tidesystem", "Værdi"],
+    #         parametre.loc[parametre["Navn"] == "Epoke", "Værdi"],
+    #         parametre.loc[parametre["Navn"] == "Enhed højdedifferencer", "Værdi"],
+    #         parametre.loc[parametre["Navn"] == "Output højde", "Værdi"],
+    #         parametre.loc[parametre["Navn"] == "Deformationsmodel", "Værdi"],
+    #         parametre.loc[parametre["Navn"] == "Tyngdemodel", "Værdi"],
+    #     ] = [
+    #         tidal_system,
+    #         epoch_target,
+    #         height_diff_unit,
+    #         output_height,
+    #         deformationmodel,
+    #         gravitymodel,
+    #     ]
+
+    # # I modsat fald kontrolleres at parametrene er konsistente med kontrolberegningen
+    # # Pt. fejler kontrollen fejlagtigt, hvis ingen parametre angives i kontrolberegningen/den endelige beregning
+    # else:
+    #     # fmt: off
+    #     if (
+    #         [
+    #             parametre.loc[parametre["Navn"] == "Tidesystem", "Værdi"].item(),
+    #             to_datetime(parametre.loc[parametre["Navn"] == "Epoke", "Værdi"]).item(),
+    #             parametre.loc[parametre["Navn"] == "Enhed højdedifferencer", "Værdi"].item(),
+    #             parametre.loc[parametre["Navn"] == "Output højde", "Værdi"].item(),
+    #             parametre.loc[parametre["Navn"] == "Deformationsmodel", "Værdi"].item(),
+    #             parametre.loc[parametre["Navn"] == "Tyngdemodel", "Værdi"].item(),
+    #         ]
+    #     ) != (
+    #         [
+    #             tidal_system,
+    #             epoch_target,
+    #             height_diff_unit,
+    #             output_height,
+    #             deformationmodel,
+    #             gravitymodel,
+    #         ]
+    #     ):
+    #     # fmt: on
+    #         fire.cli.print(
+    #             "Fejl: Beregningsparametrene for den endelige beregning skal være konsistente med kontrolberegningen"
+    #         )
+    #         raise SystemExit(1)
 
     # Til den endelige beregning skal vi bruge de oprindelige observationsdatoer
     if not kontrol:
@@ -358,9 +320,24 @@ def regn(
     observationer_uden_slukkede = observationer[observationer["Sluk"] != "x"]
 
     # Start regnemotoren!
-    motor = MotorKlasse.fra_dataframe(
-        observationer_uden_slukkede, arbejdssæt, projektnavn=projektnavn
-    )
+    # KREBSLW: kopieret fra Evers' eksempel!
+    try:
+        motor = MotorKlasse.fra_dataframe(
+            observationer_uden_slukkede, arbejdssæt, projektnavn=projektnavn, **motorkwargs
+        )
+    except TypeError as error:
+        # Fejlbeskeden vi kan få er på formen:
+        #
+        # TypeError: RegneMotor.__init__() got an unexpected keyword argument 'param'
+        #
+        # ... og derfor kan vi slippe afsted med at splitte stringen på '
+        parameter_navn = str(error).split("'")[1]
+        fire.cli.print(
+            f"FEJL: regneparameteren '{parameter_navn}' er ukendt.",
+            bold=True,
+            bg="red",
+        )
+        raise SystemExit
 
     # Tilføj "-kontrol" eller "-endelig" til alle filnavne
     motor.filer = [
