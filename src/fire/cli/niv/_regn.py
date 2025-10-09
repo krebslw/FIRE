@@ -228,31 +228,6 @@ def regn(
                 bold=True,
                 bg="yellow",
             )
-            raise SystemExit(1)
-
-    # Observationer påføres geodætiske korrektioner
-    # Pt. korrigeres observationerne både ifm. kontrolberegningen og den endelige beregning - det er min
-    # plan, at de korrigerede observationer ifm. den endelige beregning istedet skal læses fra
-    # fanebladet "Korrigerede observationer"
-    if (
-        tidal_system is not None
-        or epoch_target is not None
-        or height_diff_unit == "gpu"
-    ):
-        print("Højdeforskelle påføres geodætiske korrektioner inden udjævning")
-
-        (observationer, korrektioner) = apply_geodetic_corrections_to_height_diffs(
-            observationer,
-            arbejdssæt,
-            Path(
-                grid_inputfolder
-            ),  # Nødvendigt med Path? Hvis der manuelt angives en sti?
-            height_diff_unit,
-            tidal_system,
-            epoch_target,
-            deformationmodel,
-            gravitymodel,
-        )
 
         # konverter til float hvis der er givet en talværdi
         try:
@@ -413,14 +388,16 @@ def regn(
         resultater["Parametre"] = parametre
         # Hvis endvidere observationerne er påført geodætiske korrektioner gemmes de korrigerede
         # observationer samt korrektionerne
-        if (
-            tidal_system is not None
-            or epoch_target is not None
-            or height_diff_unit == "gpu"
-        ):
-            korrigerede_observationer = observationer[["ΔH"]].copy()
-            korrigerede_observationer = korrigerede_observationer.join(korrektioner)
-            resultater["Korrigerede observationer"] = korrigerede_observationer
+
+        # KREBSLW : Måske motoren skal gemme det i nogle geojson filer (se ovre i GeodætiskRegn)?
+        # if (
+        #     tidal_system is not None
+        #     or epoch_target is not None
+        #     or height_diff_unit == "gpu"
+        # ):
+        #     korrigerede_observationer = observationer[["ΔH"]].copy()
+        #     korrigerede_observationer = korrigerede_observationer.join(korrektioner)
+        #     resultater["Korrigerede observationer"] = korrigerede_observationer
 
         # korrigerede_observationer = korrektioner.insert(
         #     3, "ΔH", korrigerede_observationer

@@ -612,6 +612,106 @@ class GeodætiskRegn(GamaRegn):
         return dict()
 
 
+    def korriger(self):
+        """
+        Eksempel hvor apply_geodetic_corrections_to_height_diffs antages at virke med inputs:
+            point_from_lat
+            point_from_lon
+            point_to_lat
+            point_to_lon
+            epoch
+            height_diff
+            ...
+            etc
+
+        """
+        self.observationer
+        self.gamle_koter
+        for i, obs in enumerate(self.observationer):
+
+            fra = obs.fra
+            til = obs.til
+            epoch = obs.dato
+            height_diff = obs.deltaH
+
+            (observationer, korrektioner) = apply_geodetic_corrections_to_height_diffs(
+                fra,
+                til,
+                epoch,
+                height_diff,
+                self.tidal_system,
+                Path(
+                    self.grid_inputfolder
+                ),  # Nødvendigt med Path? Hvis der manuelt angives en sti?
+                self.height_diff_unit,
+                self.tidal_system,
+                self.epoch_target,
+                self.deformationmodel,
+                self.gravitymodel,
+            )
+
+            # KREBSLW: derefter skal RegneMotorens observations korrigeres, så det virker med GamaRegn.udjævn metoden
+            # Kan måske gøres som nedenfor, men har ikke testet det?
+            self.observationer[i].deltaH += korrektioner
+
+        return korrektioner
+
+    def korriger(self):
+        """
+        Eksempel hvor apply_geodetic_corrections_to_height_diffs antages at virke med inputs:
+
+            observationer: list[InternNivObservation]
+            punkter: list[InternKote]
+
+        og antages at spytte en liste af korrektioner ud: list[float]
+        """
+
+        if (
+            self.tidal_system is not None
+            or self.epoch_target is not None
+            or self.height_diff_unit == "gpu"
+        ):
+            print("Højdeforskelle påføres geodætiske korrektioner inden udjævning")
+
+            (observationer, korrektioner) = apply_geodetic_corrections_to_height_diffs(
+                # KREBSLW: Observationer og arbejdssæt erstattes af InternNivObservation og InternKote
+                # observationer,
+                # arbejdssæt,
+                self.observationer,
+                self.gamle_koter,
+                Path(
+                    self.grid_inputfolder
+                ),  # Nødvendigt med Path? Hvis der manuelt angives en sti?
+                self.height_diff_unit,
+                self.tidal_system,
+                self.epoch_target,
+                self.deformationmodel,
+                self.gravitymodel,
+            )
+
+            # KREBSLW: Herefter skal RegneMotorens observations korrigeres, så det virker med GamaRegn.udjævn metoden
+            # Kan måske gøres som nedenfor, men har ikke testet det?
+            for i,(o,k) in enumerate(zip(self.observationer, korrektioner)):
+                self.observationer[i].deltaH = o.deltaH + k
+
+            # KREBSLW: man kunne godt gemme korrektionerne ....
+            self.korrektioner = korrektioner
+
+    def gem_korrektioner_som_geojson(self):
+        # ... så man kan skrive dem ud som en geojson
+        with open("obs_corrected.geojson", "w") as fil:
+            fil.write(
+                f"""
+                [
+                    Min geojson
+                    Line: [
+                        x: 55, y :10, korrektion: {self.korrektioner}, bla:bla
+                        ]
+                ]
+                """
+            )
+
+
 
 
 class DVR90Regn(GeodætiskRegn):
