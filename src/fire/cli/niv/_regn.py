@@ -27,13 +27,6 @@ from fire.cli.ts.plot_ts import (
     plot_tidsserier,
 )
 
-from fire.api.geodetic_levelling.geodetic_correction_levelling_obs import (
-    apply_geodetic_corrections_to_height_diffs,
-)
-
-from fire.api.geodetic_levelling.metric_to_gpu_transformation import (
-    convert_geopotential_heights_to_metric_heights,
-)
 
 from fire.cli.niv import (
     find_faneblad,
@@ -531,6 +524,11 @@ def regn(
         observationer,
         infiks=infiks,
     )
+
+    # KREBSLW: Man kan gøre så Parametre altid gemmes, hvis motoren har nogle som den vil fortælle om
+    # Noget i stil med nedenstående
+    resultater["Parametre"] = DataFrame.from_dict(motor.parametre)
+
     skriv_ark(projektnavn, resultater)
     if fire.cli.firedb.config.getboolean("general", "niv_open_files"):
         # åbn html output hvis motoren producerer et

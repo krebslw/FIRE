@@ -15,6 +15,13 @@ import xmltodict
 
 import pandas as pd
 
+from fire.api.geodetic_levelling.geodetic_correction_levelling_obs import (
+    apply_geodetic_corrections_to_height_diffs,
+)
+from fire.api.geodetic_levelling.metric_to_gpu_transformation import (
+    convert_geopotential_heights_to_metric_heights
+)
+
 # Smarte type hints
 PunktNavn = str
 # NivSubnet er en forsimplet udgave af et rigtigt net, som bare indeholder navnene på punkter som indgår
@@ -385,6 +392,11 @@ class RegneMotor(ABC):
         """En liste af filnavne som motoren producerer"""
         pass
 
+    @property
+    @abstractmethod
+    def parametre(self) -> dict:
+        """En liste af relevante parametre som motoren bruger"""
+        pass
 
 class GamaRegn(RegneMotor):
     """
@@ -416,6 +428,11 @@ class GamaRegn(RegneMotor):
     def filer(self, nye_filnavne):
         """Sæt nye filnavne"""
         self.xml_in, self.xml_out, self.html_out = nye_filnavne
+
+    @property
+    def parametre(self) -> dict:
+        """Beret om diverse parametre brugt i gama-local"""
+        return dict()
 
     def skriv_gama_inputfil(self):
         """
