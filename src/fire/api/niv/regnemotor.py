@@ -613,6 +613,37 @@ class GeodætiskRegn(GamaRegn):
 
 
 
+
+class DVR90Regn(GeodætiskRegn):
+    """ Den her klasse gør i princippet ikke andet end at fastsætte nogle parametre """
+    def __init__(
+        self,
+        epoch_target: pd.Timestamp = '1990',
+        height_diff_unit: str = 'helmert',
+        output_height: str = 'helmert',
+        deformationmodel: str = 'knudsen',
+        gravitymodel: str = 'forsberg',
+        **kwargs
+        ):
+
+        fastlåste_params = dict (
+            tidal_system ='non',
+            grid_inputfolder = 'C:\min\mappe',
+        )
+
+        super().__init__(
+            epoch_target = epoch_target,
+            height_diff_unit=height_diff_unit,
+            output_height = output_height,
+            deformationmodel = deformationmodel,
+            gravitymodel = gravitymodel,
+            **fastlåste_params
+            # ...
+            **kwargs
+        )
+
+
+
 def _spredning(
     observationstype: str,
     afstand_i_m: float,
