@@ -712,6 +712,71 @@ class GeodætiskRegn(GamaRegn):
             )
 
 
+    def konverter(self):
+        """
+        Samme princip som ovenstående eksempler med `korriger`
+        """
+        # Hvis udjævningen skal foretages i gpu konverteres Helmert-højder til geopotentielle højder
+        # Pt. foretages konverteringen til geopotentielle højder både ifm. kontrolberegning og ifm.
+        # den endelige beregning - det er min plan i stedet at gemme de konverterede højder i et faneblad
+        # mhp. genbrug ifm. den endelige beregning
+        if self.height_diff_unit == "gpu":
+            print(
+                "Højder konverteres fra Helmert-højder til geopotentielle højder inden udjævning"
+            )
+
+            # KREBSLW: antag at convert_geopotential_heights_to_metric_heights arbejder med list[InterKote]
+            liste_af_konverterede_højder = convert_geopotential_heights_to_metric_heights(
+                # arbejdssæt,
+                self.gamle_koter,
+                "helmert_to_geopot",
+                Path(
+                    self.grid_inputfolder
+                ),  # Nødvendigt med Path? Hvis der manuelt angives en sti?
+                self.gravitymodel,
+                self.tidal_system,
+            )
+
+            # KREBSLW: I samme stil som i `korriger` skal regnemotoren interne repræsentation af koterne opdateres
+            for i, (punkt, konverteret_højde) in enumerate(zip(self.gamle_koter, liste_af_konverterede_højder)):
+                self.gamle_koter[i].H = konverteret_højde
+
+
+    def konverter_tilbage(self):
+        # Geopotentielle højder fra udjævningen konverteres til Helmert- eller normalhøjder
+        if self.height_diff_unit == "gpu":
+            print(
+                "Højder konverteres fra geopotentielle højder til Helmert-højder (eller normalhøjder) efter udjævning"
+            )
+
+            liste_af_konverterede_højder = convert_geopotential_heights_to_metric_heights(
+                # beregning,
+                self.nye_koter, # antages at indeholde de udjævnede koter
+                f"geopot_to_{self.output_height}",
+                Path(
+                    self.grid_inputfolder
+                ),  # Nødvendigt med Path? Hvis der manuelt angives en sti?
+                self.gravitymodel,
+                self.tidal_system,
+            )
+
+            # KREBSLW: I samme stil som i ovenstående skal regnemotoren interne repræsentation af de nye koter opdateres
+            for i, (punkt, konverteret_højde) in enumerate(zip(self.nye_koter, liste_af_konverterede_højder)):
+                self.nye_koter[i].H = konverteret_højde
+
+    def udjævn(self):
+        """
+        Den her samler det hele og er dén funktion som bliver kaldt i fire niv regn
+        """
+        self.korriger()
+        self.konverter()
+
+        # Brug udjævningsfunktionalitet fra GamaRegn
+        GamaRegn.udjævn(self)
+        # GamaRegn.udjævn sætter værdien af self.nye_koter, som så bruges i konverter_tilbage
+
+        self.konverter_tilbage()
+
 
 
 class DVR90Regn(GeodætiskRegn):
@@ -744,6 +809,7 @@ class DVR90Regn(GeodætiskRegn):
 
 
 
+# KREBSLW: Har du tænkt over hvordan spredningerne skal håndteres når der korrigeres og konverteres?
 def _spredning(
     observationstype: str,
     afstand_i_m: float,

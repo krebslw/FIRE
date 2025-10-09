@@ -360,24 +360,8 @@ def regn(
     beregning = opdater_arbejdssæt(arbejdssæt, nye_punkter_df)
     beregning = beregning.reset_index()
 
-    # Geopotentielle højder fra udjævningen konverteres til Helmert- eller normalhøjder
-    if height_diff_unit == "gpu":
-        print(
-            "Højder konverteres fra geopotentielle højder til Helmert-højder (eller normalhøjder) efter udjævning"
-        )
-
-        beregning = convert_geopotential_heights_to_metric_heights(
-            beregning,
-            f"geopot_to_{output_height}",
-            Path(
-                grid_inputfolder
-            ),  # Nødvendigt med Path? Hvis der manuelt angives en sti?
-            gravitymodel,
-            tidal_system,
-        )
-
-        # Endvidere genindføres oprindelige Helmert-højder
-        beregning["Kote"] = punktoversigt["Kote"]
+    # Endvidere genindføres oprindelige Helmert-højder
+    beregning["Kote"] = punktoversigt["Kote"]
 
     # Beregningsresultater gemmes
     resultater[næste_faneblad] = beregning
