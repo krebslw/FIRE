@@ -178,7 +178,7 @@ class RegneMotor(ABC):
             )
 
             # Det er ret dyrt at hente ident, da vi først skal hente selve punktet og dernæst loopes over alle punktets punktinfos
-            o = InternNivObservation(
+            o = NivObservation(
                 # obs.opstillingspunkt.ident,
                 # obs.sigtepunkt.ident,
                 obs.opstillingspunktid, # Så det er langt nemmere at bruge punktid'et som allerede er direkte tilknyttet observationen.
@@ -194,7 +194,7 @@ class RegneMotor(ABC):
 
         _koter = []
         for kote in koter:
-            k = InternKote(
+            k = NivKote(
                 # kote.punkt.ident,
                 kote.punktid,
                 kote.z,
