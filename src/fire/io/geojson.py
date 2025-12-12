@@ -13,6 +13,7 @@ from sqlalchemy.exc import DatabaseError
 from fire.api.model import (
     Punkt,
 )
+from fire.api.model.observationer import Observation
 from fire.ident import kan_være_gi_nummer
 from fire.cli import firedb
 from fire.api.niv.datatyper import (
@@ -333,3 +334,52 @@ def skriv_netoversigt_linjer_geojson(
 
     with open(filnavn, "wt") as obsfil:
         obsfil.write(geojson)
+
+def skriv_obs_geojson(
+    filnavn: str,
+    observationer: list[Observation],
+):
+    """Skriv geojson-fil med observationsdata til disk"""
+
+    til_json = {
+        "type": "FeatureCollection",
+        "Features": list(obser_feature(observationer)),
+    }
+
+    geojson = json.dumps(til_json, indent=4)
+
+    with open(filnavn, "wt") as obsfil:
+        obsfil.write(geojson)
+
+
+def obser_feature(
+    observationer: list[Observation],
+) -> dict[str, str]:
+    """Omsæt observationsinformationer til JSON-egnet dict"""
+    for obs in observationer:
+        fra = obs.opstillingspunkt
+        til = obs.sigtepunkt
+        feature = {
+            "type": "Feature",
+            "properties": {
+                "Fra": fra.ident,
+                "Til": til.ident,
+                "Målinger": obs.opstillinger,
+                "Afstand": obs.nivlængde,
+                "ΔH": obs.koteforskel,
+                "Observationstidspunkt": str(obs.observationstidspunkt),
+                # konvertering, da json.dump ikke uderstøtter int64
+                # "Opstillinger": int(observationer.at[i, "Opst"]),
+                # "Journal": observationer.at[i, "Journal"],
+                # "Type": observationer.at[i, "Type"],
+                # "Slukket": observationer.at[i, "Sluk"],
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [fra.geometri.koordinater[0],fra.geometri.koordinater[1]],
+                    [til.geometri.koordinater[0],til.geometri.koordinater[1]],
+                ],
+            },
+        }
+        yield feature

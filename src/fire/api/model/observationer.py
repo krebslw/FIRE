@@ -22,6 +22,7 @@ from fire.api.model import (
 __all__ = [
     "ObservationsType",
     "Observation",
+    # "NivObservation",
     "ObservationstypeID",
     "GeometriskKoteforskel",
     "TrigonometriskKoteforskel",
@@ -258,6 +259,8 @@ class Observation(FikspunktregisterObjekt):
         else:
             self._fejlmeldt = Boolean.FALSE
 
+# class NivObservation(Observation):
+#     pass
 
 class GeometriskKoteforskel(Observation):
     """

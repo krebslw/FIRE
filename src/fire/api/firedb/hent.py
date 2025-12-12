@@ -23,11 +23,13 @@ from fire.api.model import (
     Grafik,
     Observation,
     ObservationsType,
+    ObservationstypeID,
     Geometry,
     Srid,
     Koordinat,
     Tidsserie,
 )
+from fire.api.model.observationer import GeometriskKoteforskel
 from fire.ident import kan_være_gnssid
 
 
@@ -472,6 +474,49 @@ class FireDbHent(FireDbBase):
         )
 
         return list(observationer)
+
+    def hent_niv_observationer_til_punkt(
+        self,
+        punkt: Punkt,
+        tid_fra: Optional[datetime] = None,
+        tid_til: Optional[datetime] = None,
+        kun_aktive: bool = True,
+    ) -> set[Observation]:
+        """
+        Hent observationer, hvor `punkt` var opstillingspunktet.
+
+        """
+        filtre = []
+        if tid_fra is not None:
+            filtre.append(Observation.observationstidspunkt >= tid_fra)
+
+        if tid_til is not None:
+            filtre.append(Observation.observationstidspunkt <= tid_til)
+
+        if kun_aktive:
+            filtre.append(Observation._registreringtil == None)
+
+        # Hent kun koteforskelle
+        filtre.append(Observation.observationstypeid.in_((ObservationstypeID.geometrisk_koteforskel, ObservationstypeID.trigonometrisk_koteforskel)))
+
+        # hent obs med punkt som opstillingspunkt først
+        filtre_and = and_(*(filtre+[Observation.opstillingspunktid == punkt.id]))
+        # breakpoint()
+        observationer = set(
+            self.session.query(Observation)
+            .filter(filtre_and)
+            .all()
+        )
+
+        # dernæst obs med punkt som sigtepunkt
+        filtre_and = and_(*(filtre+[Observation.sigtepunktid == punkt.id]))
+        observationer.update(
+            self.session.query(Observation)
+            .filter(filtre_and)
+            .all()
+        )
+
+        return set(observationer)
 
     def hent_srid(self, sridid: str) -> Srid:
         """

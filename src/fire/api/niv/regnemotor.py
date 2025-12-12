@@ -179,10 +179,10 @@ class RegneMotor(ABC):
 
             # Det er ret dyrt at hente ident, da vi først skal hente selve punktet og dernæst loopes over alle punktets punktinfos
             o = NivObservation(
-                # obs.opstillingspunkt.ident,
-                # obs.sigtepunkt.ident,
-                obs.opstillingspunktid, # Så det er langt nemmere at bruge punktid'et som allerede er direkte tilknyttet observationen.
-                obs.sigtepunktid,
+                obs.opstillingspunkt.ident,
+                obs.sigtepunkt.ident,
+                # obs.opstillingspunktid, # Så det er langt nemmere at bruge punktid'et som allerede er direkte tilknyttet observationen.
+                # obs.sigtepunktid,
                 obs.observationstidspunkt,
                 obs.opstillinger,
                 obs.nivlængde,

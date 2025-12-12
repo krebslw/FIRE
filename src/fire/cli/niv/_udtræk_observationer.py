@@ -14,6 +14,7 @@ from typing import (
 
 import click
 
+from fire.api.model.observationer import GeometriskKoteforskel, TrigonometriskKoteforskel
 from fire.enumtools import (
     enum_names,
     selected_or_default,
@@ -25,8 +26,9 @@ from fire.io.regneark import (
     skriv_data,
 )
 from fire.srid import SRID
-from fire.api.model.punkttyper import (
+from fire.api.model import (
     Punkt,
+    # NivObservation,
 )
 from fire.api.niv.datatyper import (
     NivMetode,
@@ -52,6 +54,7 @@ from fire.cli.niv import (
 from fire.io.geojson import (
     skriv_punkter_geojson,
     skriv_observationer_geojson,
+    skriv_obs_geojson,
 )
 
 from fire.typologi import (
@@ -373,3 +376,152 @@ def udtræk_observationer(
         ark_observationer,
         infiks=f"-{timestamp()}",
     )
+
+from collections import deque
+import fiona
+import shapely
+from pyproj import Geod
+import networkx as nx
+from fire.api.niv.regnemotor import GamaRegn
+from fire.api.model.tidsserier import til_decimalår
+
+from matplotlib import pyplot as plt
+
+def udtræk_punkter_iterativ(punkt_start: Punkt, punkt_slut: Punkt):
+    db = fire.cli.firedb
+    punkt_start, punkt_slut = db.hent_punkt_liste([punkt_start, punkt_slut])
+
+    punkter_alle = set([punkt_start, punkt_slut])
+    observationer_alle = set()
+
+    observationer_start = db.hent_niv_observationer_til_punkt(punkt_start, tid_fra=dt.datetime(2000,1,1))
+    observationer_alle.update(observationer_start)
+
+    # for hver observation ser vi nu om der findes en anden observation inden for et tidsspænd
+    # 30 dage
+    delta = dt.timedelta(30)
+    observationer = deque(observationer_start)
+    obs_besøgt = set()
+
+    # Find afstand mellem de to punkter
+    lon1, lat1 = punkt_start.geometri.koordinater
+    lon2, lat2 = punkt_slut.geometri.koordinater
+
+    g = Geod(ellps="GRS80")
+    afstand = g.line_length([lon1, lon2], [lat1, lat2])
+
+    # hent observationer
+    obs = set()
+    for p in [punkt_start, punkt_slut]:
+        for obsklasse in [GeometriskKoteforskel, TrigonometriskKoteforskel]:
+            obs.update(
+                db.hent_observationer_naer_geometri(
+                    p.geometri.geometri,
+                    afstand = afstand,
+                    observationsklasse = obsklasse,
+                )
+            )
+
+    # while True:
+
+    #     try:
+    #         obs = observationer.pop()
+    #     except IndexError:
+    #         # break når queuen er tom!
+    #         break
+
+    #     if obs in obs_besøgt:
+    #         continue
+    #     obs_besøgt.add(obs)
+
+    #     punkter=(obs.sigtepunkt, obs.opstillingspunkt)
+    #     for p in punkter:
+    #         # print(f"henter observationer til {p.ident}")
+    #         observationer_ny = db.hent_niv_observationer_til_punkt(
+    #             p,
+    #             obs.observationstidspunkt-delta,
+    #             obs.observationstidspunkt+delta,
+    #         )
+    #         observationer_ny.difference_update(obs_besøgt)
+    #         # observationer_alle.update(observationer_ny)
+    #         observationer.extend(observationer_ny)
+
+    #     print(f"antal obs fundet: {len(obs_besøgt)}")
+    #     if len(obs_besøgt)>=1000:
+    #         break
+    # observationer_alle=obs_besøgt
+    observationer_alle = list(obs)
+    print(len(observationer_alle))
+
+    # skriv_obs_geojson("iter_obs.geojson",observationer_alle)
+
+    # Smid observationerne ind i en regnemotor så vi kan bruge multidigrafen
+    motor = GamaRegn.fra_query(observationer_alle, [], [])
+
+
+
+    # lav en slags binning af datoer!
+    # skal bruge en liste af intervaller, som ikke overlapper
+
+    # do some binning
+
+    liste_af_intervaller = [[2000,2001], [2002,2020]]
+
+    motorer = []
+    for interv in liste_af_intervaller:
+        obs_i_interval = [o for o in observationer_alle if dt.datetime(interv[0],1,1)<=o.observationstidspunkt and o.observationstidspunkt<dt.datetime(interv[1],1,1)]
+        motor=GamaRegn.fra_query(obs_i_interval, [], [])
+        datoer = [til_decimalår(obs.dato) for obs in motor.observationer]
+        plt.scatter(datoer, datoer)
+        plt.show()
+
+        motorer.append(motor)
+
+    # datoer = nx.get_edge_attributes(motor.multidigraf, "data")
+    breakpoint()
+    pass
+
+# @staticmethod
+# def binning(datoer: list[float], binsize: int = 14, **kwargs):
+#     """
+#     Kombiner data fra dage tættere på hinanden end binsize (i dage).
+
+#     x antages at være i decimalår og sorteret i stigende rækkefølge.
+#     Binning bruges som præprocessering til analyse med klassen PolynomieRegression1D.
+#     """
+
+#     if len(x) != len(y):
+#         raise ValueError("Inputdata skal have samme længde.")
+
+#     binsize_i_år = binsize / (365.25)
+#     x = np.array(x)
+#     y = np.array(y)
+#     # vægt = np.ones(x.shape)
+#     xdiff = np.diff(x)
+
+#     while np.any(xdiff <= binsize_i_år):
+#         x_ny = []
+#         y_ny = []
+#         vægt_ny = []
+#         i = 0
+#         while i < len(x):
+#             bin_start = x[i]
+#             bin_slut = bin_start + binsize_i_år
+
+#             # Find alle datapunkter inden for [bin_start, bin_slut]
+#             bin = np.where(np.logical_and(bin_start <= x, x <= bin_slut))
+
+#             # x_ny.append(sum(x[bin] * vægt[bin]) / sum(vægt[bin]))
+#             # y_ny.append(sum(y[bin] * vægt[bin]) / sum(vægt[bin]))
+#             vægt_ny.append(sum(vægt[bin]))
+
+#             i = np.max(bin) + 1
+
+#         x, y, vægt = np.array(x_ny), np.array(y_ny), np.array(vægt_ny)
+#         xdiff = np.diff(x)
+
+#     return x, y
+
+if __name__ == "__main__":
+    print("gugu")
+    udtræk_punkter_iterativ('53-10-09050', '53-10-09122')
