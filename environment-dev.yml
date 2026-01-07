@@ -28,7 +28,7 @@ dependencies:
   - shapely
   - sphinx-click
   - sphinx=*
-  - sphinx_rtd_theme=9.0.3
+  - sphinx_rtd_theme=3.0.2
   - sphinxcontrib-programoutput
   - sqlalchemy
   - xmltodict
