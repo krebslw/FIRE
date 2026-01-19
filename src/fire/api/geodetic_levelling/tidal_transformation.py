@@ -539,3 +539,292 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
 from fire.api.geodetic_levelling.metric_to_gpu_transformation import (
     interpolate_gravity,
 )
+
+
+class TidalSystemTransformer():
+    # Some constants
+    # Inclination dependent term
+    inclination_term = (3 / 2) * (sin(geo_p.epsilon)) ** 2 - 1
+
+    def __init__(
+            self,
+            source: str,
+            target: str,
+            latitude: float,
+            longitude: float,
+            # epoch_obs: pd.Timestamp = None,
+            gravitymodel: str = None,
+            grid_inputfolder: Path = None,
+    ):
+        if source==target:
+            raise ValueError("Nothing to transform")
+
+        self.source = source
+        self.target = target
+        self.transformation = f"{source}_to_{target}"
+        self.latitude = latitude
+        self.longitude = longitude
+        self.gravitymodel = gravitymodel
+        self.grid_inputfolder = grid_inputfolder
+
+
+    # compute some terms needed
+    @property
+    def gravity(self) -> float:
+        return interpolate_gravity(self.latitude, self.longitude, self.grid_inputfolder, self.gravitymodel)
+
+    # Latitude dependent term
+    @property
+    def latitude_term(self):
+        return 3 * (sin(self.latitude)) ** 2 - 1
+
+    @property
+    def tidal_potential_moon(self):
+            return (
+                (
+                    (const.G.value * geo_p.moon_mass * geo_p.radius_earth**2)
+                    / (4 * geo_p.moon_dist**3)
+                )
+                * self.inclination_term
+                * self.latitude_term
+            )
+
+    @property
+    def tidal_potential_sun(self):
+        return (
+            (
+                (const.G.value * const.M_sun.value * geo_p.radius_earth**2)
+                / (4 * const.au.value**3)
+            )
+            * self.inclination_term
+            * self.latitude_term
+        )
+
+    @property
+    def tidal_gravitation(self) -> float:
+        """Calculate the permanent tidal gravitation assuming a rigid Earth."""
+        # The permanent tidal gravitation is given by -dW/dr, i.e.
+        # minus the partial derivative of the permanent tidal potential wrt Earth radius
+        return -(2 / geo_p.radius_earth) * (self.tidal_potential_sun + self.tidal_potential_moon)
+
+    @property
+    def tidal_deformation_geoid(self) -> float:
+        """Permanent tidal deformation of the geoid"""
+        return (self.tidal_potential_sun + self.tidal_potential_moon)/self.gravity
+
+
+    def transform_gravity(self, gravity: float) -> float:
+        """Transform gravity from one tidal system to another tidal system.
+
+        Transforms gravity from one tidal system to another tidal system and returns the
+        result as a float.
+
+        Reference:
+        Martin Ekman, The impact of geodynamic phenomena on systems for height and gravity,
+        pp. 124-128, eq. (19), (20), (22). Nordic Geodetic Commission, 1988
+
+        Args:
+        gravity: float, gravity to be transformed from one tidal system to another, in units of m/s^2
+        latitude: float, latitude at which the input gravity is measured, in units of degrees
+        transformation: str, specification of source and target tidal system, e.g. "non_to_mean"
+
+        Returns:
+        float, the transformed gravity in units of m/s^2
+
+        Raises:
+        ?
+        """
+        # The permanent tidal gravitation assuming a rigid Earth in units of m/s^2
+        rigid_earth_contribution = self.tidal_gravitation
+        return self.transform(gravity, rigid_earth_contribution)
+
+    def transform_height(self, height: float) -> float:
+        # The permanent tidal gravitation assuming a rigid Earth in units of m/s^2
+        rigid_earth_contribution = self.tidal_deformation_geoid
+        return self.transform(height, rigid_earth_contribution)
+
+
+    def transform(
+            self,
+            value,
+            rigid_earth_contribution,
+        ):
+
+        deformable_earth_contribution=geo_p.delta * rigid_earth_contribution
+        if self.transformation == "non_to_mean":
+            gravity_transformed = value + deformable_earth_contribution
+
+        elif self.transformation == "non_to_zero":
+            gravity_transformed = (
+                value + deformable_earth_contribution - rigid_earth_contribution
+            )
+
+        elif self.transformation == "mean_to_non":
+            gravity_transformed = value - deformable_earth_contribution
+
+        elif self.transformation == "mean_to_zero":
+            gravity_transformed = value - rigid_earth_contribution
+
+        elif self.transformation == "zero_to_non":
+            gravity_transformed = (
+                value - deformable_earth_contribution + rigid_earth_contribution
+            )
+
+        elif self.transformation == "zero_to_mean":
+            gravity_transformed = value + rigid_earth_contribution
+
+        return gravity_transformed
+
+
+def transform_height_diff(height_diff, lat1, lon1, lat2, lon2, **kwargs):
+
+    p1 = TidalSystemTransformer(latitude=lat1, longitude=lon1, **kwargs)
+    p2 = TidalSystemTransformer(latitude=lat2, longitude=lon2, **kwargs)
+
+    return height_diff + p2.transform_height(0)-p1.transform_height(0)
+
+def apply_tidal_corrections_to_height_diff2(
+    height_diff: float,
+    point_from_lat: float,
+    point_from_long: float,
+    point_to_lat: float,
+    point_to_long: float,
+    epoch_obs: pd.Timestamp,
+    tidal_system: str,
+    grid_inputfolder: Path = None,
+    gravitymodel: str = None,
+) -> tuple[float, float]:
+    """Apply tidal corrections to a metric height difference.
+
+    Applies tidal corrections to a metric height difference and returns the corrected
+    height difference and the correction itself in a tuple.
+
+    The application of tidal corrections to a metric height difference implies that all periodic
+    tidal effects are removed, whereas the permanent tidal effects are removed or retained
+    (in whole or in part) depending on the specified tidal system.
+
+    Reference:
+    Klaus Schmidt, The Danish height system DVR90, pp. app 15-16.
+    National Survey and Cadastre, 2000
+
+    Args:
+    height_diff: float, metric height difference to be tidally corrected
+    point_from_lat: float, latitude of from point in units of degrees
+    point_from_long: float, longitude of from point in units of degrees
+    point_to_lat: float, latitiude of to point in units of degrees
+    point_to_long: float, longitude of to point in units of degrees
+    epoch_obs: pd.Timestamp, epoch/time of observation (format: yyyy-mm-dd hh:mm:ss)
+    tidal_system: str, tidal system of output height difference, "non", "mean" or "zero"
+    for non-tidal, mean tide or zero tide
+    grid_inputfolder: Path = None, optional parameter, folder for input grid, i.e. gravity model,
+    only relevant if tidal system is mean tide or zero tide
+    gravitymodel: str = None, optional parameter, grid-based model providing gravity in units of
+    mGal (1 mGal = 10^-5 m/s^2), must be in GeoTIFF or GTX file format, only relevant if
+    tidal system is mean tide or zero tide
+
+    Returns:
+    tuple[float, float], a tuple containing the corrected height difference and
+    the correction itself in units of meters
+
+    Raises:
+    ?
+
+    TO DO: Højere grad af konsistens fsva. vinkelmål deg/rad?
+    TO DO: Split op i mindre underfunktioner
+    TO DO: Implementer option vedr. brug af approksimative formler til transformation til mean og
+    zero tide
+    TO DO: Take daylight saving time into account
+    TO DO: Handling of small inconsistence regarding tilt factor/diminution coefficient (0.7 vs. 0.68)
+    """
+    allowed_tidal_systems = ["non", "mean", "zero"]
+    if not tidal_system in allowed_tidal_systems:
+        raise ValueError(f"`tidal_system` must be one of {', '.join(allowed_tidal_systems)}")
+
+    if tidal_system != "non" and ((gravitymodel is None) or (grid_inputfolder is None)):
+        exit(
+            "Function apply_tidal_corrections_to_height_diff: Wrong arguments for\n\
+        parameter tidal_system and/or gravitymodel and/or grid_inputfolder."
+        )
+
+    # Calculation of levelling section length and azimuth
+    # Azimuth is calculated clockwise from north; interval of azimuth: [-180 deg; 180 deg]
+    geod = pyproj.Geod(ellps="GRS80")
+    azimuth_forward, azimuth_back, section_length = geod.inv(
+        point_from_long, point_from_lat, point_to_long, point_to_lat
+    )
+
+    # Conversion of levelling section azimuth to radians
+    azimuth_forward = azimuth_forward * 2 * (pi / 360)
+
+    # Observation epoch in UTC
+    # Daylight saving time is not taken into account
+    epoch_obs = epoch_obs + pd.Timedelta(hours=-1)
+    t = Time(epoch_obs, scale="utc")
+
+    # Mean geographic coordinates
+    mean_lat = (point_from_lat + point_to_lat) / 2
+    mean_long = (point_from_long + point_to_long) / 2
+
+    # Conversion of mean geographic coordinates to cartesian ITRS coordinates
+    loc = EarthLocation(lat=mean_lat * u.deg, lon=mean_long * u.deg, height=0 * u.m)
+
+    # Apparent positions (ra, dec, dist) of the Moon and Sun in GCRS
+    with solar_system_ephemeris.set("jpl"):
+        moon = get_body("moon", t, loc)
+        sun = get_body("sun", t, loc)
+
+    # Altitude and azimuth of the Moon and Sun without refraction effects
+    # Interval of altitude: [-pi/2; pi/2]
+    # Azimuth is calculated clockwise from north; interval of azimuth: [0; 2*pi]
+    altazframe = AltAz(obstime=t, location=loc, pressure=0)
+    moon_altaz = moon.transform_to(altazframe)
+    sun_altaz = sun.transform_to(altazframe)
+    altitude_moon = moon_altaz.alt.radian
+    azimuth_moon = moon_altaz.az.radian
+    altitude_sun = sun_altaz.alt.radian
+    azimuth_sun = sun_altaz.az.radian
+
+    # Conversion of altitude to zenith distance
+    zenith_dist_moon = (pi / 2) - altitude_moon
+    zenith_dist_sun = (pi / 2) - altitude_sun
+
+    # Calculation of tidal corrections due to the Moon and Sun in units of 1e-8 m
+    tidal_corr_moon = (
+        section_length
+        * 8.5
+        * sin(2 * zenith_dist_moon)
+        * cos(azimuth_moon - azimuth_forward)
+    )
+    tidal_corr_sun = (
+        section_length
+        * 3.9
+        * sin(2 * zenith_dist_sun)
+        * cos(azimuth_sun - azimuth_forward)
+    )
+    # Tidal correction of height_diff (0.7 is diminution coefficient corresponding to a yielding
+    # Earth). This correction removes all tidals effects caused by the Moon and Sun, i.e. both
+    # periodic and permanent tidal effects and both direct and indirect effects (caused by
+    # a yielding/deforming Earth). Consequently, the corrected height difference is in
+    # non-tidal system
+    tidal_corr = (tidal_corr_moon + tidal_corr_sun) * 0.7 * 1e-8
+    height_diff_corrected = height_diff + tidal_corr
+
+    if tidal_system == "non":
+        return (height_diff_corrected, tidal_corr)
+
+    # Transform the corrected height difference from "non" to the specified tidal_system
+    height_diff_corrected = transform_height_diff(
+        height_diff_corrected,
+        point_from_lat,
+        point_from_long,
+        point_to_lat,
+        point_to_long,
+        source="non",
+        target=tidal_system,
+        grid_inputfolder=grid_inputfolder,
+        gravitymodel=gravitymodel,
+    )
+
+    tidal_corr = height_diff_corrected - height_diff
+    return (height_diff_corrected, tidal_corr)
+
