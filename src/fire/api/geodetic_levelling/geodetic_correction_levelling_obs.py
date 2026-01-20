@@ -1,8 +1,8 @@
 """This module contains functions for geodetic correction of height differences/levelling observations."""
 
 from pathlib import Path
-import copy
 
+from dataclasses import dataclass
 import pandas as pd
 
 from fire.api.geodetic_levelling.tidal_transformation import (
@@ -16,23 +16,83 @@ from fire.api.geodetic_levelling.time_propagation import (
 from fire.api.geodetic_levelling.metric_to_gpu_transformation import (
     convert_metric_height_diff_to_geopotential_height_diff,
 )
-
-from fire.api.niv.datatyper import (
-    NivObservation,
-    NivKote,
-)
+from fire.api.niv.datatyper import NivKote, NivObservation
 
 
-def apply_geodetic_corrections_to_height_diffs(
-    height_diff_objects: list[NivObservation],
-    height_objects: list[NivKote],
+@dataclass
+class ObsCorrections:
+    m2gpu_factor: float = 1
+    tidal_corr: float = 0
+    epoch_corr: float = 0
+
+def apply_corrections_to_list_of_height_diffs(
+    observationer: dict[str, NivObservation],
+    koter: dict[str, NivKote],
     height_diff_unit: str = "metric",
     epoch_target: pd.Timestamp = None,
     tidal_system: str = None,
     grid_inputfolder: Path = None,
     deformationmodel: str = None,
     gravitymodel: str = None,
-) -> tuple[list[NivObservation], pd.DataFrame]:
+):
+    fra_punkter = []
+    til_punkter = []
+    korrektioner: list[ObsCorrections] = []
+
+    for idx, obs in observationer.items():
+        deltah_corrected, korrektion = apply_geodetic_corrections_to_height_diffs(
+            obs.deltaH,
+            koter[obs.fra].øst,
+            koter[obs.fra].nord,
+            koter[obs.til].øst,
+            koter[obs.til].nord,
+            obs.dato,
+            height_diff_unit,
+            epoch_target,
+            tidal_system,
+            grid_inputfolder,
+            deformationmodel,
+            gravitymodel,
+        )
+        observationer[idx].deltaH = deltah_corrected
+
+        # Gem værdier som skal gemmes i excel
+        fra_punkter.append(obs.fra)
+        til_punkter.append(obs.til)
+        korrektioner.append([korrektion.tidal_corr, korrektion.epoch_corr, korrektion.m2gpu_factor])
+
+    data = [
+        fra_punkter,
+        til_punkter,
+        *[list(k) for k in zip(*korrektioner)]
+    ]
+    korrektioner_obs = pd.DataFrame(
+        data=data,
+        columns=[
+            "From point",
+            "To point",
+            f"ΔH tidal correction (tidal system: {tidal_system}) [m]",
+            f"ΔH epoch correction (target epoch: {epoch_target}) [m]",
+            f"ΔH m2gpu multiplication factor (tidal system: {tidal_system}) [10 m/s^2]",
+        ],
+    )
+
+    return observationer, korrektioner_obs
+
+def apply_geodetic_corrections_to_height_diffs(
+    height_diff: float,
+    point_from_long: float,
+    point_from_lat: float,
+    point_to_long: float,
+    point_to_lat: float,
+    epoch_obs: pd.Timestamp,
+    height_diff_unit: str = "metric",
+    epoch_target: pd.Timestamp = None,
+    tidal_system: str = None,
+    grid_inputfolder: Path = None,
+    deformationmodel: str = None,
+    gravitymodel: str = None,
+) -> tuple[float, ObsCorrections]:
     """Apply geodetic corrections to metric height differences.
 
     Applies various geodetic corrections to the metric height differences in a list of
@@ -75,141 +135,59 @@ def apply_geodetic_corrections_to_height_diffs(
     Raises:
     ? Hvis input mappe eller filer ikke findes, hvis der mangler punkter i points?
     """
-    # Output list for corrected/converted height differences
-    height_diff_objects_corrected = []
+    corrections = ObsCorrections()
+    if tidal_system is not None:
+        (height_diff, tidal_corr) = apply_tidal_corrections_to_height_diff(
+            height_diff,
+            point_from_lat,
+            point_from_long,
+            point_to_lat,
+            point_to_long,
+            epoch_obs,
+            tidal_system,
+            grid_inputfolder=grid_inputfolder,
+            gravitymodel=gravitymodel,
+        )
 
-    # Output DataFrame for applied corrections
-    index = []
+        corrections.tidal_corr = tidal_corr
 
-    for height_diff_object in height_diff_objects:
-        index.append(height_diff_object.id)
+    # The next steps use grid models of uplift and gravity, so we return if
+    # no grid-folder is specified.
+    if grid_inputfolder is None:
+        return height_diff, corrections
 
-    corrections_df = pd.DataFrame(
-        columns=[
-            "From point",
-            "To point",
-            f"ΔH tidal correction (tidal system: {tidal_system}) [m]",
-            f"ΔH epoch correction (target epoch: {epoch_target}) [m]",
-            f"ΔH m2gpu multiplication factor (tidal system: {tidal_system}) [10 m/s^2]",
-        ],
-        index=index,
-    )
+    # Perform uplift-correction if both epoch_target and deformationmodel is specified
+    if (epoch_target is not None) and (deformationmodel is not None):
+        (height_diff, epoch_corr) = propagate_height_diff_from_epoch_to_epoch(
+            height_diff,
+            point_from_lat,
+            point_from_long,
+            point_to_lat,
+            point_to_long,
+            epoch_obs,
+            epoch_target,
+            grid_inputfolder,
+            deformationmodel,
+        )
 
-    for height_diff_object in height_diff_objects:
-        height_diff = height_diff_object.deltaH
-        point_from = height_diff_object.fra
-        point_to = height_diff_object.til
-        epoch_obs = height_diff_object.dato
+        corrections.epoch_corr = epoch_corr
 
-        # Geographic coordinates of point_from and point_to
-        (point_from_lat, point_from_long) = [
-            (height_object.nord, height_object.øst)
-            for height_object in height_objects
-            if height_object.punkt == point_from
-        ][0]
-        (point_to_lat, point_to_long) = [
-            (height_object.nord, height_object.øst)
-            for height_object in height_objects
-            if height_object.punkt == point_to
-        ][0]
-
-        # Point from and point to are written to DataFrame for applied corrections
-        corrections_df.at[height_diff_object.id, "From point"] = point_from
-        corrections_df.at[height_diff_object.id, "To point"] = point_to
-
-        # The metric height differences are tidally corrected if the
-        # function apply_geodetic_corrections_to_height_diffs is called with an argument for
-        # parameter tidal_system
-        if tidal_system is not None:
-            (height_diff, tidal_corr) = apply_tidal_corrections_to_height_diff(
+    # Perform metric-to-gpu conversion if output-unit is set to gpu and gravitymodel is
+    # specified
+    if height_diff_unit == "gpu" and gravitymodel is not None:
+        height_diff, m2gpu_factor = (
+            convert_metric_height_diff_to_geopotential_height_diff(
                 height_diff,
                 point_from_lat,
                 point_from_long,
                 point_to_lat,
                 point_to_long,
-                epoch_obs,
                 tidal_system,
-                grid_inputfolder=grid_inputfolder,
-                gravitymodel=gravitymodel,
-            )
-
-            corrections_df.at[
-                height_diff_object.id,
-                f"ΔH tidal correction (tidal system: {tidal_system}) [m]",
-            ] = tidal_corr
-
-        # The metric height differences are propagated to a target epoch if
-        # the function apply_geodetic_corrections_to_height_diffs is called with arguments for
-        # all three parameters epoch_target, deformationmodel and grid_inputfolder
-        if (
-            (epoch_target is not None)
-            and (deformationmodel is not None)
-            and (grid_inputfolder is not None)
-        ):
-            (height_diff, epoch_corr) = propagate_height_diff_from_epoch_to_epoch(
-                height_diff,
-                point_from_lat,
-                point_from_long,
-                point_to_lat,
-                point_to_long,
-                epoch_obs,
-                epoch_target,
                 grid_inputfolder,
-                deformationmodel,
+                gravitymodel,
             )
+        )
 
-            corrections_df.at[
-                height_diff_object.id,
-                f"ΔH epoch correction (target epoch: {epoch_target}) [m]",
-            ] = epoch_corr
+        corrections.m2gpu_factor = m2gpu_factor
 
-        elif epoch_target is not None:
-            exit(
-                "Function apply_geodetic_corrections_to_height_diffs: Wrong arguments for\n\
-            parameter epoch_target and/or deformationmodel and/or grid_inputfolder."
-            )
-
-        # The metric height differences are converted to geopotential units if
-        # the function apply_geodetic_corrections_to_height_diffs is called with argument "gpu"
-        # for parameter height_diff_unit and with arguments for both parameter gravitymodel
-        # and grid_inputfolder
-        if (
-            height_diff_unit == "gpu"
-            and (gravitymodel is not None)
-            and (grid_inputfolder is not None)
-        ):
-            (height_diff, m2gpu_factor) = (
-                convert_metric_height_diff_to_geopotential_height_diff(
-                    height_diff,
-                    point_from_lat,
-                    point_from_long,
-                    point_to_lat,
-                    point_to_long,
-                    tidal_system,
-                    grid_inputfolder,
-                    gravitymodel,
-                )
-            )
-
-            corrections_df.at[
-                height_diff_object.id,
-                f"ΔH m2gpu multiplication factor (tidal system: {tidal_system}) [10 m/s^2]",
-            ] = m2gpu_factor
-
-        elif height_diff_unit == "metric":
-            pass
-
-        else:
-            exit(
-                "Function apply_geodetic_corrections_to_height_diffs: Wrong arguments for\n\
-            parameter height_diff_unit and/or gravitymodel and/or grid_inputfolder."
-            )
-
-        # Update of height_diff_object_corrected and height_diff_objects_corrected
-        height_diff_object_corrected = copy.deepcopy(height_diff_object)
-        height_diff_object_corrected.deltaH = height_diff
-        height_diff_objects_corrected.append(height_diff_object_corrected)
-
-    corrections_df = corrections_df.reset_index().rename(columns={"index": "Journal"})
-
-    return (height_diff_objects_corrected, corrections_df)
+    return height_diff, corrections

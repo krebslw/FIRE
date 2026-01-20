@@ -34,7 +34,7 @@ from fire.api.niv.lukkesum import (
 )
 
 from fire.api.geodetic_levelling.geodetic_correction_levelling_obs import (
-    apply_geodetic_corrections_to_height_diffs,
+    apply_corrections_to_list_of_height_diffs,
 )
 from fire.api.geodetic_levelling.metric_to_gpu_transformation import (
     convert_geopotential_heights_to_metric_heights,
@@ -709,18 +709,15 @@ class GeodætiskRegn(GamaRegn):
             or self.height_diff_unit == "gpu"
         ):
             print("Højdeforskelle påføres geodætiske korrektioner inden udjævning")
-
-            (self.observationer, self.korrektioner_obs) = (
-                apply_geodetic_corrections_to_height_diffs(
-                    self.observationer,
-                    self.gamle_koter,
-                    self.height_diff_unit,
-                    self.epoch_target,
-                    self.tidal_system,
-                    self.grid_inputfolder,
-                    self.deformationmodel,
-                    self.gravitymodel,
-                )
+            self.observationer, self.korrektioner_obs = apply_corrections_to_list_of_height_diffs(
+                self._observationer,
+                self._gamle_koter,
+                self.height_diff_unit,
+                self.epoch_target,
+                self.tidal_system,
+                self.grid_inputfolder,
+                self.deformationmodel,
+                self.gravitymodel,
             )
 
         elif self.height_diff_unit == "metric":
