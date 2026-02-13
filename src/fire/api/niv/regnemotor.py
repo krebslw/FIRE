@@ -14,6 +14,7 @@ import subprocess
 from typing import Self
 import xmltodict
 
+import numpy as np
 import pandas as pd
 
 from fire import uuid
@@ -526,6 +527,161 @@ class DumRegn(RegneMotor):
     @filer.setter
     def filer(self, _):
         """En dum setter, der ikke ændrer noget."""
+
+
+class SmartRegn(RegneMotor):
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+
+        super().__init__(*args, **kwargs)
+
+    def udjævn(self):
+
+        self.løs_ligning()
+
+    def løs_ligning(self):
+        """
+        Opstil og løs ligningssystem ud fra nivellementobservationer
+
+        Problemet der løses er af formen Ax = B, hvor A er systemmatricen med M rækker og N kolonner (N⨯M), x (M⨯1) er de M ubekendte
+        koter, og B er (N⨯1) de observerede koteforskelle.
+
+        Som eksempel tages et simpelt nivellementsnet som dette (hvor der kun er observationer i frem-retningen)
+
+            1 ------> 2
+            ^         |
+            |         |
+            |         v
+            4 <------ 3
+
+        De ubekendte er :
+
+            x = [H1  H2  H3  H4]^T
+
+        Systemmatricen er:
+
+            A = [1  -1   0   0
+                 0   1  -1   0
+                 0   0   1  -1
+                -1   0   0   1]
+
+        og observationsmatricen er:
+
+            B = [ΔH_21
+                 ΔH_32
+                 ΔH_43
+                 ΔH_14]
+
+        Når vi løser for koterne direkte på denne måde kræves der mindst ét fastholdt punkt, pr. sammenhængende
+        net af observationer. Fastsættes fx punkt 1 med højden H1, falder denne ud som ubekendt:
+
+            A = [-1   0   0
+                  1  -1   0
+                  0   1  -1
+                  0   0   1]
+
+            B = [ΔH_21 - H1
+                 ΔH_32
+                 ΔH_43
+                 ΔH_14 + H1]
+
+            x = [H2  H3  H4]^T
+
+        Af en eller anden grund har jeg valgt at beholde de fastholdte punkter i ligningssystemet og
+        indføre en "triviel" ligning for hvert fastholdt punkt:
+
+            A = [1   0   0   0
+                 0  -1   0   0
+                 0   1  -1   0
+                 0   0   1  -1
+                 0   0   0   1]
+
+            B = [H1
+                 ΔH_21 - H1
+                 ΔH_32
+                 ΔH_43
+                 ΔH_14 + H1]
+
+            x = [H1  H2  H3  H4]^T
+
+        Har nok gjort dette fordi det var lettere bare at læse alle værdierne direkte
+        ud fra x-vektoren, men burde være muligt at gøre uden dette krumspring.
+        """
+
+        N = len(self.observationer) + len(self.fastholdte)         # antal målinger
+        M = len(self.estimerbare_punkter)   + len(self.fastholdte) # antal parametre
+
+
+        alle_punkter = tuple(sorted(self.estimerbare_punkter)) + tuple(self.fastholdte.keys())
+
+        A = np.zeros((N,M))
+        B = np.zeros((N))
+        C = np.zeros((N,N))
+
+        # Observationer
+        i = 0
+        for fra in self.multidigraf:
+            if not fra in alle_punkter:
+                continue
+            for til in self.multidigraf[fra]:
+                if not til in alle_punkter:
+                    continue
+                for obskey in self.multidigraf[fra][til]:
+                    obs = self._observationer[obskey]
+                    j_fra =  alle_punkter.index(fra)
+                    j_til =  alle_punkter.index(til)
+
+                    A[i,j_fra] = -1
+                    A[i,j_til] = 1
+                    B[i] = obs.deltaH
+                    C[i,i] = (1/(obs.spredning))**2 # spredninger er i mm!
+
+                    i +=1
+
+        # Fastholdte
+        for pkt, kote in self.fastholdte.items():
+            j = alle_punkter.index(pkt)
+
+            # Korriger observationer for fastholdte og sæt koefficienter for fastholdt til 0
+            B = B-A[:,j]*kote
+            A[:,j] = 0
+
+            # Indsæt ny "ligning" for det fastholdte punkt
+            A[i,j] = 1
+            B[i] = kote
+            C[i,i] = 1
+            i += 1
+
+        cov_M = np.linalg.inv(A.T@C@A) # kovarians matrix
+        udjævnede_koter = cov_M@A.T@C@B # med spredninger
+
+        nye_koter = []
+        for j, punkt in enumerate(alle_punkter):
+            if punkt in self.fastholdte:
+                continue
+
+            nye_koter.append(
+                NivKote(
+                    punkt=punkt,
+                    dato=self.gyldighedstidspunkt,
+                    H=udjævnede_koter[j],
+                    spredning=sqrt(cov_M[j,j])/1e3,
+                )
+            )
+
+        self.nye_koter=nye_koter
+
+    @property
+    def filer(self) -> list:
+        """En liste af filer som SmartRegn producerer"""
+        return []
+    @filer.setter
+    def filer(self, nye_filnavne):
+        """Sæt nye filnavne"""
+        pass
 
 
 def _spredning(
