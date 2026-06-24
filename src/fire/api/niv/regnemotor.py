@@ -627,6 +627,10 @@ class SmartRegn(RegneMotor):
             if not fra in alle_punkter:
                 continue
             for til in self.multidigraf[fra]:
+                # Skip kalibrerings-observationer som er gjort fra-til samme punkt
+                if fra==til:
+                    continue
+
                 if not til in alle_punkter:
                     continue
                 for obskey in self.multidigraf[fra][til]:
