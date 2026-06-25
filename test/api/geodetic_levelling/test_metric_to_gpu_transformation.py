@@ -28,7 +28,7 @@ gravitymodel = "dk-g-direkte-fra-gri-thokn.tif"
 def test_convert_metric_height_diff_to_geopotential_height_diff(
     height_diff, tidal_system, expected
 ):
-    height_diff_converted, m2gpu_factor = (
+    height_diff_converted = height_diff + (
         convert_metric_height_diff_to_geopotential_height_diff(
             height_diff,
             point_from_lat,
@@ -84,7 +84,6 @@ def test_convert_geopotential_height_to_helmert_height():
             0,
             point_from_lat,
             point_from_long,
-            grid_inputfolder,
             gravitymodel,
             "geopot_to_helmert",
             tidal_system="non",
@@ -99,7 +98,6 @@ def test_convert_geopotential_height_to_helmert_height():
             height,
             point_from_lat,
             point_from_long,
-            grid_inputfolder,
             gravitymodel,
             "helmert_to_geopot",
             tidal_system="non",
@@ -112,7 +110,6 @@ def test_convert_geopotential_height_to_helmert_height():
             height_converted_forward,
             point_from_lat,
             point_from_long,
-            grid_inputfolder,
             gravitymodel,
             "geopot_to_helmert",
             tidal_system="non",

@@ -26,7 +26,7 @@ def apply_tidal_corrections_to_height_diff(
     tidal_system: str,
     use_approx_tidal_formulas: bool = False,
     gravitymodel: str = None,
-) -> tuple[float, float]:
+) -> float:
     """Apply tidal corrections to a metric height difference.
 
     Applies tidal corrections to a metric height difference and returns the corrected

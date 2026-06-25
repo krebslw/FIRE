@@ -91,9 +91,8 @@ def test_transform_height_diff_from_tidal_system_to_tidal_system(
     transformation_forward, transformation_backward
 ):
     # Forward transformation of height difference
-    height_diff_transformed_forward = (
+    height_diff_transformed_forward = height_diff + (
         transform_height_diff_from_tidal_system_to_tidal_system(
-            height_diff,
             transformation_forward,
             point_from_lat,
             point_to_lat,
@@ -103,9 +102,8 @@ def test_transform_height_diff_from_tidal_system_to_tidal_system(
         )
     )
     # Backward transformation of height difference
-    height_diff_transformed_backward = (
+    height_diff_transformed_backward = height_diff_transformed_forward + (
         transform_height_diff_from_tidal_system_to_tidal_system(
-            height_diff_transformed_forward,
             transformation_backward,
             point_from_lat,
             point_to_lat,
