@@ -1,5 +1,6 @@
 """This module contains functions for interpolation and calculation of gravity etc."""
 
+import importlib.resources
 from math import sin, pi
 from pathlib import Path
 
@@ -7,11 +8,11 @@ import pyproj
 
 import fire.api.geodetic_levelling.geophysical_parameters as geo_p
 
+DEFAULT_DATA_FOLDER = importlib.resources.files("fire.data")
 
 def interpolate_gravity(
     latitude: float,
     longitude: float,
-    grid_inputfolder: Path,
     gravitymodel: str,
 ) -> float:
     """Interpolate in gravity model.
@@ -34,7 +35,10 @@ def interpolate_gravity(
     TO DO: Lav seperat funktion create_pyproj_transformer, således at Transformer-objektet
     ikke oprettes hver gang der interpoleres i grid-modellen? transformer: pyproj.Transformer
     """
-    pyproj.datadir.append_data_dir(grid_inputfolder)
+    # See if gravitymodel is found in fire.data, otherwise use it as is
+    model = DEFAULT_DATA_FOLDER / Path(gravitymodel)
+    if model.is_file():
+        gravitymodel = model
 
     # Transformer object for interpolation in gravity model
     transformer = pyproj.Transformer.from_pipeline(

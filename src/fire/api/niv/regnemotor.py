@@ -591,16 +591,14 @@ class GeodætiskRegn(GamaRegn):
     en uplift-/deformationsmodel, der beskriver det langbølgede deformationssignal (herunder
     uplift) ift. "geoiden". Styres vha. parameteren "epoch_target" (enhed decimalår). Default er
     None, dvs. ingen uplift-korrektion. Uplift-korrektion forudsætter endvidere, at der vha.
-    parametrene "deformationmodel" samt "grid_inputfolder" er angivet et filnavn og en sti til en
-    deformationsmodel.
+    parameteren "deformationmodel" er angivet en sti til en deformationsmodel.
 
     Tyngdekorrektion:
     Konvertering af "rå", metriske nivellementsobservationer til geopotentialforskelle. Styres vha.
     parameteren "height_diff_unit": "metric" for ingen konvertering, "gpu" for konvertering
     til geopotentialforskelle (enhed gpu). Default er "metric", dvs. ingen konvertering.
-    Tyngdekorrektion forudsætter endvidere, at der vha. parametrene "gravitymodel" samt
-    "grid_inputfolder" er angivet et filnavn og en sti til en overflade-tyngdemodel i zero tide
-    system.
+    Tyngdekorrektion forudsætter endvidere, at der vha. parameteren "gravitymodel" er angivet
+    en sti til en overflade-tyngdemodel i zero tide system.
 
     Konvertering af højder fra databasen:
     Konvertering af eksisterende Helmert-højder fra FIRE-databasen (GeodætiskRegn attributten
@@ -633,7 +631,6 @@ class GeodætiskRegn(GamaRegn):
         output_height: str = None,
         deformationmodel: str = None,
         gravitymodel: str = None,
-        grid_inputfolder: str = None,
         filnavn_korrektioner: str = None,
         **kwargs,
     ):
@@ -653,7 +650,6 @@ class GeodætiskRegn(GamaRegn):
         self.output_height = output_height or None
         self.deformationmodel = deformationmodel or None
         self.gravitymodel = gravitymodel or None
-        self.grid_inputfolder = Path(grid_inputfolder) if grid_inputfolder else None
 
         # Initialiserer nedarvede parametre, herunder self.projektnavn
         super().__init__(**kwargs)
@@ -685,7 +681,6 @@ class GeodætiskRegn(GamaRegn):
             output_height=self.output_height,
             deformationmodel=self.deformationmodel,
             gravitymodel=self.gravitymodel,
-            grid_inputfolder=self.grid_inputfolder,
         )
 
     def korriger_observationer(self):
@@ -711,7 +706,6 @@ class GeodætiskRegn(GamaRegn):
                     self.epoch_target,
                     self.tidal_system,
                     use_approx_tidal_formulas=False,
-                    grid_inputfolder=self.grid_inputfolder,
                     deformationmodel=self.deformationmodel,
                     gravitymodel=self.gravitymodel,
                 )
@@ -731,7 +725,6 @@ class GeodætiskRegn(GamaRegn):
                 convert_geopotential_heights_to_metric_heights(
                     self.gamle_koter,
                     "helmert_to_geopot",
-                    self.grid_inputfolder,
                     self.gravitymodel,
                     self.tidal_system,
                     use_approx_tidal_formulas=False,
@@ -754,7 +747,6 @@ class GeodætiskRegn(GamaRegn):
                 convert_geopotential_heights_to_metric_heights(
                     self.nye_koter,
                     f"geopot_to_{self.output_height}",
-                    self.grid_inputfolder,
                     self.gravitymodel,
                     self.tidal_system,
                     use_approx_tidal_formulas=False,
@@ -845,7 +837,6 @@ class DVR90Regn(GeodætiskRegn):
         output_height: str = "helmert",
         deformationmodel: str = "DKup24geo_DTU2024_PK.tif",
         gravitymodel: str = "dk-g-direkte-fra-gri-thokn.tif",
-        grid_inputfolder: str = "C:/FIRE-DEV/src/fire/data",
         **kwargs,
     ):
         # Initialiserer nedarvede parametre
@@ -868,7 +859,6 @@ class DVR90Regn(GeodætiskRegn):
         self.output_height = output_height or None
         self.deformationmodel = deformationmodel or None
         self.gravitymodel = gravitymodel or None
-        self.grid_inputfolder = Path(grid_inputfolder) if grid_inputfolder else None
 
 
 def _spredning(

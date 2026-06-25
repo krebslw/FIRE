@@ -25,8 +25,7 @@ epoch_obs = pd.Timestamp(year=2024, month=3, day=12, hour=11, minute=35)
 # deltaH=np.float64(2.4840159939125797), spredning=0.5453364449814444, id='268324:1'),
 height_diff_corrected_ref = np.float64(2.4840159939125797)
 
-# Grid inputfolder, deformation model and gravity model
-grid_inputfolder = Path("C:/FIRE-DEV/src/fire/data")
+# deformation model and gravity model
 deformationmodel = "DKup24geo_DTU2024_PK.tif"
 gravitymodel = "dk-g-direkte-fra-gri-thokn.tif"
 
@@ -56,7 +55,6 @@ def test_apply_geodetic_corrections_to_height_diff(
         height_diff_unit=height_diff_unit,
         epoch_target=epoch_target,
         tidal_system=tidal_system,
-        grid_inputfolder=grid_inputfolder,
         deformationmodel=deformationmodel,
         gravitymodel=gravitymodel,
     )
