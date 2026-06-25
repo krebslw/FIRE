@@ -610,6 +610,8 @@ class SmartRegn(RegneMotor):
         Har nok gjort dette fordi det var lettere bare at læse alle værdierne direkte
         ud fra x-vektoren, men burde være muligt at gøre uden dette krumspring.
         """
+        # TODO: vi laver joint-inversion af alle subnet. Se om det gør en forskel hvis
+        # subnet udjævnes enkeltvis
 
         N = len(self.observationer) + len(self.fastholdte)         # antal målinger
         M = len(self.estimerbare_punkter)   + len(self.fastholdte) # antal parametre
