@@ -30,7 +30,7 @@ def convert_metric_height_diff_to_geopotential_height_diff(
     gravitymodel: str,
     tidal_system: str | None,
     use_approx_tidal_formulas: bool = False,
-) -> tuple[float, float]:
+) -> float:
     """Convert a metric height difference to a geopotential height difference.
 
     Converts a metric height difference to a geopotential height difference (in units of gpu)

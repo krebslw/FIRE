@@ -25,8 +25,7 @@ deformationmodel = "DKup24geo_DTU2024_PK.tif"
 
 def test_propagate_height_diff_from_epoch_to_epoch():
     # Null propagation of height difference
-    height_diff_propagated_null, epoch_corr = propagate_height_diff_from_epoch_to_epoch(
-        height_diff,
+    height_diff_propagated_null = height_diff + propagate_height_diff_from_epoch_to_epoch(
         point_from_lat,
         point_from_long,
         point_to_lat,
@@ -36,9 +35,8 @@ def test_propagate_height_diff_from_epoch_to_epoch():
         deformationmodel,
     )
     # Backward propagation of height difference
-    height_diff_propagated_backward, epoch_corr = (
+    height_diff_propagated_backward = height_diff + (
         propagate_height_diff_from_epoch_to_epoch(
-            height_diff,
             point_from_lat,
             point_from_long,
             point_to_lat,
@@ -49,9 +47,8 @@ def test_propagate_height_diff_from_epoch_to_epoch():
         )
     )
     # Forward propagation of height difference
-    height_diff_propagated_forward, epoch_corr = (
+    height_diff_propagated_forward = height_diff_propagated_backward + (
         propagate_height_diff_from_epoch_to_epoch(
-            height_diff_propagated_backward,
             point_from_lat,
             point_from_long,
             point_to_lat,

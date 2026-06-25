@@ -16,7 +16,7 @@ def propagate_height_diff_from_epoch_to_epoch(
     epoch_source: pd.Timestamp,
     epoch_target: pd.Timestamp,
     deformationmodel: str,
-) -> tuple[float, float]:
+) -> float:
     """Propagate a metric height difference from one epoch to another.
 
     Propagates a metric height difference from one epoch to another and returns the propagated
