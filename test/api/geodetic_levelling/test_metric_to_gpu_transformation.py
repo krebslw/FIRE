@@ -16,8 +16,6 @@ point_from_long = 12.94
 point_to_lat = 56.621
 point_to_long = 12.94
 
-# Grid inputfolder and gravity model
-grid_inputfolder = Path("C:/FIRE-DEV/src/fire/data")
 gravitymodel = "dk-g-direkte-fra-gri-thokn.tif"
 
 
@@ -37,7 +35,6 @@ def test_convert_metric_height_diff_to_geopotential_height_diff(
             point_from_long,
             point_to_lat,
             point_to_long,
-            grid_inputfolder,
             gravitymodel,
             tidal_system,
         )

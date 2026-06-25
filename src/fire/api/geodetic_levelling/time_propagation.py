@@ -1,10 +1,12 @@
 """This module contains functions for time propagation of height differences."""
 
+import importlib.resources
 from pathlib import Path
 
 import pandas as pd
 import pyproj
 
+DEFAULT_DATA_FOLDER = importlib.resources.files("fire.data")
 
 def propagate_height_diff_from_epoch_to_epoch(
     point_from_lat: float,
@@ -13,7 +15,6 @@ def propagate_height_diff_from_epoch_to_epoch(
     point_to_long: float,
     epoch_source: pd.Timestamp,
     epoch_target: pd.Timestamp,
-    grid_inputfolder: Path,
     deformationmodel: str,
 ) -> tuple[float, float]:
     """Propagate a metric height difference from one epoch to another.
@@ -29,7 +30,6 @@ def propagate_height_diff_from_epoch_to_epoch(
     point_to_long: float, longitude of to point in units of degrees
     epoch_source: pd.Timestamp, source epoch, e.g. epoch of observation (format: yyyy-mm-dd hh:mm:ss)
     epoch_target: pd.Timestamp, target epoch (format: yyyy-mm-dd hh:mm:ss)
-    grid_inputfolder: Path, folder for input grid, i.e. deformation model
     deformationmodel: str, deformation model used for the propagation of height differences,
     must be in GeoTIFF or GTX file format, e.g. "NKG2016_lev.tif"
 
@@ -40,7 +40,10 @@ def propagate_height_diff_from_epoch_to_epoch(
     Raises:
     ?
     """
-    pyproj.datadir.append_data_dir(grid_inputfolder)
+    # See if deformationmodel is found in fire.data, otherwise use it as is
+    model = DEFAULT_DATA_FOLDER / Path(deformationmodel)
+    if model.is_file():
+        deformationmodel = model
 
     # Up velocities of point_from and point_to in units of mm/yr
     # Flyt til overfunktionen height_diff_corr?

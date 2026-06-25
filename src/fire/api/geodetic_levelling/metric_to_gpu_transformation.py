@@ -27,7 +27,6 @@ def convert_metric_height_diff_to_geopotential_height_diff(
     point_from_long: float,
     point_to_lat: float,
     point_to_long: float,
-    grid_inputfolder: Path,
     gravitymodel: str,
     tidal_system: str | None,
     use_approx_tidal_formulas: bool = False,
@@ -56,7 +55,6 @@ def convert_metric_height_diff_to_geopotential_height_diff(
     point_from_long: float, longitude of from point in units of degrees
     point_to_lat: float, latitiude of to point in units of degrees
     point_to_long: float, longitude of to point in units of degrees
-    grid_inputfolder: Path, folder for input grid, i.e. gravity model
     gravitymodel: str, gravity model used for the conversion of a height difference to gpu,
     must be in GeoTIFF or GTX file format, e.g. "dk-g-direkte-fra-gri-thokn.tif"
     tidal_system: str|None, tidal system of input height difference, i.e. "non", "mean" or "zero"
@@ -77,14 +75,12 @@ def convert_metric_height_diff_to_geopotential_height_diff(
     point_from_gravity = interpolate_gravity(
         point_from_lat,
         point_from_long,
-        grid_inputfolder,
         gravitymodel,
     )
 
     point_to_gravity = interpolate_gravity(
         point_to_lat,
         point_to_long,
-        grid_inputfolder,
         gravitymodel,
     )
 
@@ -214,7 +210,6 @@ def convert_geopotential_height_to_helmert_height(
     height: float,
     latitude: float,
     longitude: float,
-    grid_inputfolder: Path,
     gravitymodel: str,
     conversion: str,
     tidal_system: str = None,
@@ -261,7 +256,6 @@ def convert_geopotential_height_to_helmert_height(
     geopotential height or in units of m if a Helmert height
     latitude: float, latitude of input/source height, in units of degrees
     longitude: float, longitude of input/source height, in units of degrees
-    grid_inputfolder: Path, folder for input grid, i.e. gravity model
     gravitymodel: str, gravity model used for the height conversion, must be in GeoTIFF
     or GTX file format, e.g. "dk-g-direkte-fra-gri-thokn.tif"
     conversion: str, specification of source and target height, "geopot_to_helmert" or
@@ -294,7 +288,6 @@ def convert_geopotential_height_to_helmert_height(
     gravity = interpolate_gravity(
         latitude,
         longitude,
-        grid_inputfolder,
         gravitymodel,
     )
 
@@ -349,7 +342,6 @@ def convert_geopotential_height_to_helmert_height(
 def convert_geopotential_heights_to_metric_heights(
     height_objects: list[NivKote],
     conversion: str,
-    grid_inputfolder: Path = None,
     gravitymodel: str = None,
     tidal_system: str = None,
     use_approx_tidal_formulas: bool = False,
@@ -370,8 +362,6 @@ def convert_geopotential_heights_to_metric_heights(
     or metric heights to be converted
     conversion: str, specification of source and target height, "geopot_to_helmert",
     "helmert_to_geopot", "geopot_to_normal" or "normal_to_geopot"
-    grid_inputfolder: Path = None, optional parameter, folder for input grid, i.e. gravity model,
-    only relevant if geopotential heights are to be converted to Helmert heights or vice versa
     gravitymodel: str = None, optional parameter, gravity model used for the conversion of heights,
     must be in GeoTIFF or GTX file format, only relevant if geopotential heights are to be
     converted to Helmert heights or vice versa
@@ -393,7 +383,7 @@ def convert_geopotential_heights_to_metric_heights(
     height conversion
 
     Raises:
-    ? Hvis grid_inputfolder ikke findes, hvis grid-fil ikke findes,
+    ? Hvis grid-fil ikke findes
 
     TO DO: apriori_heights: list[InternKote]=[]?, try...?
     TO DO: Håndtering manglende a priori værdi?
@@ -413,11 +403,11 @@ def convert_geopotential_heights_to_metric_heights(
         )
 
     if (conversion == "geopot_to_helmert" or conversion == "helmert_to_geopot") and (
-        (gravitymodel is None) or (grid_inputfolder is None)
+        gravitymodel is None
     ):
         exit(
             "Function convert_geopotential_heights_to_metric_heights: Wrong arguments for\n\
-            parameter grid_inputfolder and/or gravitymodel."
+            parameter gravitymodel."
         )
 
     # Output list for converted heights
@@ -459,7 +449,6 @@ def convert_geopotential_heights_to_metric_heights(
                     height,
                     latitude,
                     longitude,
-                    grid_inputfolder,
                     gravitymodel,
                     conversion,
                     tidal_system=tidal_system,

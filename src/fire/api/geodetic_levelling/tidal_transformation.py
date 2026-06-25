@@ -25,7 +25,6 @@ def apply_tidal_corrections_to_height_diff(
     epoch_obs: pd.Timestamp,
     tidal_system: str,
     use_approx_tidal_formulas: bool = False,
-    grid_inputfolder: Path = None,
     gravitymodel: str = None,
 ) -> tuple[float, float]:
     """Apply tidal corrections to a metric height difference.
@@ -53,8 +52,6 @@ def apply_tidal_corrections_to_height_diff(
     use_approx_tidal_formulas: bool = False, optional parameter, determines whether approx or
     rigorous formulas are used for tidal transformation of a height difference/gravity.
     Only relevant if tidal system is mean tide or zero tide. By default rigorous formulas are used
-    grid_inputfolder: Path = None, optional parameter, folder for input grid, i.e. gravity model,
-    only relevant if rigorous tidal formulas are used and tidal system is mean tide or zero tide
     gravitymodel: str = None, optional parameter, grid-based model providing gravity in units of
     mGal (1 mGal = 10^-5 m/s^2), must be in GeoTIFF or GTX file format, only relevant if
     rigorous tidal formulas are used and tidal system is mean tide or zero tide
@@ -81,11 +78,11 @@ def apply_tidal_corrections_to_height_diff(
     if (
         tidal_system != "non"
         and not use_approx_tidal_formulas
-        and ((gravitymodel is None) or (grid_inputfolder is None))
+        and gravitymodel is None
     ):
         exit(
             "Function apply_tidal_corrections_to_height_diff: Wrong arguments for\n\
-            parameter use_approx_tidal_formulas and/or gravitymodel and/or grid_inputfolder."
+            parameter use_approx_tidal_formulas and/or gravitymodel."
         )
 
     # Calculation of levelling section length and azimuth
@@ -169,7 +166,6 @@ def apply_tidal_corrections_to_height_diff(
         point_from_long,
         point_to_long,
         use_approx_tidal_formulas,
-        grid_inputfolder,
         gravitymodel,
     )
 
@@ -273,7 +269,6 @@ def calculate_perm_tidal_deformation_geoid(
     latitude: float,
     longitude: float,
     celestial_body: str,
-    grid_inputfolder: Path,
     gravitymodel: str,
 ) -> float:
     """Calculate the permanent tidal deformation of the geoid assuming a rigid Earth.
@@ -305,7 +300,6 @@ def calculate_perm_tidal_deformation_geoid(
     in units of degrees
     celestial_body: str, celestial body for which the permanent tidal deformation of the geoid
     is calculated, "moon" or "sun"
-    grid_inputfolder: Path, folder for input grid, i.e. gravity model
     gravitymodel: str, grid-based model providing gravity in units of mGal (1 mGal = 10^-5 m/s^2),
     must be in GeoTIFF or GTX file format, e.g. "dk-g-direkte-fra-gri-thokn.tif"
 
@@ -318,7 +312,7 @@ def calculate_perm_tidal_deformation_geoid(
     TO DO: Hvad sker der, hvis man i stedet bruger normaltyngder eller en konstant værdi for tyngden?
     Hvad er gjort ifm. udledningen af Ekmans approksimative formler?
     """
-    gravity = interpolate_gravity(latitude, longitude, grid_inputfolder, gravitymodel)
+    gravity = interpolate_gravity(latitude, longitude, gravitymodel)
 
     # Gravity is transformed from zero tide to non-tidal
     gravity = transform_gravity_from_tidal_system_to_tidal_system(
@@ -467,7 +461,6 @@ def transform_height_from_tidal_system_to_tidal_system(
     latitude: float,
     longitude: float,
     transformation: str,
-    grid_inputfolder: Path,
     gravitymodel: str,
 ) -> float:
     """Transform a geophysical height from one tidal system to another tidal system.
@@ -488,7 +481,6 @@ def transform_height_from_tidal_system_to_tidal_system(
     latitude: float, latitude of input height, in units of degrees
     longitude: float, longitude of input height, in units of degrees
     transformation: str, specification of source and target tidal system, e.g. "non_to_mean"
-    grid_inputfolder: Path, folder for input grid, i.e. gravity model
     gravitymodel: str, grid-based model providing gravity in units of mGal (1 mGal = 10^-5 m/s^2),
     must be in GeoTIFF or GTX file format, e.g. "dk-g-direkte-fra-gri-thokn.tif"
 
@@ -505,7 +497,6 @@ def transform_height_from_tidal_system_to_tidal_system(
         latitude,
         longitude,
         "moon",
-        grid_inputfolder,
         gravitymodel,
     )
 
@@ -513,7 +504,6 @@ def transform_height_from_tidal_system_to_tidal_system(
         latitude,
         longitude,
         "sun",
-        grid_inputfolder,
         gravitymodel,
     )
 
@@ -557,7 +547,6 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
     point_from_long: float = None,
     point_to_long: float = None,
     use_approx_tidal_formulas: bool = False,
-    grid_inputfolder: Path = None,
     gravitymodel: str = None,
 ) -> float:
     """Transform a geophysical height difference from one tidal system to another tidal system.
@@ -586,8 +575,6 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
     use_approx_tidal_formulas: bool = False, optional parameter, determines whether approx or
     rigorous formulas are used for tidal transformation of a height difference/gravity. By default
     rigorous formulas are used
-    grid_inputfolder: Path = None, optional parameter, folder for input grid, i.e. gravity model,
-    only relevant if rigorous tidal formulas are used
     gravitymodel: str = None, optional parameter, grid-based model providing gravity in units of
     mGal (1 mGal = 10^-5 m/s^2), must be in GeoTIFF or GTX file format, only relevant if
     rigorous tidal formulas are used
@@ -616,7 +603,6 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
             point_to_lat,
             point_to_long,
             transformation,
-            grid_inputfolder,
             gravitymodel,
         )
         - transform_height_from_tidal_system_to_tidal_system(
@@ -624,7 +610,6 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
             point_from_lat,
             point_from_long,
             transformation,
-            grid_inputfolder,
             gravitymodel,
         )
     )

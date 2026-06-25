@@ -20,8 +20,6 @@ point_from_long = 12.94
 point_to_lat = 56.621
 point_to_long = 12.94
 
-# Grid inputfolder and gravity model
-grid_inputfolder = Path("C:/FIRE-DEV/src/fire/data")
 gravitymodel = "dk-g-direkte-fra-gri-thokn.tif"
 
 
@@ -66,7 +64,6 @@ def test_transform_height_from_tidal_system_to_tidal_system(
         point_from_lat,
         point_from_long,
         transformation_forward,
-        grid_inputfolder,
         gravitymodel,
     )
     # Backward transformation of height
@@ -75,7 +72,6 @@ def test_transform_height_from_tidal_system_to_tidal_system(
         point_from_lat,
         point_from_long,
         transformation_backward,
-        grid_inputfolder,
         gravitymodel,
     )
 
@@ -103,7 +99,6 @@ def test_transform_height_diff_from_tidal_system_to_tidal_system(
             point_to_lat,
             point_from_long,
             point_to_long,
-            grid_inputfolder,
             gravitymodel,
         )
     )
@@ -116,7 +111,6 @@ def test_transform_height_diff_from_tidal_system_to_tidal_system(
             point_to_lat,
             point_from_long,
             point_to_long,
-            grid_inputfolder,
             gravitymodel,
         )
     )
