@@ -117,8 +117,7 @@ def apply_geodetic_corrections_to_height_diff(
 
     # Tidal correction of metric height difference
     if tidal_system is not None:
-        (height_diff, tidal_corr) = apply_tidal_corrections_to_height_diff(
-            height_diff,
+        corrections.tidal_corr = apply_tidal_corrections_to_height_diff(
             point_from_lat,
             point_from_long,
             point_to_lat,
@@ -130,12 +129,9 @@ def apply_geodetic_corrections_to_height_diff(
             gravitymodel=gravitymodel,
         )
 
-        corrections.tidal_corr = tidal_corr
-
     # Propagation of metric height difference to a target epoch
     if epoch_target is not None:
-        (height_diff, epoch_corr) = propagate_height_diff_from_epoch_to_epoch(
-            height_diff,
+        corrections.epoch_corr = propagate_height_diff_from_epoch_to_epoch(
             point_from_lat,
             point_from_long,
             point_to_lat,
@@ -146,25 +142,21 @@ def apply_geodetic_corrections_to_height_diff(
             deformationmodel,
         )
 
-        corrections.epoch_corr = epoch_corr
-
     # Conversion of metric height difference to geopotential units
     if height_diff_unit == "gpu":
-        (height_diff, m2gpu_factor) = (
-            convert_metric_height_diff_to_geopotential_height_diff(
-                height_diff,
-                point_from_lat,
-                point_from_long,
-                point_to_lat,
-                point_to_long,
-                grid_inputfolder,
-                gravitymodel,
-                tidal_system,
-                use_approx_tidal_formulas,
-            )
+        corrections.m2gpu_factor = convert_metric_height_diff_to_geopotential_height_diff(
+            point_from_lat,
+            point_from_long,
+            point_to_lat,
+            point_to_long,
+            grid_inputfolder,
+            gravitymodel,
+            tidal_system,
+            use_approx_tidal_formulas,
         )
 
-        corrections.m2gpu_factor = m2gpu_factor
+    # Apply corrections
+    height_diff = (height_diff + corrections.tidal_corr + corrections.epoch_corr)*corrections.m2gpu_factor
 
     return (height_diff, corrections)
 

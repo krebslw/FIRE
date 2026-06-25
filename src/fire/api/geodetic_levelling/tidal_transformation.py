@@ -18,7 +18,6 @@ import fire.api.geodetic_levelling.geophysical_parameters as geo_p
 
 
 def apply_tidal_corrections_to_height_diff(
-    height_diff: float,
     point_from_lat: float,
     point_from_long: float,
     point_to_lat: float,
@@ -150,10 +149,9 @@ def apply_tidal_corrections_to_height_diff(
     # a yielding/deforming Earth). Consequently, the corrected height difference is in
     # non-tidal system
     tidal_corr = (tidal_corr_moon + tidal_corr_sun) * 0.7 * 1e-8
-    height_diff_corrected = height_diff + tidal_corr
 
     if tidal_system == "non":
-        return (height_diff_corrected, tidal_corr)
+        return tidal_corr
 
     # If the specified tidal system is mean tide or zero tide, the corrected height difference
     # is transformed from non-tidal to the tidal system specified
@@ -163,8 +161,8 @@ def apply_tidal_corrections_to_height_diff(
     elif tidal_system == "zero":
         transformation = "non_to_zero"
 
-    height_diff_corrected = transform_height_diff_from_tidal_system_to_tidal_system(
-        height_diff_corrected,
+    # Apply extra correction to transform from non to (...)
+    tidal_corr = tidal_corr + transform_height_diff_from_tidal_system_to_tidal_system(
         transformation,
         point_from_lat,
         point_to_lat,
@@ -175,9 +173,7 @@ def apply_tidal_corrections_to_height_diff(
         gravitymodel,
     )
 
-    tidal_corr = height_diff_corrected - height_diff
-
-    return (height_diff_corrected, tidal_corr)
+    return tidal_corr
 
 
 def calculate_perm_tidal_gravitation(
@@ -555,7 +551,6 @@ def transform_height_from_tidal_system_to_tidal_system(
 
 
 def transform_height_diff_from_tidal_system_to_tidal_system(
-    height_diff: float,
     transformation: str,
     point_from_lat: float,
     point_to_lat: float,
@@ -608,21 +603,15 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
     """
     # Transformation of height difference using approx formula
     if use_approx_tidal_formulas:
-        height_diff_transformed = (
-            approx_transform_height_diff_from_tidal_system_to_tidal_system(
-                height_diff,
-                point_from_lat,
-                point_to_lat,
-                transformation,
-            )
+        return approx_transform_height_diff_from_tidal_system_to_tidal_system(
+            point_from_lat,
+            point_to_lat,
+            transformation,
         )
 
-        return height_diff_transformed
-
     # Transformation of height difference using rigorous formulas
-    height_diff_transformed = (
-        height_diff
-        + transform_height_from_tidal_system_to_tidal_system(
+    return (
+        transform_height_from_tidal_system_to_tidal_system(
             0,
             point_to_lat,
             point_to_long,
@@ -640,11 +629,8 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
         )
     )
 
-    return height_diff_transformed
-
 
 def approx_transform_height_diff_from_tidal_system_to_tidal_system(
-    height_diff: float,
     point_from_lat: float,
     point_to_lat: float,
     transformation: str,
@@ -688,25 +674,20 @@ def approx_transform_height_diff_from_tidal_system_to_tidal_system(
     )
 
     if transformation == "non_to_mean":
-        height_diff_transformed = height_diff + geo_p.gamma * latitude_dependent_term
+        return geo_p.gamma * latitude_dependent_term
 
     elif transformation == "non_to_zero":
-        height_diff_transformed = (
-            height_diff + (geo_p.gamma - 1) * latitude_dependent_term
-        )
+        return (geo_p.gamma - 1) * latitude_dependent_term
 
     elif transformation == "mean_to_non":
-        height_diff_transformed = height_diff - geo_p.gamma * latitude_dependent_term
+        return - geo_p.gamma * latitude_dependent_term
 
     elif transformation == "mean_to_zero":
-        height_diff_transformed = height_diff - latitude_dependent_term
+        return - latitude_dependent_term
 
     elif transformation == "zero_to_non":
-        height_diff_transformed = (
-            height_diff - (geo_p.gamma - 1) * latitude_dependent_term
-        )
+        return - (geo_p.gamma - 1) * latitude_dependent_term
 
     elif transformation == "zero_to_mean":
-        height_diff_transformed = height_diff + latitude_dependent_term
+        return latitude_dependent_term
 
-    return height_diff_transformed
