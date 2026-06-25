@@ -23,7 +23,6 @@ from fire.api.niv.datatyper import (
 
 
 def convert_metric_height_diff_to_geopotential_height_diff(
-    height_diff: float,
     point_from_lat: float,
     point_from_long: float,
     point_to_lat: float,
@@ -114,9 +113,8 @@ def convert_metric_height_diff_to_geopotential_height_diff(
 
     # Conversion of height_diff to geopotential units (1 gpu = 10 m^2/s^2)
     m2gpu_factor = mean_gravity * 0.1
-    height_diff = height_diff * m2gpu_factor
 
-    return (height_diff, m2gpu_factor)
+    return m2gpu_factor
 
 
 def convert_geopotential_height_to_normal_height(

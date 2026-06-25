@@ -7,7 +7,6 @@ import pyproj
 
 
 def propagate_height_diff_from_epoch_to_epoch(
-    height_diff: float,
     point_from_lat: float,
     point_from_long: float,
     point_to_lat: float,
@@ -63,6 +62,5 @@ def propagate_height_diff_from_epoch_to_epoch(
 
     # Propagation of height_diff to epoch_target
     epoch_corr = velocity_up_diff * epoch_diff * 0.001
-    height_diff = height_diff + epoch_corr
 
-    return (height_diff, epoch_corr)
+    return epoch_corr
