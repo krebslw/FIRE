@@ -27,21 +27,21 @@ def apply_tidal_corrections_to_height_diff(
     use_approx_tidal_formulas: bool = False,
     gravitymodel: str = None,
 ) -> float:
-    """Apply tidal corrections to a metric height difference.
-
-    Applies tidal corrections to a metric height difference and returns the corrected
-    height difference and the correction itself in a tuple.
+    """Compute tidal correction to a metric height difference.
 
     The application of tidal corrections to a metric height difference implies that all periodic
     tidal effects are removed, whereas the permanent tidal effects are removed or retained
     (in whole or in part) depending on the specified tidal system.
+
+    Firstly, computes the correction to remove all tidal effects, i.e. the non-tidal system.
+    If necessary, as dictated by `tidal_system`, further corrections are computed in order to move
+    from non-tidal to either the mean- or zero-tidal system.
 
     Reference:
     Klaus Schmidt, The Danish height system DVR90, pp. app 15-16.
     National Survey and Cadastre, 2000
 
     Args:
-    height_diff: float, metric height difference to be tidally corrected
     point_from_lat: float, latitude of from point in units of degrees
     point_from_long: float, longitude of from point in units of degrees
     point_to_lat: float, latitiude of to point in units of degrees
@@ -57,8 +57,7 @@ def apply_tidal_corrections_to_height_diff(
     rigorous tidal formulas are used and tidal system is mean tide or zero tide
 
     Returns:
-    tuple[float, float], a tuple containing the corrected height difference and
-    the correction itself in units of meters
+    float, tidal correction in units of meters
 
     Raises:
     ?
@@ -549,10 +548,10 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
     use_approx_tidal_formulas: bool = False,
     gravitymodel: str = None,
 ) -> float:
-    """Transform a geophysical height difference from one tidal system to another tidal system.
+    """Compute factor for transforming a geophysical height difference between tidal systems.
 
     Transforms a geophysical height difference above the geoid (e.g. a levelled height) from one
-    tidal system to another tidal system and returns the result as a float.
+    tidal system to another tidal system.
 
     The height difference to be transformed is assumed to have been tidally corrected
     (i.e. referred to a specific tidal system) before being transformed to another tidal system
@@ -563,8 +562,6 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
     pp. 128-129, eq. (24), (25). Nordic Geodetic Commission, 1988
 
     Args:
-    height_diff: float, geophysical height difference to be transformed from one tidal system
-    to another, in units of m
     transformation: str, specification of source and target tidal system, e.g. "non_to_mean"
     point_from_lat: float, latitude of from point in units of degrees
     point_to_lat: float, latitiude of to point in units of degrees
@@ -580,7 +577,7 @@ def transform_height_diff_from_tidal_system_to_tidal_system(
     rigorous tidal formulas are used
 
     Returns:
-    float, the transformed height difference in units of m
+    float, the transformation factor in units of m
 
     Raises:
     ?
@@ -620,8 +617,8 @@ def approx_transform_height_diff_from_tidal_system_to_tidal_system(
     point_to_lat: float,
     transformation: str,
 ) -> float:
-    """Transform a geophysical height difference from one tidal system to another tidal system
-    using approx formula.
+    """Compute factor for transforming height differences between tidal systems,
+    using approximative formulas
 
     Transforms a geophysical height difference above the geoid (e.g. a levelled height difference)
     from one tidal system to another tidal system using approx formula and returns the result
@@ -636,14 +633,12 @@ def approx_transform_height_diff_from_tidal_system_to_tidal_system(
     p. 131, eq. (29), (30), (31). Nordic Geodetic Commission, 1988
 
     Args:
-    height_diff: float, geophysical height difference to be transformed from one tidal system
-    to another, in units of m
     point_from_lat: float, latitude of from point in units of degrees
     point_to_lat: float, latitiude of to point in units of degrees
     transformation: str, specification of source and target tidal system, e.g. "non_to_mean"
 
     Returns:
-    float, the transformed height difference in units of m
+    float, the transformation factor in units of m
 
     Raises:
     ?

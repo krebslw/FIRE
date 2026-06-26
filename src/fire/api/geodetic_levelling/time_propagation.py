@@ -17,25 +17,20 @@ def propagate_height_diff_from_epoch_to_epoch(
     epoch_target: pd.Timestamp,
     deformationmodel: str,
 ) -> float:
-    """Propagate a metric height difference from one epoch to another.
-
-    Propagates a metric height difference from one epoch to another and returns the propagated
-    height difference and the correction itself in a tuple.
+    """Compute vertical displacement between two points due to geophysical deformation
 
     Args:
-    height_diff: float, metric height difference to be propagated
     point_from_lat: float, latitude of from point in units of degrees
     point_from_long: float, longitude of from point in units of degrees
     point_to_lat: float, latitiude of to point in units of degrees
     point_to_long: float, longitude of to point in units of degrees
     epoch_source: pd.Timestamp, source epoch, e.g. epoch of observation (format: yyyy-mm-dd hh:mm:ss)
     epoch_target: pd.Timestamp, target epoch (format: yyyy-mm-dd hh:mm:ss)
-    deformationmodel: str, deformation model used for the propagation of height differences,
+    deformationmodel: str, deformation model,
     must be in GeoTIFF or GTX file format, e.g. "NKG2016_lev.tif"
 
     Returns:
-    tuple[float, float], a tuple containing the propagated height difference and
-    the correction itself in units of meters
+    float, vertical displacement correction in units of meters
 
     Raises:
     ?

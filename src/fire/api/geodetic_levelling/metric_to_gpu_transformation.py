@@ -31,26 +31,24 @@ def convert_metric_height_diff_to_geopotential_height_diff(
     tidal_system: str | None,
     use_approx_tidal_formulas: bool = False,
 ) -> float:
-    """Convert a metric height difference to a geopotential height difference.
+    """Compute conversion factor for metric to geopotential height difference conversion.
 
-    Converts a metric height difference to a geopotential height difference (in units of gpu)
-    and returns the converted height difference and the m2gpu multiplication factor in a tuple.
+    Computes the conversion factor for converting a metric height difference to a
+    geopotential height difference (in units of gpu).
 
     The gravity model used for the conversion is assumed to be in zero tide system as this is
     the conventional tide system for gravity.
 
-    If the input height difference is in the zero tide system, the gravity interpolated from the
-    gravity model is not tidally transformed.
+    Thus, if tidal system is the zero tide system, the gravity interpolated from the gravity
+    model is not tidally transformed.
 
-    If the input height difference is in non-tidal or mean tide system, the gravity interpolated
-    from the gravity model is transformed from the zero tide system to the tidal system of the
-    input height difference.
+    If tidal system is non-tidal or mean tide system, the gravity interpolated from the
+    gravity model is transformed from the zero tide system to the chose tidal system.
 
-    If the input height difference is not corrected for tidal effects, the gravity interpolated
-    from the gravity model is transformed from the zero tide system to the mean tide system.
+    If tidal system is not given, (i.e. for converting raw, uncorrected height differences),
+    the gravity interpolated from the gravity model is transformed to the mean tide system.
 
     Args:
-    height_diff: float, metric height difference to be converted to gpu
     point_from_lat: float, latitude of from point in units of degrees
     point_from_long: float, longitude of from point in units of degrees
     point_to_lat: float, latitiude of to point in units of degrees
@@ -65,8 +63,7 @@ def convert_metric_height_diff_to_geopotential_height_diff(
     are used
 
     Returns:
-    tuple[float, float], a tuple containing the converted height difference
-    in units of gpu (1 gpu = 10 m^2/s^2) and the m2gpu multiplication factor in units of m/s^2
+    float, the m2gpu multiplication factor in units of m/s^2
 
     Raises:
     ?

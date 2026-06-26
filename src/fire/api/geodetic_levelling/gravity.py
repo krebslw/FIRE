@@ -22,7 +22,6 @@ def interpolate_gravity(
     Args:
     latitude: float, latitude for which gravity is interpolated, in units of degrees
     longitude: float, longitude for which gravity is interpolated, in units of degrees
-    grid_inputfolder: Path, folder for input grid, i.e. gravity model
     gravitymodel: str, grid-based model providing gravity in units of mGal (1 mGal = 10^-5 m/s^2),
     must be in GeoTIFF or GTX file format, e.g. "dk-g-direkte-fra-gri-thokn.tif"
 
