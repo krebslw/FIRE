@@ -570,7 +570,7 @@ class DumRegn(RegneMotor):
         return dict()
 
 
-class GeodætiskRegn(GamaRegn):
+class GeodætiskRegn(RegneMotor):
     """
     Regnemotor som bruger GNU Gama til at lave geodætiske nivellementsberegninger.
 
@@ -622,6 +622,12 @@ class GeodætiskRegn(GamaRegn):
 
     TO DO: Håndtér spredninger?
     """
+    intern_motorvælger = {
+        "gama": GamaRegn,
+        "GamaRegn": GamaRegn,
+        "dum": DumRegn,
+        "DumRegn": DumRegn,
+    }
 
     def __init__(
         self,
@@ -632,6 +638,7 @@ class GeodætiskRegn(GamaRegn):
         deformationmodel: str = None,
         gravitymodel: str = None,
         filnavn_korrektioner: str = None,
+        intern_regnemotor: str = "GamaRegn",
         **kwargs,
     ):
         # Intitialiser parametre
@@ -651,25 +658,25 @@ class GeodætiskRegn(GamaRegn):
         self.deformationmodel = deformationmodel or None
         self.gravitymodel = gravitymodel or None
 
-        # Initialiserer nedarvede parametre, herunder self.projektnavn
-        super().__init__(**kwargs)
+        # Initialiserer intern regnemotor
+        self.intern_regnemotor = self.intern_motorvælger[intern_regnemotor](**kwargs)
 
         # Initialiserer parameter vedr. output-fil med geodætiske korrektioner
         self.filnavn_korrektioner = (
-            filnavn_korrektioner or f"{self.projektnavn}-korrektioner.xlsx"
+            filnavn_korrektioner or f"{self.intern_regnemotor.projektnavn}-korrektioner.xlsx"
         )
 
     @property
     def filer(self) -> list:
         """En liste af filer som GeodætiskRegn producerer"""
-        return [self.xml_in, self.xml_out, self.html_out, self.filnavn_korrektioner]
+        # return [self.xml_in, self.xml_out, self.html_out, self.filnavn_korrektioner]
+        return self.intern_regnemotor.filer + [self.filnavn_korrektioner]
 
     @filer.setter
     def filer(self, nye_filnavne):
         """Sæt nye filnavne"""
-        self.xml_in, self.xml_out, self.html_out, self.filnavn_korrektioner = (
-            nye_filnavne
-        )
+        self.intern_regnemotor.filer = nye_filnavne[:-1]
+        self.filnavn_korrektioner = nye_filnavne[-1]
 
     @property
     def parametre(self) -> dict:
@@ -698,10 +705,10 @@ class GeodætiskRegn(GamaRegn):
         ):
             print("Højdeforskelle påføres geodætiske korrektioner inden udjævning")
 
-            (self._observationer, self.korrektioner_obs) = (
+            (self.intern_regnemotor._observationer, self.korrektioner_obs) = (
                 apply_geodetic_corrections_to_height_diff_objects(
-                    self._observationer,
-                    self._gamle_koter,
+                    self.intern_regnemotor._observationer,
+                    self.intern_regnemotor._gamle_koter,
                     self.height_diff_unit,
                     self.epoch_target,
                     self.tidal_system,
@@ -719,11 +726,11 @@ class GeodætiskRegn(GamaRegn):
             )
 
             # Helmert-højderne fra databasen gemmes inden konvertering til geopotentielle højder
-            self.gamle_koter_db = self.gamle_koter
+            self.gamle_koter_db = self.intern_regnemotor.gamle_koter
 
-            (self.gamle_koter, self.tyngder_konvertering_til_gpu) = (
+            (self.intern_regnemotor.gamle_koter, self.tyngder_konvertering_til_gpu) = (
                 convert_geopotential_heights_to_metric_heights(
-                    self.gamle_koter,
+                    self.intern_regnemotor.gamle_koter,
                     "helmert_to_geopot",
                     self.gravitymodel,
                     self.tidal_system,
@@ -743,9 +750,9 @@ class GeodætiskRegn(GamaRegn):
                 f"Højder konverteres fra geopotentielle højder til {deskriptor[self.output_height]} efter udjævning"
             )
 
-            (self.nye_koter, self.tyngder_konvertering_til_meter) = (
+            (self.intern_regnemotor.nye_koter, self.tyngder_konvertering_til_meter) = (
                 convert_geopotential_heights_to_metric_heights(
-                    self.nye_koter,
+                    self.intern_regnemotor.nye_koter,
                     f"geopot_to_{self.output_height}",
                     self.gravitymodel,
                     self.tidal_system,
@@ -771,7 +778,7 @@ class GeodætiskRegn(GamaRegn):
     def gendan_gamle_højder(self):
         """Helmert-højder fra databasen gendannes."""
         if self.height_diff_unit == "gpu":
-            self.gamle_koter = self.gamle_koter_db
+            self.intern_regnemotor.gamle_koter = self.gamle_koter_db
 
     def skriv_korrektioner(self):
         """Skriv excel-fil med anvendte korrektioner/tyngder og beregningsparametre."""
@@ -806,15 +813,28 @@ class GeodætiskRegn(GamaRegn):
             except:
                 AttributeError
 
+    # Vi eksponerer disse metoder til cli-laget ved at overskrive RegneMotors metoder med de tilsvarende
+    # metoder fra den interne regnemotor. .udjævn er den eneste hvor der egenetlit sker noget nyt.
+    @property
+    def fastholdte(self):
+        return self.intern_regnemotor.fastholdte
+
+    def netanalyse(self):
+        return self.intern_regnemotor.netanalyse()
+
+    def til_dataframe(self):
+        return self.intern_regnemotor.til_dataframe()
+
+    def valider_fastholdte(self):
+        return self.intern_regnemotor.valider_fastholdte()
+
     def udjævn(self):
         """Korrigerer observationer, konverterer gamle højder, skriver gama input, kalder gama,
         læser gama output, konverterer nye højder og skriver excel-fil med korrektioner.
         """
         self.korriger_observationer()
         self.konverter_gamle_højder_til_gpu()
-        self.skriv_gama_inputfil()
-        self.kald_gama()
-        self.nye_koter = self.læs_gama_outputfil()
+        self.intern_regnemotor.udjævn()
         self.konverter_nye_højder_til_meter()
         self.gendan_gamle_højder()
         self.skriv_korrektioner()

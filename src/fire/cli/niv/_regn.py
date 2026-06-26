@@ -208,7 +208,7 @@ def regn(
     # Tjek om der er parametre til regnemotoren. Parametre der ikke kan læses
     # springes over.
     motorkwargs = fortolk_regneparametre(regneparametre)
-
+    breakpoint()
     # Start regnemotoren!
     try:
         motor = MotorKlasse.fra_dataframe(
