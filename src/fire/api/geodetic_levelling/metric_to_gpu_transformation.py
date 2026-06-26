@@ -276,64 +276,51 @@ def convert_geopotential_height_to_helmert_height(
     Raises:
     ?
     """
+    # Set tolerance for iterative computation of helmert heights to 0.01 mm
+    tolerance = 0.00001
+
+    def _conversion_factor(height):
+        """Compute conversion factor in units 10 m/s^2"""
+        return (gravity * 0.1) + (0.07045 * 1e-6 * height)
+
     if not conversion in ["geopot_to_helmert", "helmert_to_geopot"]:
         raise ValueError(
             "Function convert_geopotential_height_to_helmert_height: Wrong argument for parameter conversion."
         )
 
     # Interpolated gravity in units of m/s^2
-    gravity = interpolate_gravity(
-        latitude,
-        longitude,
-        gravitymodel,
-    )
+    gravity = interpolate_gravity(latitude, longitude, gravitymodel)
 
     # Interpolated gravity is tidally transformed if tidal system of input height
     # is different than zero tide
-    if tidal_system != "zero":
-        if tidal_system == "non":
-            transformation = "zero_to_non"
+    if tidal_system == "non":
+        transformation = "zero_to_non"
+    elif tidal_system == "mean" or tidal_system is None:
+        transformation = "zero_to_mean"
 
-        elif tidal_system == "mean" or tidal_system is None:
-            transformation = "zero_to_mean"
-
-        gravity = transform_gravity_from_tidal_system_to_tidal_system(
-            gravity, latitude, transformation, use_approx_tidal_formulas
-        )
-
-    # Conversion of a geopotential height to Helmert height
-    if conversion == "geopot_to_helmert":
-        # Conversion factor (metric Helmert height to geopotential height) in units of 10 m/s^2
-        conversion_factor = (gravity * 0.1) + (0.07045 * 1e-6 * approx_helmert_height)
-
-        # Helmert height in units of meters
-        height_converted = height / conversion_factor
-
-        # Iterative calculation of Helmert height
-        # The iteration is started if height_converted is not nan
-        if iterate == True and isnan(height_converted) == False:
-            while not (
-                -0.00001 <= (height_converted - approx_helmert_height) <= 0.00001
-            ):
-                approx_helmert_height = height_converted
-
-                # Conversion factor (metric Helmert height to geopotential height) in units of 10 m/s^2
-                conversion_factor = (gravity * 0.1) + (
-                    0.07045 * 1e-6 * approx_helmert_height
-                )
-
-                # Helmert height in units of meters
-                height_converted = height / conversion_factor
+    gravity = transform_gravity_from_tidal_system_to_tidal_system(
+        gravity, latitude, transformation, use_approx_tidal_formulas
+    )
 
     # Conversion of a Helmert height to geopotential height
-    elif conversion == "helmert_to_geopot":
-        # Conversion factor (metric Helmert height to geopotential height) in units of 10 m/s^2
-        conversion_factor = (gravity * 0.1) + (0.07045 * 1e-6 * height)
+    if conversion == "helmert_to_geopot":
+        conversion_factor = _conversion_factor(height)
+        gpu_converted = height * conversion_factor
+        return (gpu_converted, conversion_factor)
 
-        # Geopotential height in units of gpu (1 gpu = 10 m^2/s^2)
-        height_converted = height * conversion_factor
+    conversion_factor = _conversion_factor(approx_helmert_height)
+    helmert_converted = height / conversion_factor
 
-    return (height_converted, conversion_factor)
+    # Iterative calculation of Helmert height
+    if iterate == True and isnan(helmert_converted) == False:
+        while abs(helmert_converted - approx_helmert_height) > tolerance:
+
+            approx_helmert_height = helmert_converted
+
+            conversion_factor = _conversion_factor(approx_helmert_height)
+            helmert_converted = height / conversion_factor
+
+    return (helmert_converted, conversion_factor)
 
 
 def convert_geopotential_heights_to_metric_heights(
