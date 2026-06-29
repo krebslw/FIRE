@@ -411,15 +411,15 @@ class GamaRegn(RegneMotor):
         self.xml_out = xml_out or f"{self.projektnavn}-resultat.xml"
         self.html_out = html_out or f"{self.projektnavn}-resultat.html"
 
-    @property
-    def filer(self) -> list:
+    def _get_filer(self) -> list:
         """En liste af filer som Gama producerer"""
         return [self.xml_in, self.xml_out, self.html_out]
 
-    @filer.setter
-    def filer(self, nye_filnavne):
+    def _set_filer(self, nye_filnavne):
         """Sæt nye filnavne"""
         self.xml_in, self.xml_out, self.html_out = nye_filnavne
+
+    filer = property(fget=_get_filer, fset=_set_filer)
 
     @property
     def parametre(self) -> dict:
@@ -539,7 +539,6 @@ class GamaRegn(RegneMotor):
 
     def udjævn(self):
         """Skriver gama input, kalder gama og læser gama output."""
-
         self.skriv_gama_inputfil()
         self.kald_gama()
         self.nye_koter = self.læs_gama_outputfil()
@@ -550,24 +549,21 @@ class DumRegn(RegneMotor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._filer = []
 
-    def udjævn(self):
-        self.nye_koter = self.gamle_koter
+    def _get_filer(self) -> list:
+        return []
 
-    @property
-    def filer(self) -> list:
-        """DumRegn producerer ingen filer, returnerer altid den samme tomme liste."""
-        return self._filer
+    def _set_filer(self, _):
+        return
 
-    @filer.setter
-    def filer(self, _):
-        """En dum setter, der ikke ændrer noget."""
+    filer = property(fget=_get_filer, fset=_set_filer)
 
     @property
     def parametre(self) -> dict:
-        """En dict af parametre brugt i DumRegn"""
         return dict()
+
+    def udjævn(self):
+        self.nye_koter = self.gamle_koter
 
 
 class GeodætiskRegn(GamaRegn):
@@ -659,22 +655,22 @@ class GeodætiskRegn(GamaRegn):
             filnavn_korrektioner or f"{self.projektnavn}-korrektioner.xlsx"
         )
 
-    @property
-    def filer(self) -> list:
+    def _get_filer(self) -> list:
         """En liste af filer som GeodætiskRegn producerer"""
-        return [self.xml_in, self.xml_out, self.html_out, self.filnavn_korrektioner]
+        return super()._get_filer() + [self.filnavn_korrektioner]
 
-    @filer.setter
-    def filer(self, nye_filnavne):
+    def _set_filer(self, nye_filnavne):
         """Sæt nye filnavne"""
-        self.xml_in, self.xml_out, self.html_out, self.filnavn_korrektioner = (
-            nye_filnavne
-        )
+
+        super()._set_filer(nye_filnavne[:-1])
+        self.filnavn_korrektioner = nye_filnavne[-1]
+
+    filer = property(fget=_get_filer, fset=_set_filer)
 
     @property
     def parametre(self) -> dict:
 
-        return dict(
+        return super().parametre | dict(
             tidal_system=self.tidal_system,
             epoch_target=self.epoch_target,
             height_diff_unit=self.height_diff_unit,
@@ -698,7 +694,7 @@ class GeodætiskRegn(GamaRegn):
         ):
             print("Højdeforskelle påføres geodætiske korrektioner inden udjævning")
 
-            (self._observationer, self.korrektioner_obs) = (
+            self._observationer, self.korrektioner_obs = (
                 apply_geodetic_corrections_to_height_diff_objects(
                     self._observationer,
                     self._gamle_koter,
@@ -721,7 +717,7 @@ class GeodætiskRegn(GamaRegn):
             # Helmert-højderne fra databasen gemmes inden konvertering til geopotentielle højder
             self.gamle_koter_db = self.gamle_koter
 
-            (self.gamle_koter, self.tyngder_konvertering_til_gpu) = (
+            self.gamle_koter, self.tyngder_konvertering_til_gpu = (
                 convert_geopotential_heights_to_metric_heights(
                     self.gamle_koter,
                     "helmert_to_geopot",
@@ -743,7 +739,7 @@ class GeodætiskRegn(GamaRegn):
                 f"Højder konverteres fra geopotentielle højder til {deskriptor[self.output_height]} efter udjævning"
             )
 
-            (self.nye_koter, self.tyngder_konvertering_til_meter) = (
+            self.nye_koter, self.tyngder_konvertering_til_meter = (
                 convert_geopotential_heights_to_metric_heights(
                     self.nye_koter,
                     f"geopot_to_{self.output_height}",
@@ -812,9 +808,7 @@ class GeodætiskRegn(GamaRegn):
         """
         self.korriger_observationer()
         self.konverter_gamle_højder_til_gpu()
-        self.skriv_gama_inputfil()
-        self.kald_gama()
-        self.nye_koter = self.læs_gama_outputfil()
+        super().udjævn()
         self.konverter_nye_højder_til_meter()
         self.gendan_gamle_højder()
         self.skriv_korrektioner()
