@@ -833,26 +833,16 @@ class DVR90Regn(GeodætiskRegn):
         gravitymodel: str = "dk-g-direkte-fra-gri-thokn.tif",
         **kwargs,
     ):
-        # Initialiserer nedarvede parametre
-        super().__init__(**kwargs)
-
-        # Re-intitialiser parametre vedr. geodætiske korrektioner med default-værdier for
-        # DVR90Regn og/eller regneparametre fra kommandolinje-interface
-        self.tidal_system = tidal_system or None
-        # Konvertering fra decimalår til datetime
-        # Hvis epoch_target ligger langt tilbage eller frem i tid kan det medføre ErfaWarnings
-        # ang. "dubious year", hvilke vi ikke ønsker at se i denne specifikke sammenhæng
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=erfa.ErfaWarning)
-            self.epoch_target = (
-                Time(epoch_target, format="decimalyear").datetime
-                if epoch_target
-                else None
-            )
-        self.height_diff_unit = height_diff_unit
-        self.output_height = output_height or None
-        self.deformationmodel = deformationmodel or None
-        self.gravitymodel = gravitymodel or None
+        # Initialiserer geodætisk regn med de fastsatte parametre.
+        super().__init__(
+            tidal_system=tidal_system,
+            epoch_target=epoch_target,
+            height_diff_unit=height_diff_unit,
+            output_height=output_height,
+            deformationmodel=deformationmodel,
+            gravitymodel=gravitymodel,
+            **kwargs,
+        )
 
 
 def _spredning(
