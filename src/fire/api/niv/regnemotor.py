@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import astuple
 from datetime import datetime
 from functools import cached_property
@@ -538,10 +539,6 @@ class SmartRegn(RegneMotor):
 
         super().__init__(*args, **kwargs)
 
-    def udjævn(self):
-
-        self.løs_ligning()
-
     def løs_ligning(self):
         """
         Opstil og løs ligningssystem ud fra nivellementobservationer
@@ -674,7 +671,7 @@ class SmartRegn(RegneMotor):
                     punkt=punkt,
                     dato=self.gyldighedstidspunkt,
                     H=udjævnede_koter[j],
-                    spredning=sqrt(cov_M[j,j])/1e3,
+                    spredning=sqrt(cov_M[j,j]),
                 )
             )
 
@@ -688,6 +685,106 @@ class SmartRegn(RegneMotor):
     def filer(self, nye_filnavne):
         """Sæt nye filnavne"""
         pass
+
+
+    def generer_statistik(self):
+        # vi mangler sådan en her: en intern dict for nye_koter
+        nk_dict = {nk.punkt: nk for nk in self.nye_koter}
+
+        def get_koteforskel(fra, til):
+            return nk_dict[til].H - nk_dict[fra].H
+
+        def get_stdev(fra, til):
+            return np.hypot(nk_dict[til].spredning, nk_dict[fra].spredning)
+
+        def get_obs_stats(obs: NivObservation) -> dict:
+            """
+            generer statistik linje for "udjævnet observation" i stil med gama html rapport
+
+            Udjævnet observation tages blot som koteforskellen af de udjævnede koter. Vi udjævner ikke
+            observationerne direkte.
+            Spredningen beregnes ud fra fejlophobningsloven (antaget de nye koter er uafhængige)
+            """
+            try:
+                dH_adj = get_koteforskel(obs.fra, obs.til)
+                S_adj = get_stdev(obs.fra, obs.til)
+            except KeyError:
+                # enten fra- eller til-punktet er ikke blevet udjævnet
+                return None
+
+            dH_obs = obs.deltaH
+            dH_res = (dH_adj-dH_obs)*1e3 # to_mm
+            return dict(
+                    fra = obs.fra,
+                    til = obs.til,
+                    dH_obs = dH_obs,
+                    dH_adj = dH_adj,
+                    dH_res = dH_res,
+                    S_adj = S_adj,
+                )
+
+        def get_kote_stats(ny_kote: NivKote):
+            """generer statistik linje for udjævnet kote i stil med gama html rapport"""
+            H_prior = self._gamle_koter.get(ny_kote.punkt, None)
+            H_prior = H_prior.H if H_prior is not None else None
+
+            H_adj   = ny_kote.H
+            correction = H_adj - H_prior
+
+            return dict(
+                punkt = ny_kote.punkt,
+                H_prior = H_prior,
+                H_adj = H_adj,
+                correction = correction,
+                S_adj   = ny_kote.spredning
+            )
+
+        def generer_summary():
+            n_udjævnet  = ...
+            n_fast      = ...
+            n_ialt      = ...
+
+            n_normal_ligninger = ... # samme som n_obs
+            n_ubekendt = ... # samme som self.estimerbare
+            n_bekendt = ... # samme som self.fastholdt
+
+            dof = ... # antal uafhængige observationer
+            # burde være = n_normalligninger - n_ubekendt
+
+            network_defect = ...  # ???
+
+            conf_level = 0.95
+
+            stddev = ... # sum af alle varianser?
+
+        def generer_overordnet_statistik():
+            ...
+            t_test = ...
+            test_elimination_of_observations = ...
+
+            return
+
+        stats = dict(
+            obs_stats = [get_obs_stats(obs) for obs in self.observationer],
+            kote_stats = [get_kote_stats(nk) for nk in self.nye_koter]
+        )
+
+        return stats
+
+
+    def generer_udjævningsrapport(self):
+        md_rapport = f"""
+        # SmartRegn
+        asdf{self.fastholdte}
+
+        """
+
+        return md_rapport
+
+    def udjævn(self):
+        self.løs_ligning()
+        stats = self.generer_statistik()
+        breakpoint()
 
 
 def _spredning(
