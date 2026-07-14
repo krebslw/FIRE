@@ -289,7 +289,7 @@ def bernese(
             beskrivelse="fire indlæs bernese: Automatisk oprettelse af tidsserier",
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_tidsserier, commit=False)
-        with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+        with YndefuldeFejl(Exception, med_årsag=True):
             fire.cli.firedb.session.flush()
 
     # Indlæs "observationer"
@@ -302,7 +302,7 @@ def bernese(
         beskrivelse="fire indlæs bernese: Indlæsning af observationer",
     )
     fire.cli.firedb.indset_sagsevent(sagsevent_observationer, commit=False)
-    with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+    with YndefuldeFejl(Exception, med_årsag=True):
         fire.cli.firedb.session.flush()
 
     # Her fra indlæses koordinater og tidsserier opdateres
@@ -369,11 +369,11 @@ def bernese(
             beskrivelse="fire indlæs bernese: Opdatering af tidsserier",
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_tidsserier, commit=False)
-        with YndefuldeFejl(Exception, med_rollback=True):
+        with YndefuldeFejl(Exception):
             fire.cli.firedb.session.flush()
 
     fire.cli.firedb.luk_sag(sag, commit=False)
-    with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+    with YndefuldeFejl(Exception, med_årsag=True):
         fire.cli.firedb.session.flush()
 
     print_koordinat_tabel(nye_koordinater)

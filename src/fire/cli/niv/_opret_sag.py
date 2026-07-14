@@ -128,7 +128,7 @@ def opret_sag(projektnavn: str, beskrivelse: str, sagsbehandler: str, **kwargs) 
     fire.cli.firedb.indset_sag(Sag(id=sag["uuid"], sagsinfos=[sagsinfo]), commit=False)
 
     fejltekst = f"Der opstod en fejl - sag {sag.id} for '{projektnavn}' IKKE oprettet"
-    with YndefuldeFejl(Exception, fejltekst, med_rollback=True):
+    with YndefuldeFejl(Exception, fejltekst):
         # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()
 

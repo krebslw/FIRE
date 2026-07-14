@@ -201,7 +201,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     fire.cli.firedb.indset_sagsevent(sagsevent_punkter, commit=False)
 
     fejlbesked = f"Der opstod en fejl - nye punkter for '{projektnavn}' IKKE indlæst!"
-    with YndefuldeFejl(Exception, fejlbesked, med_årsag=True, med_rollback=True):
+    with YndefuldeFejl(Exception, fejlbesked, med_årsag=True):
         fire.cli.firedb.session.flush()
 
     # Generer dokumentation til fanebladet "Sagsgang"
@@ -285,7 +285,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         if pd.isna(beskrivelse) or beskrivelse == "":
             navn = nyetablerede["Foreløbigt navn"][i]
             raise AfbrydFejl(
-                f"Beskrivelse for punkt '{navn}' ikke angivet!", med_rollback=True
+                f"Beskrivelse for punkt '{navn}' ikke angivet!"
             )
         punktinfo.append(
             PunktInformation(
@@ -344,7 +344,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     fire.cli.firedb.indset_sagsevent(sagsevent_punktinfo, commit=False)
 
     fejlbesked = f"Der opstod en fejl - punkter for '{projektnavn}' IKKE indlæst!"
-    with YndefuldeFejl(Exception, fejlbesked, med_årsag=True, med_rollback=True):
+    with YndefuldeFejl(Exception, fejlbesked, med_årsag=True):
         fire.cli.firedb.session.flush()
 
     # Generer dokumentation til fanebladet "Sagsgang"

@@ -58,7 +58,7 @@ def åbn_sag(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     fire.cli.firedb.session.add(ny_sagsinfo)
 
     fejltekst = f"Der opstod en fejl - sag {sag.id} for '{projektnavn}' IKKE åbnet!"
-    with YndefuldeFejl(fejltekst, Exception, med_årsag=True, med_rollback=True):
+    with YndefuldeFejl(fejltekst, Exception, med_årsag=True):
         # først må vi sikre at sagen står som aktiv...
         fire.cli.firedb.session.flush()
 

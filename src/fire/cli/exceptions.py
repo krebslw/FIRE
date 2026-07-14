@@ -13,12 +13,14 @@ class AfbrydFejl(SystemExit):
     Fejlbeskeden formatteres ens på tværs af cli-laget med hvid-på-rød skrift, præfixeret
     med "FEJL".
 
+    `med_rollback=True` sørger for at rulle den fælles `firedb.session` tilbage.
+
     Yderligere args/kwargs gives videre til SystemExit. Dvs. at disse bliver printet med
     default formattering, hvilket kan være nyttigt hvis man gerne vil give yderligere
     information til brugeren omkring fejlen.
     """
 
-    def __init__(self, tekst: str = "", *args, med_rollback: bool = False, **kwargs):
+    def __init__(self, tekst: str = "", *args, med_rollback: bool = True, **kwargs):
         # Hvis fejlbesked er tom, skrives bare "FEJL!" i stedet for "FEJL: "
         # Men det er nok dårlig praksis at lade fejlbeskeden være tom. Idet mindste
         # bør mulig_årsag i så fald være udfyldt.
@@ -54,7 +56,7 @@ def YndefuldeFejl(
     fejltekst: str = "",
     *args,
     med_årsag: bool = False,
-    med_rollback: bool = False,
+    med_rollback: bool = True,
     **kwargs,
 ):
     """Try-except contextmananger til pæne fejlmeddelelser

@@ -600,7 +600,7 @@ def ilæg_revision(
         fejltekst = f"Ukorrekt koordinatformat:\n{'    '.join(r['Ny værdi'])}"
         uddybende_tekst = "Skal være på formen: 'x y z t sx sy sz', hvor ubrugte værdier sættes til 'nan'"
         with YndefuldeFejl(
-            ValueError, fejltekst, uddybende_tekst, med_rollback=True, med_årsag=True
+            ValueError, fejltekst, uddybende_tekst, med_årsag=True
         ):
             koord = [float(k.replace(",", ".")) for k in r["Ny værdi"].split()]
 
@@ -703,7 +703,7 @@ def ilæg_revision(
         # NB! Førhen blev denne fejltekst formatteret som gul-på-rød skrift.
         # Nu er det bare hvid-på-rød som alle andre fejltekster.
         fejltekst = f"Kan ikke finde punkt {ident}!"
-        with YndefuldeFejl(NoResultFound, fejltekst, med_årsag=True, med_rollback=True):
+        with YndefuldeFejl(NoResultFound, fejltekst, med_årsag=True):
             punkt = fire.cli.firedb.hent_punkt(ident)
             infonøgler = {
                 info.objektid: i for i, info in enumerate(punkt.punktinformationer)
@@ -912,7 +912,7 @@ def ilæg_revision(
 def flush():
     """Indlæs data i database"""
     fejltekst = "Der opstod en fejl under revisionsilægning."
-    with YndefuldeFejl(DatabaseError, fejltekst, med_årsag=True, med_rollback=True):
+    with YndefuldeFejl(DatabaseError, fejltekst, med_årsag=True):
         fire.cli.firedb.session.flush()
 
 

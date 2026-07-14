@@ -175,7 +175,7 @@ def ilæg_observationer(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
 
     # Fang alle fejl under Flush
     fejltekst = f"Der opstod en fejl - observationer for '{projektnavn}' IKKE indlæst!"
-    with YndefuldeFejl(Exception, fejltekst, med_årsag=True, med_rollback=True):
+    with YndefuldeFejl(Exception, fejltekst, med_årsag=True):
         fire.cli.firedb.session.flush()
 
     spørgsmål = click.style("Du indsætter nu ", fg="white", bg="red")

@@ -152,7 +152,7 @@ def fjern_punkt_fra_punktsamling(
     fire.cli.firedb.indset_sagsevent(sagsevent, commit=False)
 
     fejltekst = f"Der opstod en fejl - punkt {punkt.ident} IKKE slettet fra '{punktsamling.navn}'"
-    with YndefuldeFejl(Exception, fejltekst, med_rollback=True, med_årsag=True):
+    with YndefuldeFejl(Exception, fejltekst, med_årsag=True):
         # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()
 
@@ -761,7 +761,7 @@ def ilæg_punktsamling(
             punktsamlinger=pktsamling_til_redigering,
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_rediger_punktsamlinger, commit=False)
-        with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+        with YndefuldeFejl(Exception, med_årsag=True):
             fire.cli.firedb.session.flush()
 
         # Generer dokumentation til fanebladet "Sagsgang"
@@ -787,7 +787,7 @@ def ilæg_punktsamling(
             koordinater=koord_til_oprettelse,
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_nye_jessenkoter, commit=False)
-        with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+        with YndefuldeFejl(Exception, med_årsag=True):
             fire.cli.firedb.session.flush()
 
         # Generer dokumentation til fanebladet "Sagsgang"
@@ -809,7 +809,7 @@ def ilæg_punktsamling(
             punktsamlinger=pktsamling_til_oprettelse,
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_opret_punktsamlinger, commit=False)
-        with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+        with YndefuldeFejl(Exception, med_årsag=True):
             fire.cli.firedb.session.flush()
 
         # Generer dokumentation til fanebladet "Sagsgang"
@@ -971,7 +971,7 @@ def ilæg_tidsserie(
             tidsserier=ts_til_redigering,
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_rediger_tidsserier, commit=False)
-        with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+        with YndefuldeFejl(Exception, med_årsag=True):
             fire.cli.firedb.session.flush(
                 [
                     sagsevent_rediger_tidsserier,
@@ -997,7 +997,7 @@ def ilæg_tidsserie(
             tidsserier=ts_til_oprettelse,
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_opret_tidsserier, commit=False)
-        with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+        with YndefuldeFejl(Exception, med_årsag=True):
             fire.cli.firedb.session.flush()
 
         # Generer dokumentation til fanebladet "Sagsgang"
