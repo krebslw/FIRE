@@ -18,7 +18,7 @@ from fire.cli.niv import (
     bekræft,
 )
 from fire.cli.exceptions import (
-    NothingToDo,
+    IntetAtGøre,
     bemærk,
     YndefuldeFejl,
 )
@@ -102,7 +102,7 @@ def opret_sag(projektnavn: str, beskrivelse: str, sagsbehandler: str, **kwargs) 
     """
 
     if os.path.isfile(f"{projektnavn}.xlsx"):
-        raise NothingToDo(
+        raise IntetAtGøre(
             f"Filen '{projektnavn}.xlsx' eksisterer - sagen er allerede oprettet"
         )
 

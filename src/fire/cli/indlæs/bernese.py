@@ -25,7 +25,7 @@ from fire.api.model import (
 from fire.cli.niv import bekræft
 from fire.cli.indlæs import indlæs
 from fire.cli.exceptions import (
-    Afbryd,
+    AfbrydFejl,
     advarsel,
     YndefuldeFejl,
 )
@@ -73,9 +73,9 @@ def find_srid(solution: BerneseSolution) -> Srid:
     try:
         srid = fire.cli.firedb.hent_srid(SRIDINDEX[solution.datum])
     except IndexError:
-        raise Afbryd(f"Ukendt referenceramme: {solution.datum}")
+        raise AfbrydFejl(f"Ukendt referenceramme: {solution.datum}")
     except NoResultFound:
-        raise Afbryd(
+        raise AfbrydFejl(
             f"{solution.datum} ({SRIDINDEX[solution.datum]}) findes ikke i databasen!"
         )
     return srid
@@ -358,7 +358,7 @@ def bernese(
         fire.cli.firedb.session.rollback()
         fejlende_punkt = fire.cli.firedb.hent_punkt(ex.params["punktid"])
 
-        raise Afbryd(
+        raise AfbrydFejl(
             f"Koordinat på station {fejlende_punkt.gnss_navn} findes allerede i databasen:",
             f"({ex.params['x']}, {ex.params['y']}, {ex.params['z']}, {ex.params['t']})",
         )

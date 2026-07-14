@@ -25,7 +25,7 @@ from fire.cli.niv import (
     er_projekt_okay,
 )
 from fire.cli.exceptions import (
-    Afbryd,
+    AfbrydFejl,
     YndefuldeFejl,
 )
 
@@ -141,7 +141,7 @@ def ilæg_observationer(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
                 value7=0,  # 1,2,3 henviser til 1.,2.,3. præcisionsnivellement. 0 til "ingen af dem"
             )
         else:
-            raise Afbryd(f"Ukendt observationstype: '{obs.Type}'")
+            raise AfbrydFejl(f"Ukendt observationstype: '{obs.Type}'")
         alle_uuider[i] = observation.id
         til_registrering.append(observation)
 

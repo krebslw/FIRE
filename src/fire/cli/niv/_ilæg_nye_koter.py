@@ -31,8 +31,8 @@ from fire.cli.niv import (
     KOTESYSTEMER,
 )
 from fire.cli.exceptions import (
-    Afbryd,
-    NothingToDo,
+    AfbrydFejl,
+    IntetAtGøre,
     YndefuldeFejl,
 )
 
@@ -100,7 +100,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
 
     filnavn_gama_output = pathlib.Path(f"{projektnavn}-resultat-endelig.html")
     if not filnavn_gama_output.is_file():
-        raise Afbryd(
+        raise AfbrydFejl(
             f"Sagsopdateringen kræver en outputfil fra GNU Gama {str(filnavn_gama_output)}"
         )
 
@@ -115,7 +115,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
 
     # Forbered data til kote-oprettelse
     if len(punktoversigt["System"].unique()) > 1:
-        raise Afbryd("Flere forskellige højdereferencesystemer er angivet!")
+        raise AfbrydFejl("Flere forskellige højdereferencesystemer er angivet!")
 
     kotesystem = punktoversigt["System"][0]
 
@@ -130,7 +130,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
             projektnavn, "Højdetidsserier", arkdef.HØJDETIDSSERIE, ignore_failure=True
         )
         if hts_ark is None:
-            raise Afbryd(
+            raise AfbrydFejl(
                 f"Fanebladet Højdetidsserier skal være til stede hvis du vil ilægge tidsserie-koter"
             )
 
@@ -173,7 +173,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
                 ts.koordinater.append(kote)
 
             if not opdaterede_tidsserier:
-                raise Afbryd(
+                raise AfbrydFejl(
                     f"Kan ikke indsætte en ny højdetidsserie-kote {kote.z} for punkt {punkt.ident}."
                     f"Punktet er ikke tilknyttet nogle gyldige tidsserier!",
                 )
@@ -181,7 +181,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
             tidsserier_til_registrering.extend(opdaterede_tidsserier)
 
     if 0 == len(til_registrering):
-        raise NothingToDo("Ingen koter at registrere!")
+        raise IntetAtGøre("Ingen koter at registrere!")
 
     # Tilknyt koter til observationer i en beregning
     observationer = observationer[
@@ -196,14 +196,14 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
 
     # det giver kun mening at oprette en beregning hvis der er relaterede observationer
     if not observationer_i_beregning:
-        raise Afbryd(
+        raise AfbrydFejl(
             "Beregning foretaget uden tilknytning til observationer i databasen!"
         )
     n_koter = len(opdaterede_punkter)
     n_obs = len(observationer_i_beregning)
     # det giver kun mening at oprette en beregning hvis der er relaterede observationer
     if n_koter > n_obs:
-        raise Afbryd("Færre observationer end beregnede koter registreret i databasen!")
+        raise AfbrydFejl("Færre observationer end beregnede koter registreret i databasen!")
 
     beregning = Beregning(
         observationer=observationer_i_beregning,

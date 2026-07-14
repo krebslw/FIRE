@@ -16,7 +16,7 @@ from fire.cli.niv import (
     skriv_ark,
 )
 from fire.cli.exceptions import (
-    NothingToDo,
+    IntetAtGøre,
     YndefuldeFejl,
 )
 
@@ -45,7 +45,7 @@ def åbn_sag(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     sag = find_sag(projektnavn, accepter_inaktiv=True)
 
     if sag.aktiv:
-        raise NothingToDo(f"Sag {sag.id} for {projektnavn} er allerede åben.")
+        raise IntetAtGøre(f"Sag {sag.id} for {projektnavn} er allerede åben.")
 
     gammel_sagsinfo = sag.sagsinfos[-1]
     ny_sagsinfo = Sagsinfo(

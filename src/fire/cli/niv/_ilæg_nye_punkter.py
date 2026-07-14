@@ -35,8 +35,8 @@ from fire.cli.niv import (
     er_projekt_okay,
 )
 from fire.cli.exceptions import (
-    Afbryd,
-    NothingToDo,
+    AfbrydFejl,
+    IntetAtGøre,
     advarsel,
     YndefuldeFejl,
 )
@@ -138,7 +138,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     n = nyetablerede.shape[0]
 
     if n == 0:
-        raise NothingToDo("Ingen nyetablerede punkter at registrere")
+        raise IntetAtGøre("Ingen nyetablerede punkter at registrere")
 
     landsnummer_pit = fire.cli.firedb.hent_punktinformationtype("IDENT:landsnr")
     beskrivelse_pit = fire.cli.firedb.hent_punktinformationtype("ATTR:beskrivelse")
@@ -284,7 +284,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         beskrivelse = nyetablerede["Beskrivelse"][i]
         if pd.isna(beskrivelse) or beskrivelse == "":
             navn = nyetablerede["Foreløbigt navn"][i]
-            raise Afbryd(
+            raise AfbrydFejl(
                 f"Beskrivelse for punkt '{navn}' ikke angivet!", med_rollback=True
             )
         punktinfo.append(

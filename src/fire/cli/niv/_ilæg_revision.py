@@ -39,7 +39,7 @@ from fire.cli.niv import (
 )
 from fire.cli.niv._udtræk_revision import LOKATION_DEFAULT
 from fire.cli.exceptions import (
-    NothingToDo,
+    IntetAtGøre,
     advarsel,
     YndefuldeFejl,
 )
@@ -517,7 +517,7 @@ def ilæg_revision(
         revision = revision.drop(range(start, stop), axis="index")
 
     if revision.empty:
-        raise NothingToDo("Ingen besøgte punkter til ilægning. Stopper.")
+        raise IntetAtGøre("Ingen besøgte punkter til ilægning. Stopper.")
 
     # Find alle punkter, der skal nyoprettes
     nye_punkter = []

@@ -36,7 +36,7 @@ from fire.cli.niv import (
     udled_jessenpunkt_fra_punktoversigt,
 )
 from fire.cli.exceptions import (
-    Afbryd,
+    AfbrydFejl,
     advarsel,
     YndefuldeFejl,
 )
@@ -242,7 +242,7 @@ def regn(
         #
         # ... og derfor kan vi slippe afsted med at splitte stringen på '
         parameter_navn = str(error).split("'")[1]
-        raise Afbryd(f"regneparameteren '{parameter_navn}' er ukendt.")
+        raise AfbrydFejl(f"regneparameteren '{parameter_navn}' er ukendt.")
 
     # opdater Parametre i regneark (er vi kommet her til er alle angivne parametre gyldige)
     beregningsparametre = {"regnemotor": MotorKlasse.__name__} | motorkwargs

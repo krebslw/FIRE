@@ -28,8 +28,8 @@ from fire.cli.niv import (
     afbryd_hvis_ugyldigt_jessenpunkt,
 )
 from fire.cli.exceptions import (
-    Afbryd,
-    NothingToDo,
+    AfbrydFejl,
+    IntetAtGøre,
     advarsel,
     YndefuldeFejl,
 )
@@ -128,7 +128,7 @@ def fjern_punkt_fra_punktsamling(
         )
 
     if punktsamling.jessenpunkt == punkt:
-        raise Afbryd(f"Må ikke fjerne punktsamlingens jessenpunkt!")
+        raise AfbrydFejl(f"Må ikke fjerne punktsamlingens jessenpunkt!")
 
     # Tidsserier som skal lukkes først!
     tidsserier = [
@@ -138,7 +138,7 @@ def fjern_punkt_fra_punktsamling(
     ]
 
     if tidsserier:
-        raise Afbryd(
+        raise AfbrydFejl(
             f"Må ikke fjerne et punkt fra en punktsamling hvor der ligger aktive tidsserier ({tidsserier})!",
             f"Anvend 'fire luk tidsserie' for at lukke tidsserierne først.",
         )
@@ -317,7 +317,7 @@ def opret_punktsamling(
         )
     else:
         # Hverken Punktoversigt eller jessenpunktets ident er givet.
-        raise NothingToDo(
+        raise IntetAtGøre(
             "Intet Jessenpunkt angivet, og kan ikke udlede Jessenpunkt fra Punktoversigten, da den er fravalgt."
         )
 
@@ -484,7 +484,7 @@ def udtræk_punktsamling(
             ps for ps in jessenpunkt.punktsamlinger if ps.jessenpunkt == jessenpunkt
         ]
     else:
-        raise NothingToDo(
+        raise IntetAtGøre(
             f"Hverken Jessenpunkt eller Punktsamling angivet. Afbryder..."
         )
 
@@ -637,7 +637,7 @@ def ilæg_punktsamling(
         fire.cli.print(f"Behandler punktgruppe {punktgruppenavn}")
 
         if pd.isna(formål) or formål == "":
-            raise Afbryd(f"Formål for punktsamling {punktgruppenavn} ikke angivet!")
+            raise AfbrydFejl(f"Formål for punktsamling {punktgruppenavn} ikke angivet!")
 
         jessenpunkt = fire.cli.firedb.hent_punkt(punktgruppedata["Jessenpunkt"])
         afbryd_hvis_ugyldigt_jessenpunkt(jessenpunkt)
@@ -749,7 +749,7 @@ def ilæg_punktsamling(
     if not (
         koord_til_oprettelse or pktsamling_til_redigering or pktsamling_til_oprettelse
     ):
-        raise NothingToDo(f"Ingen punktsamlinger at oprette eller redigere. Afbryder!")
+        raise IntetAtGøre(f"Ingen punktsamlinger at oprette eller redigere. Afbryder!")
 
     # ================= 3A. SAGSEVENT REDIGER PUNKTSAMLING =================
 
@@ -925,7 +925,7 @@ def ilæg_tidsserie(
         formål = row["Formål"].strip()
 
         if pd.isna(formål) or formål == "":
-            raise Afbryd(f"Formål for tidsserie {tidsserienavn} ikke angivet!")
+            raise AfbrydFejl(f"Formål for tidsserie {tidsserienavn} ikke angivet!")
 
         try:
             ts = fire.cli.firedb.hent_tidsserie(tidsserienavn)
@@ -1100,7 +1100,7 @@ def find_punktsamling(
 
     # Sikr at den fundne Punktsamling også har korrekt Jessenpunkt
     if punktsamling.jessenpunkt != jessenpunkt:
-        raise Afbryd(
+        raise AfbrydFejl(
             f"Jessenpunktet '{punktsamling.jessenpunkt.ident}' for punktsamlingen '{punktsamlingsnavn}' "
             f"er ikke det samme som det angivne Jessenpunkt '{jessenpunkt.ident}'",
         )
@@ -1124,7 +1124,7 @@ def er_punktsamling_unik(
     der falder inden for de 3 kategorier.
     """
     if not isinstance(punktsamling_A, PunktSamling):
-        raise Afbryd("'punktsamling' er ikke en instans af PunktSamling")
+        raise AfbrydFejl("'punktsamling' er ikke en instans af PunktSamling")
 
     # Mængde af punkter i Punktsamling A
     punkter_A = {pkt.ident for pkt in punktsamling_A.punkter}
@@ -1172,7 +1172,7 @@ def opret_ny_tidsserie(
     except NoResultFound:
         pass
     else:
-        raise Afbryd(f"Tidsserien '{tidsserienavn}' eksisterer allerede.")
+        raise AfbrydFejl(f"Tidsserien '{tidsserienavn}' eksisterer allerede.")
 
     if punkt not in punktsamling.punkter:
         punktsamling.tilføj_punkter([punkt])
@@ -1207,7 +1207,7 @@ def opret_ny_punktsamling(
     except NoResultFound:
         pass
     else:
-        raise Afbryd(
+        raise AfbrydFejl(
             f"Punktsamlingen '{punktsamlingsnavn}' eksisterer allerede. ",
             f"Anvend 'fire niv udtræk-punktsamling' for at udtrække og redigere i eksisterende punktsamlinger.",
         )

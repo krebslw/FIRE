@@ -25,8 +25,8 @@ from fire.io.regneark import arkdef
 import fire.cli
 from fire.cli import firedb, grøn
 from fire.cli.exceptions import (
-    Afbryd,
-    NothingToDo,
+    AfbrydFejl,
+    IntetAtGøre,
     YndefuldeFejl,
     advarsel,
 )
@@ -380,7 +380,7 @@ def find_parameter(projektnavn: str, parameter: str) -> str:
 def find_sag(projektnavn: str, accepter_inaktiv=False) -> Sag:
     """Bomb hvis sag for projektnavn ikke er oprettet. Ellers returnér sagen"""
     if not os.path.isfile(f"{projektnavn}.xlsx"):
-        raise Afbryd(
+        raise AfbrydFejl(
             f"Filen '{projektnavn}.xlsx' ikke fundet - står du i den rigtige folder?"
         )
     sagsgang = find_sagsgang(projektnavn)
@@ -393,7 +393,7 @@ def find_sag(projektnavn: str, accepter_inaktiv=False) -> Sag:
         sag = fire.cli.firedb.hent_sag(sagsid)
 
     if not accepter_inaktiv and not sag.aktiv:
-        raise NothingToDo(
+        raise IntetAtGøre(
             f"Sag {sagsid} for {projektnavn} er markeret inaktiv. Genåbn for at gå videre."
         )
     return sag
@@ -450,7 +450,7 @@ def opret_region_punktinfo(punkt: Punkt) -> PunktInformation:
     # indsæt region
     pit = fire.cli.firedb.hent_punktinformationtype(region)
     if pit is None:
-        raise Afbryd(f"Kan ikke finde region '{region}'")
+        raise AfbrydFejl(f"Kan ikke finde region '{region}'")
 
     return PunktInformation(infotype=pit, punkt=punkt)
 
@@ -465,14 +465,14 @@ def er_projekt_okay(projektnavn: str) -> None:
     """
     projekt_db = find_parameter(projektnavn, "Database")
     if projekt_db != fire.cli.firedb.db:
-        raise Afbryd(
+        raise AfbrydFejl(
             f"'{projektnavn}' er oprettet i {projekt_db}-databasen - du forbinder til {fire.cli.firedb.db}-databasen!"
         )
 
     fil_version = packaging.version.parse(find_parameter(projektnavn, "Version"))
     fire_version = packaging.version.parse(fire.__version__)
     if fil_version.major != fire_version.major:
-        raise Afbryd(
+        raise AfbrydFejl(
             f"'{projektnavn}' er oprettet med version {fil_version} - du har version {fire_version} installeret!"
         )
 
@@ -495,12 +495,12 @@ def udled_jessenpunkt_fra_punktoversigt(
     # Tjek om der er anvendt Jessen-system
     # Denne er et sanity-tjek -- Man skal ville det hvis man vil oprette punktsamlinger!
     if len(set(punktoversigt["System"])) > 1:
-        raise Afbryd(
+        raise AfbrydFejl(
             "Flere forskellige højdereferencesystemer er angivet i Punktoversigt!"
         )
     kotesystem = punktoversigt["System"].iloc[0]
     if kotesystem != "Jessen":
-        raise Afbryd("Kotesystem skal være 'Jessen'")
+        raise AfbrydFejl("Kotesystem skal være 'Jessen'")
 
     # Tjek om der kun er ét fastholdt punkt, og gør brugeren opmærksom på hvis punktet
     # ikke har et Jessennummer.
@@ -508,10 +508,10 @@ def udled_jessenpunkt_fra_punktoversigt(
     fastholdte_koter = punktoversigt["Kote"][punktoversigt["Fasthold"] != ""]
 
     if len(fastholdte_punkter) != 1:
-        raise Afbryd("Punktsamlinger kræver netop ét fastholdt Jessenpunkt.")
+        raise AfbrydFejl("Punktsamlinger kræver netop ét fastholdt Jessenpunkt.")
 
     if pd.isna(fastholdte_koter).any():
-        raise Afbryd("Fastholdt punkt har ikke nogen fastholdt kote!")
+        raise AfbrydFejl("Fastholdt punkt har ikke nogen fastholdt kote!")
 
     jessenpunkt_ident = fastholdte_punkter.iloc[0]
     jessenpunkt_kote = fastholdte_koter.iloc[0]
@@ -526,7 +526,7 @@ def udled_jessenpunkt_fra_punktoversigt(
 def afbryd_hvis_ugyldigt_jessenpunkt(jessenpunkt: Punkt) -> None:
     """Smid fejl hvis valgt jessenpunkt ikke er et registreret jessenpunkt"""
     if not jessenpunkt.jessennummer:
-        raise Afbryd(
+        raise AfbrydFejl(
             f"Jessenpunktet {jessenpunkt.ident} har intet Jessennummer.",
             "Jessennummer kan oprettes igennem Punktrevision ved indsættelse af IDENT:jessen og NET:jessen.",
         )
@@ -555,13 +555,13 @@ def hent_relevante_tidsserier(
         # Den her fejler hvis den fundne tidsserie ikke har punkt som punkt
         # Vil kun ske hvis man manuelt har tastet noget mærkeligt ind i arket.
         if tidsserie.punkt != punkt:
-            raise Afbryd(
+            raise AfbrydFejl(
                 f"Mismatch mellem punkt {punkt.ident} og tidsserie {tidsserie.navn}!"
             )
 
         # Samme som ovenstående, men for Punktgruppenavn
         if tidsserie.punktsamling.navn != htsdata["Punktgruppenavn"]:
-            raise Afbryd(
+            raise AfbrydFejl(
                 f"Mismatch mellem punktgruppe {htsdata['Punktgruppenavn']} og tidsserie {tidsserie.navn}!"
             )
         if (

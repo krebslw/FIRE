@@ -6,7 +6,7 @@ from fire.cli import firedb
 from fire.cli import print as click_print
 
 
-class Afbryd(SystemExit):
+class AfbrydFejl(SystemExit):
     """
     Standardklasse til fejlbeskeder der skal forårsage en programafbrydelse
 
@@ -37,7 +37,7 @@ class Afbryd(SystemExit):
         super().__init__(*args, **kwargs)
 
 
-class NothingToDo(SystemExit):
+class IntetAtGøre(SystemExit):
     """
     Hejses når kommandolinjeværktøjer indser at der er intet at foretage sig.
     """
@@ -75,8 +75,7 @@ def YndefuldeFejl(
 
         # Mulig årsag sættes som sekundært argument, som passes videre til SystemExit,
         # og som derfor printes med default formattering.
-        raise Afbryd(fejltekst, mulig_årsag, *args, med_rollback=med_rollback, **kwargs)
-
+        raise AfbrydFejl(fejltekst, mulig_årsag, *args, med_rollback=med_rollback, **kwargs)
 
 def bemærk(tekst: str):
     click_print(
