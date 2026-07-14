@@ -14,6 +14,11 @@ from fire.cli.ts.plot_ts import (
     plot_data,
     plot_tidsserie,
 )
+from fire.cli.exceptions import (
+    AfbrydFejl,
+    bemærk,
+    YndefuldeFejl,
+)
 from fire.ident import klargør_identer_til_søgning, bestem_identtype
 
 
@@ -152,11 +157,9 @@ def koordinater(
     tidsserier = konstruer_tidsserier(punkter_identer, transformers, historik)
 
     if not tidsserier:
-        fire.cli.print(
-            f"Fejl: Ingen af punkterne har koordinater i det valgte referencesystem.",
-            fg="red",
+        raise AfbrydFejl(
+            "Ingen af punkterne har koordinater i det valgte referencesystem."
         )
-        raise SystemExit(1)
 
     _print_tidsserier(tidsserier, fil)
 
@@ -249,16 +252,13 @@ def klargør_transformationer(
         },
     }
     """
-    try:
+    with YndefuldeFejl(NoResultFound, f"Source-srid '{src}' ikke fundet!"):
         transformers = {
             fire.cli.firedb.hent_srid(src := source): {
                 target: (trans := lav_transformer(source, target))
             }
             for source in sources
         }
-    except NoResultFound:
-        fire.cli.print(f"Fejl: Source-srid '{src}' ikke fundet!", fg="red")
-        raise SystemExit(1)
 
     try:
         target_srid = fire.cli.firedb.hent_srid(target)
@@ -279,25 +279,20 @@ def lav_transformer(s_crs: str | CRS, t_crs: str | CRS) -> Transformer:
     if s_crs == t_crs:
         return Transformer.from_pipeline("+proj=noop")
 
-    try:
+    with YndefuldeFejl(
+        ProjError,
+        f"Kan ikke transformere fra {s_crs} til {t_crs}",
+        med_årsag=True,
+    ):
         transformer = Transformer.from_crs(crs_from=s_crs, crs_to=t_crs, always_xy=True)
-    except ProjError as e:
-        fire.cli.print(
-            f"Fejl: Kan ikke transformere fra {s_crs} til {t_crs}. Mulig årsag:",
-            fg="red",
-        )
-        fire.cli.print(e)
-        raise SystemExit(1)
 
     if "proj=noop" in transformer.definition:
-        fire.cli.print(
-            f'Bemærk: Klargjorde en "noop" transformation fra {s_crs} til {t_crs}',
-            fg="yellow",
+        bemærk(
+            f'Klargjorde en "noop" transformation fra {s_crs} til {t_crs}',
         )
     elif "ballpark" in transformer.description.lower():
-        fire.cli.print(
-            f'Bemærk: Klargjorde en "ballpark" transformation fra {s_crs} til {t_crs}',
-            fg="yellow",
+        bemærk(
+            f'Klargjorde en "ballpark" transformation fra {s_crs} til {t_crs}',
         )
     else:
         fire.cli.print(
@@ -305,6 +300,7 @@ def lav_transformer(s_crs: str | CRS, t_crs: str | CRS) -> Transformer:
         )
 
     return transformer
+
 
 # Her fastsættes dicts til oversættelse af PROJ's interne akse- og enhedsnavne
 # til nogle mere kortfattede og danske navne.
