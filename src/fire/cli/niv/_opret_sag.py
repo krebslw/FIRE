@@ -17,7 +17,12 @@ from fire.cli.niv import (
     skriv_ark,
     bekræft,
 )
-
+from fire.cli.exceptions import (
+    YndefuldeFejl,
+    Afbryd,
+    NothingToDo,
+    bemærk,
+)
 from fire.api.model import (
     Sag,
     Sagsinfo,
@@ -98,10 +103,7 @@ def opret_sag(projektnavn: str, beskrivelse: str, sagsbehandler: str, **kwargs) 
     """
 
     if os.path.isfile(f"{projektnavn}.xlsx"):
-        fire.cli.print(
-            f"Filen '{projektnavn}.xlsx' eksisterer - sagen er allerede oprettet"
-        )
-        raise SystemExit(1)
+        raise NothingToDo(f"Filen '{projektnavn}.xlsx' eksisterer - sagen er allerede oprettet")
 
     beskrivelse = " ".join(beskrivelse)
 
@@ -123,35 +125,28 @@ def opret_sag(projektnavn: str, beskrivelse: str, sagsbehandler: str, **kwargs) 
         beskrivelse=f"{projektnavn}: {beskrivelse}",
     )
     fire.cli.firedb.indset_sag(Sag(id=sag["uuid"], sagsinfos=[sagsinfo]), commit=False)
-    try:
+
+    fejltekst = f"Der opstod en fejl - sag {sag.id} for '{projektnavn}' IKKE oprettet"
+    with YndefuldeFejl(Exception, fejltekst, med_rollback=True):
+        # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()
-    except Exception as ex:
-        fire.cli.firedb.session.rollback()
-        fire.cli.print(
-            f"Der opstod en fejl - sag {sag.id} for '{projektnavn}' IKKE oprettet"
-        )
-        return
+
+    spørgsmål = click.style(
+        f"Opretter ny sag i {fire.cli.firedb.db}-databasen - er du sikker? ",
+        bg="red",
+        fg="white",
+    )
+    if bekræft(spørgsmål):
+        fire.cli.firedb.session.commit()
+        fire.cli.print(f"Sag '{projektnavn}' oprettet")
     else:
-        spørgsmål = click.style(
-            f"Opretter ny sag i {fire.cli.firedb.db}-databasen - er du sikker? ",
-            bg="red",
-            fg="white",
-        )
-        if bekræft(spørgsmål):
-            fire.cli.firedb.session.commit()
-            fire.cli.print(f"Sag '{projektnavn}' oprettet")
-        else:
-            fire.cli.firedb.session.rollback()
-            advarsel = click.style(
-                f"BEMÆRK: Sag oprettes IKKE i databasen!",
-                bg="yellow",
-                fg="black",
-            )
-            fire.cli.print(advarsel)
-            # Ved demonstration af systemet er det nyttigt at kunne oprette
-            # et sagsregneark, uden at oprette en tilhørende sag
-            if not bekræft("Vil du alligevel oprette et sagsregneark?", gentag=False):
-                return
+        fire.cli.firedb.session.rollback()
+        bemærk(f"Sag oprettes IKKE i databasen!")
+
+        # Ved demonstration af systemet er det nyttigt at kunne oprette
+        # et sagsregneark, uden at oprette en tilhørende sag
+        if not bekræft("Vil du alligevel oprette et sagsregneark?", gentag=False):
+            return
 
     fire.cli.print(f"Skriver sagsregneark '{projektnavn}.xlsx'")
 

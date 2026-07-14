@@ -24,7 +24,10 @@ from fire.cli.niv import (
     skriv_ark,
     er_projekt_okay,
 )
-
+from fire.cli.exceptions import (
+    YndefuldeFejl,
+    Afbryd,
+)
 
 @niv.command()
 @fire.cli.default_options()
@@ -87,14 +90,13 @@ def ilæg_observationer(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
 
         # Vi skal bruge fra- og til-punkterne for at kunne oprette et
         # objekt af typen Observation
-        try:
-            punktnavn = obs.Fra
+        punktnavn = obs.Fra
+        with YndefuldeFejl(NoResultFound, f"Ukendt punkt: '{punktnavn}'"):
             punkt_fra = fire.cli.firedb.hent_punkt(punktnavn)
-            punktnavn = obs.Til
+
+        punktnavn = obs.Til
+        with YndefuldeFejl(NoResultFound, f"Ukendt punkt: '{punktnavn}'"):
             punkt_til = fire.cli.firedb.hent_punkt(punktnavn)
-        except NoResultFound:
-            fire.cli.print(f"Ukendt punkt: '{punktnavn}'", fg="red", bg="white")
-            raise SystemExit(1)
 
         # For nivellementsobservationer er gruppeidentifikatoren identisk
         # med journalsidenummeret
@@ -138,10 +140,7 @@ def ilæg_observationer(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
                 value7=0,  # 1,2,3 henviser til 1.,2.,3. præcisionsnivellement. 0 til "ingen af dem"
             )
         else:
-            fire.cli.print(
-                f"Ukendt observationstype: '{obs.Type}'", fg="red", bg="white"
-            )
-            raise SystemExit(1)
+            raise Afbryd(f"Ukendt observationstype: '{obs.Type}'")
         alle_uuider[i] = observation.id
         til_registrering.append(observation)
 
@@ -174,32 +173,27 @@ def ilæg_observationer(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     }
     sagsgang = frame.append(sagsgang, sagsgangslinje)
 
-    try:
+    # Fang alle fejl under Flush
+    fejltekst = f"Der opstod en fejl - observationer for '{projektnavn}' IKKE indlæst!"
+    with YndefuldeFejl(Exception, fejltekst, med_årsag=True, med_rollback=True):
         fire.cli.firedb.session.flush()
-    except Exception as ex:
-        # rul tilbage hvis databasen smider en exception
-        fire.cli.firedb.session.rollback()
-        fire.cli.print(
-            f"Der opstod en fejl - observationer for '{projektnavn}' IKKE indlæst!"
-        )
-        fire.cli.print(f"Mulig årsag: {ex}")
+
+    spørgsmål = click.style("Du indsætter nu ", fg="white", bg="red")
+    spørgsmål += click.style(
+        f"{len(til_registrering)} observationer ", fg="white", bg="red", bold=True
+    )
+    spørgsmål += click.style(f"i ", fg="white", bg="red")
+    spørgsmål += click.style(
+        f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True
+    )
+    spørgsmål += click.style("-databasen - er du sikker?", fg="white", bg="red")
+
+    if bekræft(spørgsmål):
+        fire.cli.firedb.session.commit()
+
+        # Skriv resultater til resultatregneark
+        resultater = {"Sagsgang": sagsgang, "Observationer": observationer}
+        skriv_ark(projektnavn, resultater)
     else:
-        spørgsmål = click.style("Du indsætter nu ", fg="white", bg="red")
-        spørgsmål += click.style(
-            f"{len(til_registrering)} observationer ", fg="white", bg="red", bold=True
-        )
-        spørgsmål += click.style(f"i ", fg="white", bg="red")
-        spørgsmål += click.style(
-            f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True
-        )
-        spørgsmål += click.style("-databasen - er du sikker?", fg="white", bg="red")
-
-        if bekræft(spørgsmål):
-            fire.cli.firedb.session.commit()
-
-            # Skriv resultater til resultatregneark
-            resultater = {"Sagsgang": sagsgang, "Observationer": observationer}
-            skriv_ark(projektnavn, resultater)
-        else:
-            fire.cli.firedb.session.rollback()
-            fire.cli.print(f"Observationer for '{projektnavn}' IKKE indlæst!")
+        fire.cli.firedb.session.rollback()
+        fire.cli.print(f"Observationer for '{projektnavn}' IKKE indlæst!")

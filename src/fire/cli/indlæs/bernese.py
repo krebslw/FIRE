@@ -24,6 +24,11 @@ from fire.api.model import (
 )
 from fire.cli.niv import bekræft
 from fire.cli.indlæs import indlæs
+from fire.cli.exceptions import (
+    advarsel,
+    YndefuldeFejl,
+    Afbryd,
+)
 
 SRIDINDEX = {
     "IGb08": "EPSG:9015",
@@ -52,8 +57,10 @@ def find_relevante_punkter(
     manglende_punkter = [pkt for pkt in relevante_punkter if pkt not in punkter_i_db]
 
     if manglende_punkter and not ignorer_advarsler:
-        fire.cli.print(f"ADVARSEL: Punkterne ")
-        fire.cli.print(f"{', '.join(manglende_punkter)} er ikke oprettet i databasen")
+        advarsel(
+            f"Punkterne:"
+            f"{', '.join(manglende_punkter)} er ikke oprettet i databasen"
+        )
         if not bekræft("Vil du fortsætte og ignorere data fra ikke oprettede punkter?"):
             raise SystemExit
 
@@ -67,9 +74,9 @@ def find_srid(solution: BerneseSolution) -> Srid:
     try:
         srid = fire.cli.firedb.hent_srid(SRIDINDEX[solution.datum])
     except IndexError:
-        raise SystemExit(f"Ukendt referenceramme: {solution.datum}")
+        raise Afbryd(f"Ukendt referenceramme: {solution.datum}")
     except NoResultFound:
-        raise SystemExit(
+        raise Afbryd(
             f"{solution.datum} ({SRIDINDEX[solution.datum]}) findes ikke i databasen!"
         )
     return srid
@@ -283,7 +290,8 @@ def bernese(
             beskrivelse="fire indlæs bernese: Automatisk oprettelse af tidsserier",
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_tidsserier, commit=False)
-        fire.cli.firedb.session.flush()
+        with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+            fire.cli.firedb.session.flush()
 
     # Indlæs "observationer"
     nye_observationer = opret_nye_gnss_observationer(
@@ -295,7 +303,8 @@ def bernese(
         beskrivelse="fire indlæs bernese: Indlæsning af observationer",
     )
     fire.cli.firedb.indset_sagsevent(sagsevent_observationer, commit=False)
-    fire.cli.firedb.session.flush()
+    with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+        fire.cli.firedb.session.flush()
 
     # Her fra indlæses koordinater og tidsserier opdateres
     nye_koordinater = []
@@ -350,14 +359,10 @@ def bernese(
         fire.cli.firedb.session.rollback()
         fejlende_punkt = fire.cli.firedb.hent_punkt(ex.params["punktid"])
 
-        print(
-            f"FEJL: Koordinat på station {fejlende_punkt.gnss_navn} findes allerede i databasen:"
-        )
-        print(
+        raise Afbryd(
+            f"Koordinat på station {fejlende_punkt.gnss_navn} findes allerede i databasen:",
             f"({ex.params['x']}, {ex.params['y']}, {ex.params['z']}, {ex.params['t']})"
         )
-
-        raise SystemExit(1)
 
     if inkluder_koordinater_i_tidsserier:
         sagsevent_tidsserier = sag.ny_sagsevent(
@@ -365,10 +370,12 @@ def bernese(
             beskrivelse="fire indlæs bernese: Opdatering af tidsserier",
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_tidsserier, commit=False)
-        fire.cli.firedb.session.flush()
+        with YndefuldeFejl(Exception, med_rollback=True):
+            fire.cli.firedb.session.flush()
 
     fire.cli.firedb.luk_sag(sag, commit=False)
-    fire.cli.firedb.session.flush()
+    with YndefuldeFejl(Exception, med_årsag=True, med_rollback=True):
+        fire.cli.firedb.session.flush()
 
     print_koordinat_tabel(nye_koordinater)
 

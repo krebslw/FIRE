@@ -30,6 +30,11 @@ from fire.cli.niv import (
     udled_jessenpunkt_fra_punktoversigt,
     KOTESYSTEMER,
 )
+from fire.cli.exceptions import (
+    Afbryd,
+    YndefuldeFejl,
+    NothingToDo,
+)
 
 
 def punktdata_ikke_skal_opdateres(punktdata: dict) -> bool:
@@ -95,10 +100,9 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
 
     filnavn_gama_output = pathlib.Path(f"{projektnavn}-resultat-endelig.html")
     if not filnavn_gama_output.is_file():
-        fire.cli.print(
+        raise Afbryd(
             f"Sagsopdateringen kræver en outputfil fra GNU Gama {str(filnavn_gama_output)}"
         )
-        raise SystemExit(1)
 
     # Indlæs regnearket
     punktoversigt = find_faneblad(
@@ -111,13 +115,9 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
 
     # Forbered data til kote-oprettelse
     if len(punktoversigt["System"].unique()) > 1:
-        fire.cli.print(
-            "FEJL: Flere forskellige højdereferencesystemer er angivet!",
-            fg="white",
-            bg="red",
-            bold=True,
+        raise Afbryd(
+            "Flere forskellige højdereferencesystemer er angivet!"
         )
-        raise SystemExit()
 
     kotesystem = punktoversigt["System"][0]
 
@@ -132,13 +132,9 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
             projektnavn, "Højdetidsserier", arkdef.HØJDETIDSSERIE, ignore_failure=True
         )
         if hts_ark is None:
-            fire.cli.print(
-                f"FEJL: Fanebladet Højdetidsserier skal være til stede hvis du vil ilægge tidsserie-koter",
-                fg="white",
-                bg="red",
-                bold=True,
+            raise Afbryd(
+                f"Fanebladet Højdetidsserier skal være til stede hvis du vil ilægge tidsserie-koter"
             )
-            raise SystemExit(1)
 
         fastholdt_kote, fastholdt_punkt = udled_jessenpunkt_fra_punktoversigt(
             punktoversigt
@@ -179,20 +175,15 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
                 ts.koordinater.append(kote)
 
             if not opdaterede_tidsserier:
-                fire.cli.print(
-                    f"FEJL: Kan ikke indsætte en ny højdetidsserie-kote {kote.z} for punkt {punkt.ident}."
+                raise Afbryd(
+                    f"Kan ikke indsætte en ny højdetidsserie-kote {kote.z} for punkt {punkt.ident}."
                     f"Punktet er ikke tilknyttet nogle gyldige tidsserier!",
-                    fg="white",
-                    bg="red",
-                    bold=True,
                 )
-                raise SystemExit(1)
 
             tidsserier_til_registrering.extend(opdaterede_tidsserier)
 
     if 0 == len(til_registrering):
-        fire.cli.print("Ingen koter at registrere!", fg="yellow", bold=True)
-        return
+        raise NothingToDo("Ingen koter at registrere!")
 
     # Tilknyt koter til observationer i en beregning
     observationer = observationer[
@@ -207,25 +198,16 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
 
     # det giver kun mening at oprette en beregning hvis der er relaterede observationer
     if not observationer_i_beregning:
-        fire.cli.print(
-            "FEJL: Beregning foretaget uden tilknytning til observationer i databasen!",
-            fg="white",
-            bg="red",
-            bold=True,
+        raise Afbryd(
+            "Beregning foretaget uden tilknytning til observationer i databasen!"
         )
-        raise SystemExit()
-
     n_koter = len(opdaterede_punkter)
     n_obs = len(observationer_i_beregning)
     # det giver kun mening at oprette en beregning hvis der er relaterede observationer
     if n_koter > n_obs:
-        fire.cli.print(
-            "FEJL: Færre observationer end beregnede koter registreret i databasen!",
-            fg="white",
-            bg="red",
-            bold=True,
+        raise Afbryd(
+            "Færre observationer end beregnede koter registreret i databasen!"
         )
-        raise SystemExit()
 
     beregning = Beregning(
         observationer=observationer_i_beregning,
@@ -289,28 +271,24 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         }
         sagsgang = frame.append(sagsgang, sagsgangslinje)
 
-    try:
+    fejlbesked = f"Der opstod en fejl - koter for '{projektnavn}' IKKE indlæst!"
+    with YndefuldeFejl(Exception, fejlbesked, med_årsag=True, med_rollback=True):
         fire.cli.firedb.session.flush()
-    except Exception as ex:
-        # rul tilbage hvis databasen smider en exception
-        fire.cli.firedb.session.rollback()
-        fire.cli.print(f"Der opstod en fejl - koter for '{projektnavn}' IKKE indlæst!")
-        fire.cli.print(f"Mulig årsag: {ex}")
-    else:
-        spørgsmål = click.style("Du indsætter nu ", fg="white", bg="red")
-        spørgsmål += click.style(f"{n_koter} kote(r) ", fg="white", bg="red", bold=True)
-        spørgsmål += click.style(f"i ", fg="white", bg="red")
-        spørgsmål += click.style(
-            f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True
-        )
-        spørgsmål += click.style("-databasen - er du sikker?", fg="white", bg="red")
 
-        if bekræft(spørgsmål):
-            fire.cli.firedb.session.commit()
+    spørgsmål = click.style("Du indsætter nu ", fg="white", bg="red")
+    spørgsmål += click.style(f"{n_koter} kote(r) ", fg="white", bg="red", bold=True)
+    spørgsmål += click.style(f"i ", fg="white", bg="red")
+    spørgsmål += click.style(
+        f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True
+    )
+    spørgsmål += click.style("-databasen - er du sikker?", fg="white", bg="red")
 
-            # Skriv resultater til resultatregneark
-            resultater = {"Sagsgang": sagsgang, "Resultat": ny_punktoversigt}
-            if skriv_ark(projektnavn, resultater):
-                fire.cli.print(
-                    f"Koter registreret. Resultater skrevet til '{projektnavn}.xlsx'"
-                )
+    if bekræft(spørgsmål):
+        fire.cli.firedb.session.commit()
+
+        # Skriv resultater til resultatregneark
+        resultater = {"Sagsgang": sagsgang, "Resultat": ny_punktoversigt}
+        if skriv_ark(projektnavn, resultater):
+            fire.cli.print(
+                f"Koter registreret. Resultater skrevet til '{projektnavn}.xlsx'"
+            )

@@ -29,6 +29,11 @@ from fire.cli.niv import (
     er_projekt_okay,
     KOTESYSTEMER,
 )
+from fire.cli.exceptions import (
+    Afbryd,
+    YndefuldeFejl,
+    advarsel,
+)
 
 
 @niv.command()
@@ -161,21 +166,19 @@ def importer_observationer(projektnavn: str) -> pd.DataFrame:
 
     n_tabte = 0
     for punktnavn in observerede_punkter:
-        try:
+        with YndefuldeFejl(NoResultFound, f"Ukendt punkt: '{punktnavn}'"):
             punkt = fire.cli.firedb.hent_punkt(punktnavn)
-            ident = punkt.ident
-            if punkt.tabtgået:
-                fire.cli.print(
-                    f"{punkt.ident} er tabtgået",
-                    fg="black",
-                    bg="yellow",
-                )
-                n_tabte += 1
-            else:
-                fire.cli.print(f"Fandt {ident}", fg="green")
-        except NoResultFound:
-            fire.cli.print(f"Ukendt punkt: '{punktnavn}'", fg="red", bg="white")
-            raise SystemExit(1)
+
+        ident = punkt.ident
+        if punkt.tabtgået:
+            fire.cli.print(
+                f"{punkt.ident} er tabtgået",
+                fg="black",
+                bg="yellow",
+            )
+            n_tabte += 1
+        else:
+            fire.cli.print(f"Fandt {ident}", fg="green")
         kanonisk_ident[punktnavn] = ident
 
     fra = tuple(kanonisk_ident[ident] for ident in fra)
@@ -200,26 +203,16 @@ def importer_observationer(projektnavn: str) -> pd.DataFrame:
     # ...og advarer hvis der er strækninger med flere hovedjournalsidenumre
     for strækning in journalsider:
         if len(journalsider[strækning]) > 1:
-            fire.cli.print(
-                "ADVARSEL:Flere hovedjournalsider til samme strækning:",
-                fg="yellow",
-                bold=True,
-            )
-            fire.cli.print(
-                f"{strækning}: {sorted(journalsider[strækning])}",
-                fg="yellow",
-                bold=True,
+            advarsel(
+                "Flere hovedjournalsider til samme strækning:\n"
+                f"{strækning}: {sorted(journalsider[strækning])}"
             )
 
     # Check at vi har returmålinger for alle strækninger.
     par = set([tuple(p) for p in zip(fra, til)])
     for p in par:
         if tuple(reversed(p)) not in par:
-            fire.cli.print(
-                f"ADVARSEL: Der mangler returmåling for {p}",
-                fg="yellow",
-                bold=True,
-            )
+            advarsel(f"Der mangler returmåling for {p}")
 
     return observationer
 
@@ -242,16 +235,9 @@ def opbyg_punktoversigt(
 
     nye_punkter = tuple(sorted(set(nyetablerede.index)))
 
-    try:
+    fejltekst = f"{kotesystem} ({KOTESYSTEMER[kotesystem]}) ikke fundet i srid-tabel"
+    with YndefuldeFejl(NoResultFound, fejltekst):
         srid = fire.cli.firedb.hent_srid(KOTESYSTEMER[kotesystem])
-    except NoResultFound:
-        fire.cli.print(
-            f"{kotesystem} ({KOTESYSTEMER[kotesystem]}) ikke fundet i srid-tabel",
-            bg="red",
-            fg="white",
-            err=True,
-        )
-        raise SystemExit(1)
 
     for punkt in alle_punkter:
         if not pd.isna(punktoversigt.at[punkt, "Kote"]):
@@ -356,11 +342,8 @@ def læs_observationsstrenge(
 
                 # Check at observationen er i et af de kendte formater
                 tokens = line.split(" ", 13)
-                assert len(tokens) in (
-                    9,
-                    13,
-                    14,
-                ), f"Deform input linje: {line} i fil: {fil.Filnavn}"
+                if len(tokens) not in (9,13,14):
+                    raise Afbryd(f"Deform input linje: {line} i fil: {fil.Filnavn}")
 
                 # Bring observationen på kanonisk 14-feltform.
                 for _ in range(len(tokens), 13):
@@ -373,12 +356,11 @@ def læs_observationsstrenge(
 
                 # Korriger de rædsomme dato/tidsformater
                 tid = " ".join((tokens[2], tokens[3]))
-                try:
+                with YndefuldeFejl(
+                    ValueError,
+                    f"Ikke-understøttet datoformat: '{tid}' i fil: '{fil.Filnavn}'",
+                ):
                     isotid = datetime.strptime(tid, "%d.%m.%Y %H.%M")
-                except ValueError:
-                    raise SystemExit(
-                        f"Argh - ikke-understøttet datoformat: '{tid}' i fil: '{fil.Filnavn}'"
-                    )
 
                 # Opbyg række-som-dict: Omsæt numeriske data fra strengrepræsentation til tal
                 obs = {

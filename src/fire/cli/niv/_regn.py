@@ -35,6 +35,11 @@ from fire.cli.niv import (
     hent_relevante_tidsserier,
     udled_jessenpunkt_fra_punktoversigt,
 )
+from fire.cli.exceptions import (
+    Afbryd,
+    YndefuldeFejl,
+    advarsel,
+)
 
 from fire.cli.niv._netoversigt import byg_netgeometri_og_singulære
 
@@ -208,13 +213,9 @@ def regn(
         try:
             parameter, værdi = regneparameter.split("=")
         except ValueError:
-            fire.cli.print(
-                (
-                    f"ADVARSEL: regneparameteren '{regneparameter} kan ikke tolkes. "
-                    "Skal være på formen 'parameter=værdi'."
-                ),
-                bold=True,
-                bg="yellow",
+            advarsel(
+                f"regneparameteren '{regneparameter} kan ikke tolkes. "
+                "Skal være på formen 'parameter=værdi'."
             )
             continue
 
@@ -238,12 +239,7 @@ def regn(
         #
         # ... og derfor kan vi slippe afsted med at splitte stringen på '
         parameter_navn = str(error).split("'")[1]
-        fire.cli.print(
-            f"FEJL: regneparameteren '{parameter_navn}' er ukendt.",
-            bold=True,
-            bg="red",
-        )
-        raise SystemExit
+        raise Afbryd(f"regneparameteren '{parameter_navn}' er ukendt.")
 
     # opdater Parametre i regneark (er vi kommet her til er alle angivne parametre gyldige)
     beregningsparametre = {"regnemotor": MotorKlasse.__name__} | motorkwargs
@@ -257,19 +253,14 @@ def regn(
 
     fire.cli.print("Så regner vi")
 
-    try:
+    with YndefuldeFejl(ValideringFejl, "", med_årsag=True):
         motor.valider_fastholdte()
-    except ValideringFejl as fejl:
-        fire.cli.print(f"FEJL: {fejl}", bg="red", fg="white")
-        raise SystemExit(1)
 
     # Analyser net
     net_uden_ensomme, ensomme_subnet, estimerbare_punkter = motor.netanalyse()
     if ensomme_subnet:
-        fire.cli.print(
-            f"ADVARSEL: Manglende fastholdt punkt i mindst et subnet! Forslag til fastholdte punkter i hvert subnet:",
-            bg="yellow",
-            fg="black",
+        advarsel(
+            f"Manglende fastholdt punkt i mindst et subnet! Forslag til fastholdte punkter i hvert subnet:",
         )
         for i, subn in enumerate(ensomme_subnet):
             fire.cli.print(f"  Subnet {i}: {subn[0]}", fg="red")
@@ -280,15 +271,8 @@ def regn(
         f"Fastholder {len(motor.fastholdte)} og beregner nye koter for {len(estimerbare_punkter)} punkter"
     )
 
-    try:
+    with YndefuldeFejl(UdjævningFejl, "", med_årsag=True):
         motor.udjævn()
-    except UdjævningFejl as fejl:
-        fire.cli.print(
-            f"FEJL: {fejl}",
-            bg="red",
-            fg="white",
-        )
-        raise SystemExit(1)
 
     # Generer ny dataframe med resultaterne.
     nye_punkter_df = motor.til_dataframe()
@@ -426,23 +410,15 @@ def opdater_parametre(gamle_parametre: DataFrame, beregningsparametre: dict, kon
 
         # findes parameter allerede i regnearket?
         if not parameter in list(gamle_parametre.index):
-            fire.cli.print(
-                (
-                    f"ADVARSEL: {parameter}={værdi} sat i endelig beregning, "
-                    "kontrolberegning udført uden denne regneparameter!"
-                ),
-                bold=True,
-                bg="yellow",
+            advarsel(
+               f"{parameter}={værdi} sat i endelig beregning, "
+                "kontrolberegning udført uden denne regneparameter!"
             )
         elif (kontrolværdi := str(gamle_parametre.at[parameter, "Værdi"])) != værdi:
-            fire.cli.print(
-                (
-                    "ADVARSEL: Kontrolberegning udført med regneparameter "
-                    f"{parameter}={kontrolværdi}, {parameter}={værdi} sat i "
-                    "endelig beregning!"
-                ),
-                bold=True,
-                bg="yellow",
+            advarsel(
+                "Kontrolberegning udført med regneparameter "
+                f"{parameter}={kontrolværdi}, {parameter}={værdi} sat i "
+                "endelig beregning!"
             )
 
     return parametre.reset_index()

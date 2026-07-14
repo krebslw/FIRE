@@ -15,6 +15,10 @@ from fire.cli.niv import (
     find_sagsgang,
     skriv_ark,
 )
+from fire.cli.exceptions import (
+    YndefuldeFejl,
+    NothingToDo,
+)
 
 
 @niv_command_group.command()
@@ -41,10 +45,8 @@ def åbn_sag(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     sag = find_sag(projektnavn, accepter_inaktiv=True)
 
     if sag.aktiv:
-        fire.cli.print(
-            f"Sag {sag.id} for {projektnavn} er allerede åben."
-        )
-        raise SystemExit(1)
+        raise NothingToDo(f"Sag {sag.id} for {projektnavn} er allerede åben.")
+
 
     gammel_sagsinfo = sag.sagsinfos[-1]
     ny_sagsinfo = Sagsinfo(
@@ -56,7 +58,8 @@ def åbn_sag(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     )
     fire.cli.firedb.session.add(ny_sagsinfo)
 
-    try:
+    fejltekst = f"Der opstod en fejl - sag {sag.id} for '{projektnavn}' IKKE åbnet!"
+    with YndefuldeFejl(fejltekst, Exception, med_årsag=True, med_rollback=True):
         # først må vi sikre at sagen står som aktiv...
         fire.cli.firedb.session.flush()
 
@@ -64,24 +67,6 @@ def åbn_sag(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         sagsevent = sag.ny_sagsevent(beskrivelse=f"Genåbning af sag {projektnavn}")
         fire.cli.firedb.indset_sagsevent(sagsevent, commit=False)
         fire.cli.firedb.session.flush()
-    except Exception as ex:
-        fire.cli.firedb.session.rollback()
-        fire.cli.print(
-            f"Der opstod en fejl - sag {sag.id} for '{projektnavn}' IKKE åbnet!"
-        )
-        fire.cli.print(f"Mulig årsag: {ex}")
-    else:
-        spørgsmål = click.style(
-            f"Er du sikker på at du vil åbne sagen {projektnavn}?",
-            bg="red",
-            fg="white",
-        )
-        if bekræft(spørgsmål):
-            fire.cli.firedb.session.commit()
-            fire.cli.print(f"Sag {sag.id} for '{projektnavn}' åbnet!")
-        else:
-            fire.cli.firedb.session.rollback()
-            fire.cli.print(f"Sag {sag.id} for '{projektnavn}' IKKE åbnet!")
 
     # Generer dokumentation til fanebladet "Sagsgang"
     # -----------------------------------------------
@@ -94,6 +79,21 @@ def åbn_sag(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         "uuid": sagsevent.id,
     }
     sagsgang = frame.append(sagsgang, sagsgangslinje)
-    fire.cli.print("Opdatér sagsgang i regneark")
-    if skriv_ark(projektnavn, {"Sagsgang": sagsgang}):
-        fire.cli.print(f"Sagen er nu åbnet i regnearket '{projektnavn}.xlsx'")
+
+    spørgsmål = click.style(
+        f"Er du sikker på at du vil åbne sagen {projektnavn}?",
+        bg="red",
+        fg="white",
+    )
+    if bekræft(spørgsmål):
+        fire.cli.firedb.session.commit()
+        fire.cli.print(f"Sag {sag.id} for '{projektnavn}' åbnet!")
+
+        # Opdater kun regneark hvis spørgsmål bekræftes
+        fire.cli.print("Opdatér sagsgang i regneark")
+        if skriv_ark(projektnavn, {"Sagsgang": sagsgang}):
+            fire.cli.print(f"Sagen er nu åbnet i regnearket '{projektnavn}.xlsx'")
+
+    else:
+        fire.cli.firedb.session.rollback()
+        fire.cli.print(f"Sag {sag.id} for '{projektnavn}' IKKE åbnet!")

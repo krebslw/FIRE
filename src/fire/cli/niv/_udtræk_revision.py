@@ -25,6 +25,10 @@ from fire.cli.niv import (
     find_sag,
     er_projekt_okay,
 )
+from fire.cli.exceptions import (
+    YndefuldeFejl,
+    advarsel,
+)
 from fire.typologi import (
     adskil_identer,
     adskil_distrikter,
@@ -257,13 +261,11 @@ def udtræk_revision(
     # Hent data
     punkter = hent_punkter_i_opmålingsdistrikter(opmålingsdistrikter)
     løse_punkter = klargør_identer_til_søgning(løse_punkter)
-    try:
+
+    with YndefuldeFejl(ValueError, "", med_årsag=True):
         punkter.extend(
             fire.cli.firedb.hent_punkt_liste(løse_punkter, ignorer_ukendte=False)
         )
-    except ValueError as ex:
-        fire.cli.print(f"FEJL: {ex}", bg="red", fg="white")
-        raise SystemExit(1)
 
     # Tilføj punkt-informationerne til et nyt revisionsark
     revision = nyt_ark(arkdef.REVISION)
@@ -277,10 +279,9 @@ def udtræk_revision(
             lokation = punkt.geometri.koordinater
             lokations_id = punkt.geometri.objektid
         except AttributeError:
-            fire.cli.print(
-                f"NB! {ident} mangler lokationskoordinat - bruger {LOKATION_DEFAULT}",
-                fg="yellow",
-                bold=True,
+            advarsel(
+                f"{ident} mangler lokationskoordinat - bruger {LOKATION_DEFAULT}",
+                præfix="NB! ",
             )
             lokation = LOKATION_DEFAULT
 

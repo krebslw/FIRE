@@ -34,6 +34,12 @@ from fire.cli.niv import (
     opret_region_punktinfo,
     er_projekt_okay,
 )
+from fire.cli.exceptions import (
+    Afbryd,
+    YndefuldeFejl,
+    advarsel,
+    NothingToDo,
+)
 
 FIKSPUNKTSYPER = {
     "GI": FikspunktsType.GI,
@@ -132,8 +138,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     n = nyetablerede.shape[0]
 
     if n == 0:
-        fire.cli.print("Ingen nyetablerede punkter at registrere")
-        return
+        raise NothingToDo("Ingen nyetablerede punkter at registrere")
 
     landsnummer_pit = fire.cli.firedb.hent_punktinformationtype("IDENT:landsnr")
     beskrivelse_pit = fire.cli.firedb.hent_punktinformationtype("ATTR:beskrivelse")
@@ -181,15 +186,9 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
             geometriobjekter=[GeometriObjekt(geometri=Point(lokation))],
         )
 
-        try:
+        fejltekst = f"'{nyetablerede['Fikspunktstype'][i]}' er ikke en gyldig fikspunktsype! Vælg mellem GI, MV, HØJDE, JESSEN og VANDSTANDSBRÆT"
+        with YndefuldeFejl(KeyError, fejltekst):
             fikspunktstype = FIKSPUNKTSYPER[nyetablerede["Fikspunktstype"][i].upper()]
-        except KeyError:
-            fire.cli.print(
-                f"FEJL: '{nyetablerede['Fikspunktstype'][i]}' er ikke en gyldig fikspunktsype! Vælg mellem GI, MV, HØJDE, JESSEN og VANDSTANDSBRÆT",
-                bg="red",
-                bold=True,
-            )
-            raise SystemExit(1)
 
         fikspunktstyper.append(fikspunktstype)
 
@@ -200,7 +199,10 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         punkter=list(punkter.values())
         )
     fire.cli.firedb.indset_sagsevent(sagsevent_punkter, commit=False)
-    fire.cli.firedb.session.flush()  # hvis noget ikke virker får vi fejl her!
+
+    fejlbesked = f"Der opstod en fejl - nye punkter for '{projektnavn}' IKKE indlæst!"
+    with YndefuldeFejl(Exception, fejlbesked, med_årsag=True, med_rollback=True):
+        fire.cli.firedb.session.flush()
 
     # Generer dokumentation til fanebladet "Sagsgang"
     sagsgangslinje = {
@@ -263,12 +265,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
             )
 
         if afm_id == 4999:
-            fire.cli.print(
-                f"ADVARSEL: Nyoprettet punkt index {i} har ingen gyldig afmærkning anført",
-                fg="red",
-                bg="white",
-                bold=True,
-            )
+            advarsel(f"Nyoprettet punkt index {i} har ingen gyldig afmærkning anført")
 
         # Grundet den lidt kluntede løsning med AFM:nnnn punktinfo er fx AFM:2700 (bolt)
         # registreret som en tekst-punktinformation (frem for flag, som ville være den
@@ -287,14 +284,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         beskrivelse = nyetablerede["Beskrivelse"][i]
         if pd.isna(beskrivelse) or beskrivelse == "":
             navn = nyetablerede["Foreløbigt navn"][i]
-            fire.cli.print(
-                f"FEJL: Beskrivelse for punkt '{navn}' ikke angivet!",
-                fg="white",
-                bg="red",
-                bold=True,
-            )
-            fire.cli.firedb.session.rollback()
-            raise SystemExit
+            raise Afbryd(f"Beskrivelse for punkt '{navn}' ikke angivet!", med_rollback=True)
         punktinfo.append(
             PunktInformation(
                 infotype=beskrivelse_pit,
@@ -350,7 +340,10 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         punktinformationer=punktinfo
     )
     fire.cli.firedb.indset_sagsevent(sagsevent_punktinfo, commit=False)
-    fire.cli.firedb.session.flush()  # hvis noget ikke virker får vi fejl her!
+
+    fejlbesked = f"Der opstod en fejl - punkter for '{projektnavn}' IKKE indlæst!"
+    with YndefuldeFejl(Exception, fejlbesked, med_årsag=True, med_rollback=True):
+        fire.cli.firedb.session.flush()
 
     # Generer dokumentation til fanebladet "Sagsgang"
     sagsgangslinje = {
