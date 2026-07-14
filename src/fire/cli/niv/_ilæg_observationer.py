@@ -25,9 +25,10 @@ from fire.cli.niv import (
     er_projekt_okay,
 )
 from fire.cli.exceptions import (
-    YndefuldeFejl,
     Afbryd,
+    YndefuldeFejl,
 )
+
 
 @niv.command()
 @fire.cli.default_options()
@@ -158,8 +159,7 @@ def ilæg_observationer(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
 
     # Generer sagsevent
     sagsevent = sag.ny_sagsevent(
-        beskrivelse=sagseventtekst,
-        observationer = til_registrering
+        beskrivelse=sagseventtekst, observationer=til_registrering
     )
     fire.cli.firedb.indset_sagsevent(sagsevent, commit=False)
 
@@ -183,9 +183,7 @@ def ilæg_observationer(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         f"{len(til_registrering)} observationer ", fg="white", bg="red", bold=True
     )
     spørgsmål += click.style(f"i ", fg="white", bg="red")
-    spørgsmål += click.style(
-        f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True
-    )
+    spørgsmål += click.style(f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True)
     spørgsmål += click.style("-databasen - er du sikker?", fg="white", bg="red")
 
     if bekræft(spørgsmål):

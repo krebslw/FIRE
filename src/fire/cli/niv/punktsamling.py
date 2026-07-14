@@ -28,10 +28,10 @@ from fire.cli.niv import (
     afbryd_hvis_ugyldigt_jessenpunkt,
 )
 from fire.cli.exceptions import (
-    YndefuldeFejl,
-    advarsel,
     Afbryd,
     NothingToDo,
+    advarsel,
+    YndefuldeFejl,
 )
 import fire.io.dataframe as frame
 from fire.io.regneark import arkdef

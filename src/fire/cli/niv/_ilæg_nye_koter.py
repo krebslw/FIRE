@@ -32,8 +32,8 @@ from fire.cli.niv import (
 )
 from fire.cli.exceptions import (
     Afbryd,
-    YndefuldeFejl,
     NothingToDo,
+    YndefuldeFejl,
 )
 
 
@@ -115,9 +115,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
 
     # Forbered data til kote-oprettelse
     if len(punktoversigt["System"].unique()) > 1:
-        raise Afbryd(
-            "Flere forskellige højdereferencesystemer er angivet!"
-        )
+        raise Afbryd("Flere forskellige højdereferencesystemer er angivet!")
 
     kotesystem = punktoversigt["System"][0]
 
@@ -205,9 +203,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     n_obs = len(observationer_i_beregning)
     # det giver kun mening at oprette en beregning hvis der er relaterede observationer
     if n_koter > n_obs:
-        raise Afbryd(
-            "Færre observationer end beregnede koter registreret i databasen!"
-        )
+        raise Afbryd("Færre observationer end beregnede koter registreret i databasen!")
 
     beregning = Beregning(
         observationer=observationer_i_beregning,
@@ -278,9 +274,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     spørgsmål = click.style("Du indsætter nu ", fg="white", bg="red")
     spørgsmål += click.style(f"{n_koter} kote(r) ", fg="white", bg="red", bold=True)
     spørgsmål += click.style(f"i ", fg="white", bg="red")
-    spørgsmål += click.style(
-        f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True
-    )
+    spørgsmål += click.style(f"{fire.cli.firedb.db}", fg="white", bg="red", bold=True)
     spørgsmål += click.style("-databasen - er du sikker?", fg="white", bg="red")
 
     if bekræft(spørgsmål):

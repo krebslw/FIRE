@@ -25,9 +25,9 @@ from fire.api.model import (
 from fire.cli.niv import bekræft
 from fire.cli.indlæs import indlæs
 from fire.cli.exceptions import (
+    Afbryd,
     advarsel,
     YndefuldeFejl,
-    Afbryd,
 )
 
 SRIDINDEX = {
@@ -58,8 +58,7 @@ def find_relevante_punkter(
 
     if manglende_punkter and not ignorer_advarsler:
         advarsel(
-            f"Punkterne:"
-            f"{', '.join(manglende_punkter)} er ikke oprettet i databasen"
+            f"Punkterne:" f"{', '.join(manglende_punkter)} er ikke oprettet i databasen"
         )
         if not bekræft("Vil du fortsætte og ignorere data fra ikke oprettede punkter?"):
             raise SystemExit
@@ -361,7 +360,7 @@ def bernese(
 
         raise Afbryd(
             f"Koordinat på station {fejlende_punkt.gnss_navn} findes allerede i databasen:",
-            f"({ex.params['x']}, {ex.params['y']}, {ex.params['z']}, {ex.params['t']})"
+            f"({ex.params['x']}, {ex.params['y']}, {ex.params['z']}, {ex.params['t']})",
         )
 
     if inkluder_koordinater_i_tidsserier:

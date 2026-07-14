@@ -26,10 +26,11 @@ import fire.cli
 from fire.cli import firedb, grøn
 from fire.cli.exceptions import (
     Afbryd,
+    NothingToDo,
     YndefuldeFejl,
     advarsel,
-    NothingToDo,
 )
+
 # Kotesystemer som understøttes i niv-modulet
 KOTESYSTEMER = {
     "DVR90": "EPSG:5799",
@@ -168,7 +169,9 @@ def juster_kolonnebredder(faneblad: Worksheet):
     """
     max_bredde = 40
     for kolonne in faneblad.columns:
-        kolonnebredde = min(max([len(str(row.value)) for row in kolonne])+1, max_bredde)
+        kolonnebredde = min(
+            max([len(str(row.value)) for row in kolonne]) + 1, max_bredde
+        )
         faneblad.column_dimensions[kolonne[0].column_letter].width = kolonnebredde
 
 
@@ -383,7 +386,9 @@ def find_sag(projektnavn: str, accepter_inaktiv=False) -> Sag:
     sagsgang = find_sagsgang(projektnavn)
     sagsid = find_sagsid(sagsgang)
 
-    fejlbesked = f"Sag for {projektnavn} er endnu ikke oprettet - brug fire niv opret-sag!"
+    fejlbesked = (
+        f"Sag for {projektnavn} er endnu ikke oprettet - brug fire niv opret-sag!"
+    )
     with YndefuldeFejl(Exception, fejlbesked):
         sag = fire.cli.firedb.hent_sag(sagsid)
 
@@ -503,9 +508,7 @@ def udled_jessenpunkt_fra_punktoversigt(
     fastholdte_koter = punktoversigt["Kote"][punktoversigt["Fasthold"] != ""]
 
     if len(fastholdte_punkter) != 1:
-        raise Afbryd(
-            "Punktsamlinger kræver netop ét fastholdt Jessenpunkt."
-        )
+        raise Afbryd("Punktsamlinger kræver netop ét fastholdt Jessenpunkt.")
 
     if pd.isna(fastholdte_koter).any():
         raise Afbryd("Fastholdt punkt har ikke nogen fastholdt kote!")

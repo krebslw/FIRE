@@ -31,8 +31,8 @@ from fire.cli.niv import (
 )
 from fire.cli.exceptions import (
     Afbryd,
-    YndefuldeFejl,
     advarsel,
+    YndefuldeFejl,
 )
 
 
@@ -342,7 +342,7 @@ def læs_observationsstrenge(
 
                 # Check at observationen er i et af de kendte formater
                 tokens = line.split(" ", 13)
-                if len(tokens) not in (9,13,14):
+                if len(tokens) not in (9, 13, 14):
                     raise Afbryd(f"Deform input linje: {line} i fil: {fil.Filnavn}")
 
                 # Bring observationen på kanonisk 14-feltform.

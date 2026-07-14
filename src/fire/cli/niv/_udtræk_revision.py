@@ -26,14 +26,13 @@ from fire.cli.niv import (
     er_projekt_okay,
 )
 from fire.cli.exceptions import (
-    YndefuldeFejl,
     advarsel,
+    YndefuldeFejl,
 )
 from fire.typologi import (
     adskil_identer,
     adskil_distrikter,
 )
-
 
 CELLEVÆRDI_INGEN: Final[None] = None
 "Regnearksceller tildelt værdien None er uden indhold."

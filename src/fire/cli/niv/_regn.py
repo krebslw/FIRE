@@ -37,8 +37,8 @@ from fire.cli.niv import (
 )
 from fire.cli.exceptions import (
     Afbryd,
-    YndefuldeFejl,
     advarsel,
+    YndefuldeFejl,
 )
 
 from fire.cli.niv._netoversigt import byg_netgeometri_og_singulære
@@ -66,7 +66,7 @@ motorvælger = {
     "--regneparameter",
     "regneparametre",
     multiple=True,
-    help="Regnemotorspecifikke parametre. Sættes på formen 'parameter=værdi'. Flere parametre kan sættes i samme kommando."
+    help="Regnemotorspecifikke parametre. Sættes på formen 'parameter=værdi'. Flere parametre kan sættes i samme kommando.",
 )
 @click.option(
     "-P",
@@ -230,7 +230,10 @@ def regn(
     # Start regnemotoren!
     try:
         motor = MotorKlasse.fra_dataframe(
-            observationer_uden_slukkede, arbejdssæt, projektnavn=projektnavn, **motorkwargs
+            observationer_uden_slukkede,
+            arbejdssæt,
+            projektnavn=projektnavn,
+            **motorkwargs,
         )
     except TypeError as error:
         # Fejlbeskeden vi kan få er på formen:
@@ -389,7 +392,9 @@ def opdater_arbejdssæt(arbejdssæt: DataFrame, nye_koter: DataFrame):
     return arbejdssæt
 
 
-def opdater_parametre(gamle_parametre: DataFrame, beregningsparametre: dict, kontrol: bool) -> DataFrame:
+def opdater_parametre(
+    gamle_parametre: DataFrame, beregningsparametre: dict, kontrol: bool
+) -> DataFrame:
     """
     Opdater fanebladet Parametre
     """
@@ -398,12 +403,12 @@ def opdater_parametre(gamle_parametre: DataFrame, beregningsparametre: dict, kon
     # lav ny parameter dataframe der kun indeholder standardparametrene Version, Database
     parametre = gamle_parametre.copy()
     standardparametre = set(["Version", "Database"])
-    parametre.drop(set(parametre.index)-standardparametre, inplace=True)
+    parametre.drop(set(parametre.index) - standardparametre, inplace=True)
 
     for parameter, værdi in beregningsparametre.items():
         # parametre sættes as-is, brugeren må reagere advarslerne hvis forskel
         # i parametre er utilsigtet
-        parametre.loc[parameter]=værdi
+        parametre.loc[parameter] = værdi
 
         if kontrol:
             continue
@@ -411,7 +416,7 @@ def opdater_parametre(gamle_parametre: DataFrame, beregningsparametre: dict, kon
         # findes parameter allerede i regnearket?
         if not parameter in list(gamle_parametre.index):
             advarsel(
-               f"{parameter}={værdi} sat i endelig beregning, "
+                f"{parameter}={værdi} sat i endelig beregning, "
                 "kontrolberegning udført uden denne regneparameter!"
             )
         elif (kontrolværdi := str(gamle_parametre.at[parameter, "Værdi"])) != værdi:

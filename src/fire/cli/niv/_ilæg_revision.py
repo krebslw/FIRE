@@ -39,10 +39,9 @@ from fire.cli.niv import (
 )
 from fire.cli.niv._udtræk_revision import LOKATION_DEFAULT
 from fire.cli.exceptions import (
-    Afbryd,
-    YndefuldeFejl,
     NothingToDo,
     advarsel,
+    YndefuldeFejl,
 )
 
 

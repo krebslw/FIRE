@@ -36,9 +36,9 @@ from fire.cli.niv import (
 )
 from fire.cli.exceptions import (
     Afbryd,
-    YndefuldeFejl,
-    advarsel,
     NothingToDo,
+    advarsel,
+    YndefuldeFejl,
 )
 
 FIKSPUNKTSYPER = {
@@ -196,8 +196,8 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     er = "er" if len(punkter) > 1 else ""
     sagsevent_punkter = sag.ny_sagsevent(
         beskrivelse=f"Oprettelse af punkt{er} ifm. {projektnavn}",
-        punkter=list(punkter.values())
-        )
+        punkter=list(punkter.values()),
+    )
     fire.cli.firedb.indset_sagsevent(sagsevent_punkter, commit=False)
 
     fejlbesked = f"Der opstod en fejl - nye punkter for '{projektnavn}' IKKE indlæst!"
@@ -284,7 +284,9 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         beskrivelse = nyetablerede["Beskrivelse"][i]
         if pd.isna(beskrivelse) or beskrivelse == "":
             navn = nyetablerede["Foreløbigt navn"][i]
-            raise Afbryd(f"Beskrivelse for punkt '{navn}' ikke angivet!", med_rollback=True)
+            raise Afbryd(
+                f"Beskrivelse for punkt '{navn}' ikke angivet!", med_rollback=True
+            )
         punktinfo.append(
             PunktInformation(
                 infotype=beskrivelse_pit,
@@ -337,7 +339,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     # sagsevent for punktinfo
     sagsevent_punktinfo = sag.ny_sagsevent(
         beskrivelse=f"Oprettelse af punktinfo ifm. {projektnavn}",
-        punktinformationer=punktinfo
+        punktinformationer=punktinfo,
     )
     fire.cli.firedb.indset_sagsevent(sagsevent_punktinfo, commit=False)
 

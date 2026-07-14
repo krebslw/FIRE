@@ -18,10 +18,9 @@ from fire.cli.niv import (
     bekræft,
 )
 from fire.cli.exceptions import (
-    YndefuldeFejl,
-    Afbryd,
     NothingToDo,
     bemærk,
+    YndefuldeFejl,
 )
 from fire.api.model import (
     Sag,
@@ -103,7 +102,9 @@ def opret_sag(projektnavn: str, beskrivelse: str, sagsbehandler: str, **kwargs) 
     """
 
     if os.path.isfile(f"{projektnavn}.xlsx"):
-        raise NothingToDo(f"Filen '{projektnavn}.xlsx' eksisterer - sagen er allerede oprettet")
+        raise NothingToDo(
+            f"Filen '{projektnavn}.xlsx' eksisterer - sagen er allerede oprettet"
+        )
 
     beskrivelse = " ".join(beskrivelse)
 

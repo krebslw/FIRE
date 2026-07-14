@@ -25,6 +25,7 @@ from fire.cli.exceptions import (
     advarsel,
 )
 
+
 @niv.command()
 @fire.cli.default_options()
 @click.argument(
@@ -146,9 +147,7 @@ def netoversigt(projektnavn: str, **kwargs) -> None:
     skriv_ark(projektnavn, resultater, "-netoversigt")
 
     singulære_punkter = tuple(sorted(resultater["Singulære"]["Punkt"]))
-    fire.cli.print(
-        f"Fandt {len(singulære_punkter)} singulære punkter."
-    )
+    fire.cli.print(f"Fandt {len(singulære_punkter)} singulære punkter.")
     fire.cli.print(f"Fandt {len(polygoner)} polygoner.")
 
 
