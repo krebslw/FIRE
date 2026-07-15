@@ -267,7 +267,7 @@ def ilæg_nye_koter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
         }
         sagsgang = frame.append(sagsgang, sagsgangslinje)
 
-    fejlbesked = f"Der opstod en fejl - koter for '{projektnavn}' IKKE indlæst!"
+    fejlbesked = f"Koter for '{projektnavn}' IKKE indlæst!"
     with YndefuldeFejl(Exception, fejlbesked, med_årsag=True):
         fire.cli.firedb.session.flush()
 

@@ -911,7 +911,7 @@ def ilæg_revision(
 
 def flush():
     """Indlæs data i database"""
-    fejltekst = "Der opstod en fejl under revisionsilægning."
+    fejltekst = "Revisionsark IKKE indlæst."
     with YndefuldeFejl(DatabaseError, fejltekst, med_årsag=True):
         fire.cli.firedb.session.flush()
 

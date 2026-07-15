@@ -164,7 +164,7 @@ def indsæt(
     )
     db.indset_sagsevent(sagsevent, commit=False)
     db.luk_sag(sag, commit=False)
-    with YndefuldeFejl(Exception, f"Der opstod en fejl - fil {filnavn} IKKE indsat!"):
+    with YndefuldeFejl(Exception, f"Fil {filnavn} IKKE indsat!"):
         # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()
 
@@ -227,7 +227,7 @@ def slet(filnavn: str, sagsbehandler: str, **kwargs) -> None:
     )
     db.indset_sagsevent(sagsevent, commit=False)
     db.luk_sag(sag, commit=False)
-    with YndefuldeFejl(Exception, f"Der opstod en fejl - fil {filnavn} IKKE slettet!"):
+    with YndefuldeFejl(Exception, f"Fil {filnavn} IKKE slettet!"):
         # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()
 

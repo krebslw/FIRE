@@ -200,7 +200,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     )
     fire.cli.firedb.indset_sagsevent(sagsevent_punkter, commit=False)
 
-    fejlbesked = f"Der opstod en fejl - nye punkter for '{projektnavn}' IKKE indlæst!"
+    fejlbesked = f"Nye punkter for '{projektnavn}' IKKE indlæst!"
     with YndefuldeFejl(Exception, fejlbesked, med_årsag=True):
         fire.cli.firedb.session.flush()
 
@@ -343,7 +343,7 @@ def ilæg_nye_punkter(projektnavn: str, sagsbehandler: str, **kwargs) -> None:
     )
     fire.cli.firedb.indset_sagsevent(sagsevent_punktinfo, commit=False)
 
-    fejlbesked = f"Der opstod en fejl - punkter for '{projektnavn}' IKKE indlæst!"
+    fejlbesked = f"Punkter for '{projektnavn}' IKKE indlæst!"
     with YndefuldeFejl(Exception, fejlbesked, med_årsag=True):
         fire.cli.firedb.session.flush()
 

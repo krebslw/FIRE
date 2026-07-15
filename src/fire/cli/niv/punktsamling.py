@@ -151,7 +151,7 @@ def fjern_punkt_fra_punktsamling(
     )
     fire.cli.firedb.indset_sagsevent(sagsevent, commit=False)
 
-    fejltekst = f"Der opstod en fejl - punkt {punkt.ident} IKKE slettet fra '{punktsamling.navn}'"
+    fejltekst = f"Punkt {punkt.ident} IKKE slettet fra '{punktsamling.navn}'"
     with YndefuldeFejl(Exception, fejltekst, med_årsag=True):
         # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()

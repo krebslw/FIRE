@@ -75,7 +75,7 @@ def luk_sag(projektnavn: str, sagsbehandler, **kwargs) -> None:
     fire.cli.firedb.indset_sagsevent(sagsevent, commit=False)
     fire.cli.firedb.luk_sag(sag, commit=False)
 
-    fejltekst = f"Der opstod en fejl - sag {sag.id} for '{projektnavn}' IKKE lukket!"
+    fejltekst = f"Sag {sag.id} for '{projektnavn}' IKKE lukket!"
     with YndefuldeFejl(Exception, fejltekst, med_årsag=True):
         # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()
