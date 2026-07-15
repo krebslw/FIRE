@@ -261,7 +261,7 @@ def udtræk_revision(
     punkter = hent_punkter_i_opmålingsdistrikter(opmålingsdistrikter)
     løse_punkter = klargør_identer_til_søgning(løse_punkter)
 
-    with YndefuldeFejl(ValueError, "", med_årsag=True):
+    with YndefuldeFejl(ValueError, med_årsag=True):
         punkter.extend(
             fire.cli.firedb.hent_punkt_liste(løse_punkter, ignorer_ukendte=False)
         )

@@ -256,7 +256,7 @@ def regn(
 
     fire.cli.print("Så regner vi")
 
-    with YndefuldeFejl(ValideringFejl, "", med_årsag=True):
+    with YndefuldeFejl(ValideringFejl, med_årsag=True):
         motor.valider_fastholdte()
 
     # Analyser net
@@ -274,7 +274,7 @@ def regn(
         f"Fastholder {len(motor.fastholdte)} og beregner nye koter for {len(estimerbare_punkter)} punkter"
     )
 
-    with YndefuldeFejl(UdjævningFejl, "", med_årsag=True):
+    with YndefuldeFejl(UdjævningFejl, med_årsag=True):
         motor.udjævn()
 
     # Generer ny dataframe med resultaterne.
