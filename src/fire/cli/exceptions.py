@@ -1,9 +1,9 @@
 """Modul til håndtering af excetions og warnings i FIRE's cli-lag"""
-
 from contextlib import contextmanager
 
 from fire.cli import firedb
 from fire.cli import print as click_print
+import click
 
 
 class AfbrydFejl(SystemExit):
@@ -13,30 +13,38 @@ class AfbrydFejl(SystemExit):
     Fejlbeskeden formatteres ens på tværs af cli-laget med hvid-på-rød skrift, præfixeret
     med "FEJL".
 
-    `med_rollback=True` sørger for at rulle den fælles `firedb.session` tilbage.
+    En `bitekst` kan specificeres til at give brugeren yderligere info. Biteksten vises
+    med default formattering.
 
-    Yderligere args/kwargs gives videre til SystemExit. Dvs. at disse bliver printet med
-    default formattering, hvilket kan være nyttigt hvis man gerne vil give yderligere
-    information til brugeren omkring fejlen.
+    `med_rollback=True` sørger for at rulle den fælles `firedb.session` tilbage.
     """
 
-    def __init__(self, tekst: str = "", *args, med_rollback: bool = True, **kwargs):
+    def __init__(self, tekst: str = "", bitekst: str = "", med_rollback: bool = True):
+
+        if med_rollback:
+            firedb.session.rollback()
+
         # Hvis fejlbesked er tom, skrives bare "FEJL!" i stedet for "FEJL: "
         # Men det er nok dårlig praksis at lade fejlbeskeden være tom. Idet mindste
         # bør mulig_årsag i så fald være udfyldt.
         præfix = "FEJL: " if tekst else "FEJL!"
 
-        click_print(
+        self.besked = click.style(
             f"{præfix}{tekst}",
             fg="white",
             bg="red",
             bold=True,
         )
+        self.besked += click.style(
+            f"\n{bitekst}"
+        )
 
-        if med_rollback:
-            firedb.session.rollback()
-
-        super().__init__(*args, **kwargs)
+        # Besked gives videre til SystemExit, som en ANSI-formatteret string.
+        # Beskeden printes kun rigtigt, hvis den er det eneste argument til
+        # SystemExit. Dvs. at
+        # super().__init__(self.besked, "eksta_argument")
+        # ville ødelægge formatteringen!
+        super().__init__(self.besked)
 
 
 class IntetAtGøre(SystemExit):
@@ -45,19 +53,16 @@ class IntetAtGøre(SystemExit):
     """
 
     def __init__(self, tekst: str, *args, **kwargs):
-        click_print(f"{tekst}", fg="yellow", bold=True)
-
-        super().__init__(*args, **kwargs)
+        self.besked = click.style(f"{tekst}", fg="yellow", bold=True)
+        super().__init__(self.besked)
 
 
 @contextmanager
 def YndefuldeFejl(
     exception: Exception | tuple[Exception],
     fejltekst: str = "",
-    *args,
     med_årsag: bool = False,
     med_rollback: bool = True,
-    **kwargs,
 ):
     """Try-except contextmananger til pæne fejlmeddelelser
 
@@ -77,7 +82,7 @@ def YndefuldeFejl(
 
         # Mulig årsag sættes som sekundært argument, som passes videre til SystemExit,
         # og som derfor printes med default formattering.
-        raise AfbrydFejl(fejltekst, mulig_årsag, *args, med_rollback=med_rollback, **kwargs)
+        raise AfbrydFejl(fejltekst, mulig_årsag, med_rollback=med_rollback)
 
 def bemærk(tekst: str):
     click_print(
