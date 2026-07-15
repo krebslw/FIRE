@@ -19,17 +19,17 @@ from fire.api.model import (
     Tidsserie,
 )
 from fire.cli.niv import bekræft
+from fire.cli.exceptions import (
+    YndefuldeFejl,
+)
 
-
-STOP = rød(
-    """
+STOP = rød("""
         ███████ ████████  ██████  ██████      ██ ██
         ██         ██    ██    ██ ██   ██     ██ ██
         ███████    ██    ██    ██ ██████      ██ ██
              ██    ██    ██    ██ ██
         ███████    ██     ██████  ██          ██ ██
-"""
-)
+""")
 
 
 @click.group()
@@ -83,35 +83,31 @@ def punkt(uuid: str, sagsbehandler, **kwargs) -> None:
         ],
     )
 
-    try:
+    with YndefuldeFejl(NoResultFound, f"Punkt med UUID {uuid} ikke fundet!"):
         punkt = db.hent_punkt(uuid)
-    except NoResultFound:
-        fire.cli.print(f"Punkt med UUID {uuid} ikke fundet!")
-        raise SystemExit
 
-    try:
+    with YndefuldeFejl(
+        DatabaseError,
+        f"Der opstod en fejl - punkt id {uuid} IKKE lukket!",
+        med_årsag=True,
+    ):
         # Indsæt alle objekter i denne session
         db.luk_punkt(punkt, sagsevent, commit=False)
         db.session.flush()
         db.luk_sag(sag, commit=False)
         db.session.flush()
-    except DatabaseError as e:
-        # rul tilbage hvis databasen smider en exception
-        db.session.rollback()
-        fire.cli.print(f"Der opstod en fejl - punkt id {uuid} IKKE lukket!")
-        print(e)
+
+    tekst = click.style(f"Du forbinder til {db.db}-databasen.", bg="red", fg="white")
+    tekst += f"\nEr du sikker på at du vil lukke punktet {punkt.ident} ({uuid})?"
+    spørgsmål = f"{STOP}\n\n" + click.style(tekst, bg="red", fg="white")
+    spørgsmål += "\n\n\nLukning af punktet KAN IKKE rulles tilbage. Denne ændring er irreversibel,\n"
+    spørgsmål += "tænkt dig grundigt om inden du siger ja."
+    if bekræft(spørgsmål):
+        db.session.commit()
+        fire.cli.print(f"Punkt {punkt.ident} ({uuid} lukket!")
     else:
-        tekst = click.style(f"Du forbinder til {db.db}-databasen.", bg="red", fg="white")
-        tekst += f"\nEr du sikker på at du vil lukke punktet {punkt.ident} ({uuid})?"
-        spørgsmål = f"{STOP}\n\n" + click.style(tekst, bg="red", fg="white")
-        spørgsmål += "\n\n\nLukning af punktet KAN IKKE rulles tilbage. Denne ændring er irreversibel,\n"
-        spørgsmål += "tænkt dig grundigt om inden du siger ja."
-        if bekræft(spørgsmål):
-            db.session.commit()
-            fire.cli.print(f"Punkt {punkt.ident} ({uuid} lukket!")
-        else:
-            db.session.rollback()
-            fire.cli.print(f"Punkt {punkt.ident} ({uuid} IKKE lukket!")
+        db.session.rollback()
+        fire.cli.print(f"Punkt {punkt.ident} ({uuid} IKKE lukket!")
 
 
 @luk.command()
@@ -153,7 +149,9 @@ def koordinat(objektid: str, sagsbehandler, **kwargs) -> None:
         ],
     )
 
-    try:
+    with YndefuldeFejl(
+        NoResultFound, f"Koordinat med objektid {objektid} ikke fundet!"
+    ):
         koordinat = (
             db.session.query(Koordinat)
             .filter(
@@ -161,29 +159,23 @@ def koordinat(objektid: str, sagsbehandler, **kwargs) -> None:
             )
             .one()
         )
-    except NoResultFound:
-        fire.cli.print(f"Koordinat med objektid {objektid} ikke fundet!")
-        raise SystemExit
 
     punkt = koordinat.punkt
     srid = koordinat.srid
 
-    try:
+    with YndefuldeFejl(
+        DatabaseError,
+        f"Der opstod en fejl - koordinat med objektid {objektid} IKKE lukket!",
+        med_årsag=True,
+    ):
         # Indsæt alle objekter i denne session
         db.fejlmeld_koordinat(koordinat, sagsevent, commit=False)
         db.session.flush()
         db.luk_sag(sag, commit=False)
         db.session.flush()
-    except DatabaseError as e:
-        # rul tilbage hvis databasen smider en exception
-        db.session.rollback()
-        fire.cli.print(
-            f"Der opstod en fejl - koordinat med objektid {objektid} IKKE lukket!"
-        )
-        print(e)
-    else:
-        tekst = click.style(f"Du forbinder til {db.db}-databasen.", bg="red", fg="white")
-        tekst += f"""
+
+    tekst = click.style(f"Du forbinder til {db.db}-databasen.", bg="red", fg="white")
+    tekst += f"""
 Er du sikker på at du vil lukke {punkt.ident}'s {srid.name}-koordinat med objektid={objektid}:
 
   {koordinat.registreringfra=}
@@ -193,12 +185,12 @@ Er du sikker på at du vil lukke {punkt.ident}'s {srid.name}-koordinat med objek
   {koordinat.t=}
 
 """
-        if bekræft(tekst):
-            db.session.commit()
-            fire.cli.print(f"Koordinat ({objektid}) lukket!")
-        else:
-            db.session.rollback()
-            fire.cli.print(f"Koordinat ({objektid}) IKKE lukket!")
+    if bekræft(tekst):
+        db.session.commit()
+        fire.cli.print(f"Koordinat ({objektid}) lukket!")
+    else:
+        db.session.rollback()
+        fire.cli.print(f"Koordinat ({objektid}) IKKE lukket!")
 
 
 @luk.command()
@@ -241,7 +233,9 @@ def observation(objektid: str, sagsbehandler, **kwargs) -> None:
         ],
     )
 
-    try:
+    with YndefuldeFejl(
+        NoResultFound, f"Observation med objektid {objektid} ikke fundet!"
+    ):
         obs = (
             db.session.query(Observation)
             .filter(
@@ -249,35 +243,29 @@ def observation(objektid: str, sagsbehandler, **kwargs) -> None:
             )
             .one()
         )
-    except NoResultFound:
-        fire.cli.print(f"Observation med objektid {objektid} ikke fundet!")
-        raise SystemExit
 
-    try:
+    with YndefuldeFejl(
+        DatabaseError,
+        f"Der opstod en fejl - observation med objektid {objektid} IKKE lukket!",
+        med_årsag=True,
+    ):
         # Indsæt alle objekter i denne session
         db.fejlmeld_observation(obs, sagsevent, commit=False)
         db.session.flush()
         db.luk_sag(sag, commit=False)
         db.session.flush()
-    except DatabaseError as e:
-        # rul tilbage hvis databasen smider en exception
-        db.session.rollback()
-        fire.cli.print(
-            f"Der opstod en fejl - observation med objektid {objektid} IKKE lukket!"
-        )
-        print(e)
-    else:
-        tekst = click.style(f"Du forbinder til {db.db}-databasen.", bg="red", fg="white")
-        tekst += f"""\nEr du sikker på at du vil lukke observationen med {objektid=:}:
+
+    tekst = click.style(f"Du forbinder til {db.db}-databasen.", bg="red", fg="white")
+    tekst += f"""\nEr du sikker på at du vil lukke observationen med {objektid=:}:
 
         {repr(obs)}
 """
-        if bekræft(tekst):
-            db.session.commit()
-            fire.cli.print(f"Observation {objektid} lukket!")
-        else:
-            db.session.rollback()
-            fire.cli.print(f"Observation {objektid} IKKE lukket!")
+    if bekræft(tekst):
+        db.session.commit()
+        fire.cli.print(f"Observation {objektid} lukket!")
+    else:
+        db.session.rollback()
+        fire.cli.print(f"Observation {objektid} IKKE lukket!")
 
 
 @luk.command()
@@ -305,7 +293,9 @@ def punktsamling(objektid: str, sagsbehandler, **kwargs) -> None:
     db.session.add(sag)
     db.session.flush()
 
-    try:
+    with YndefuldeFejl(
+        NoResultFound, f"Punktsamling med objektid {objektid} ikke fundet!"
+    ):
         ps = (
             db.session.query(PunktSamling)
             .filter(
@@ -313,39 +303,31 @@ def punktsamling(objektid: str, sagsbehandler, **kwargs) -> None:
             )
             .one()
         )
-    except NoResultFound:
-        fire.cli.print(f"Punktsamling med objektid {objektid} ikke fundet!")
-        raise SystemExit
 
     sagsevent = sag.ny_sagsevent(beskrivelse=f"'fire luk punktsamling {objektid}")
 
-    try:
+    with YndefuldeFejl(
+        DatabaseError,
+        f"Der opstod en fejl - punktsamling med objektid {objektid} IKKE lukket!",
+        med_årsag=True,
+    ):
         # Indsæt alle objekter i denne session
         db.luk_punktsamling(ps, sagsevent, commit=False)
         db.session.flush()
         db.luk_sag(sag, commit=False)
         db.session.flush()
-    except DatabaseError as e:
-        # rul tilbage hvis databasen smider en exception
-        db.session.rollback()
-        fire.cli.print(
-            f"Der opstod en fejl - punktsamling med objektid {objektid} IKKE lukket!"
-        )
-        print(e)
-    else:
-        tekst = click.style(f"Du forbinder til {db.db}-databasen.", bg="red", fg="white")
-        tekst += f"""\nEr du sikker på at du vil lukke punktsamlingen med {objektid=:}:
+
+    tekst = click.style(f"Du forbinder til {db.db}-databasen.", bg="red", fg="white")
+    tekst += f"""\nEr du sikker på at du vil lukke punktsamlingen med {objektid=:}:
 
         {repr(ps)}
 """
-        if bekræft(tekst):
-            db.session.commit()
-            fire.cli.print(f"Punktsamling {objektid} lukket!")
-        else:
-            db.session.rollback()
-            fire.cli.print(f"Punktsamling {objektid} IKKE lukket!")
-
-    return
+    if bekræft(tekst):
+        db.session.commit()
+        fire.cli.print(f"Punktsamling {objektid} lukket!")
+    else:
+        db.session.rollback()
+        fire.cli.print(f"Punktsamling {objektid} IKKE lukket!")
 
 
 @luk.command()
@@ -373,7 +355,9 @@ def tidsserie(objektid: str, sagsbehandler, **kwargs) -> None:
     db.session.add(sag)
     db.session.flush()
 
-    try:
+    with YndefuldeFejl(
+        NoResultFound, f"Tidsserie med objektid {objektid} ikke fundet!"
+    ):
         ts = (
             db.session.query(Tidsserie)
             .filter(
@@ -381,34 +365,28 @@ def tidsserie(objektid: str, sagsbehandler, **kwargs) -> None:
             )
             .one()
         )
-    except NoResultFound:
-        fire.cli.print(f"Tidsserie med objektid {objektid} ikke fundet!")
-        raise SystemExit
 
     sagsevent = sag.ny_sagsevent(beskrivelse=f"'fire luk tidsserie {objektid}")
 
-    try:
+    with YndefuldeFejl(
+        DatabaseError,
+        f"Der opstod en fejl - tidsserie med objektid {objektid} IKKE lukket!",
+        med_årsag=True,
+    ):
         # Indsæt alle objekter i denne session
         db.luk_tidsserie(ts, sagsevent, commit=False)
         db.session.flush()
         db.luk_sag(sag, commit=False)
         db.session.flush()
-    except DatabaseError as e:
-        # rul tilbage hvis databasen smider en exception
-        db.session.rollback()
-        fire.cli.print(
-            f"Der opstod en fejl - tidsserie med objektid {objektid} IKKE lukket!"
-        )
-        print(e)
-    else:
-        tekst = click.style(f"Du forbinder til {db.db}-databasen.", bg="red", fg="white")
-        tekst += f"""\nEr du sikker på at du vil lukke tidsserien med {objektid=:}:
+
+    tekst = click.style(f"Du forbinder til {db.db}-databasen.", bg="red", fg="white")
+    tekst += f"""\nEr du sikker på at du vil lukke tidsserien med {objektid=:}:
 
         {repr(ts)}
 """
-        if bekræft(tekst):
-            db.session.commit()
-            fire.cli.print(f"Tidsserie {objektid} lukket!")
-        else:
-            db.session.rollback()
-            fire.cli.print(f"Tidsserie {objektid} IKKE lukket!")
+    if bekræft(tekst):
+        db.session.commit()
+        fire.cli.print(f"Tidsserie {objektid} lukket!")
+    else:
+        db.session.rollback()
+        fire.cli.print(f"Tidsserie {objektid} IKKE lukket!")
