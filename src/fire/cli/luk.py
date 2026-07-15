@@ -88,7 +88,7 @@ def punkt(uuid: str, sagsbehandler, **kwargs) -> None:
 
     with YndefuldeFejl(
         DatabaseError,
-        f"Der opstod en fejl - punkt id {uuid} IKKE lukket!",
+        f"Punkt id {uuid} IKKE lukket!",
         med_årsag=True,
     ):
         # Indsæt alle objekter i denne session
@@ -165,7 +165,7 @@ def koordinat(objektid: str, sagsbehandler, **kwargs) -> None:
 
     with YndefuldeFejl(
         DatabaseError,
-        f"Der opstod en fejl - koordinat med objektid {objektid} IKKE lukket!",
+        f"Koordinat med objektid {objektid} IKKE lukket!",
         med_årsag=True,
     ):
         # Indsæt alle objekter i denne session
@@ -246,7 +246,7 @@ def observation(objektid: str, sagsbehandler, **kwargs) -> None:
 
     with YndefuldeFejl(
         DatabaseError,
-        f"Der opstod en fejl - observation med objektid {objektid} IKKE lukket!",
+        f"Observation med objektid {objektid} IKKE lukket!",
         med_årsag=True,
     ):
         # Indsæt alle objekter i denne session
@@ -308,7 +308,7 @@ def punktsamling(objektid: str, sagsbehandler, **kwargs) -> None:
 
     with YndefuldeFejl(
         DatabaseError,
-        f"Der opstod en fejl - punktsamling med objektid {objektid} IKKE lukket!",
+        f"Punktsamling med objektid {objektid} IKKE lukket!",
         med_årsag=True,
     ):
         # Indsæt alle objekter i denne session
@@ -370,7 +370,7 @@ def tidsserie(objektid: str, sagsbehandler, **kwargs) -> None:
 
     with YndefuldeFejl(
         DatabaseError,
-        f"Der opstod en fejl - tidsserie med objektid {objektid} IKKE lukket!",
+        f"Tidsserie med objektid {objektid} IKKE lukket!",
         med_årsag=True,
     ):
         # Indsæt alle objekter i denne session
