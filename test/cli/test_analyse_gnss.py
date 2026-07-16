@@ -46,8 +46,8 @@ def test_cli_analyse_gnss_fejler(mocker, options):
     [
         (["--plot", "--referenceramme", "IGb08", "RDIO_5D_IGb08"], "."),
         (
-            ["--plot", "--fil", "test_statistik.csv", "RDIO_5D_IGb08"],
-            "test_statistik.csv",
+            ["--plot", "--fil", "test_statistik.xlsx", "RDIO_5D_IGb08"],
+            "test_statistik.xlsx",
         ),
         (["--plot", "--parameter", "e", "RDIO_5D_IGb08"], "."),
         (["--plot", "--grad", "2", "RDIO_5D_IGb08"], "."),
