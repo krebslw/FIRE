@@ -1,14 +1,11 @@
-from dataclasses import dataclass, fields
 from datetime import datetime as dt
-import time
 from typing import List, Tuple, Type
 
 import functools
 import numpy as np
-from numpy.polynomial import polynomial as P
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
-from scipy.stats import t, norm
+
 
 from fire.matematik import xyz2neu
 from fire.api.model import (
@@ -21,6 +18,11 @@ from fire.api.model import (
 )
 from fire.api.model.observationer import ObservationsLængde
 from fire.api.model.punkttyper import Koordinat
+from fire.api.statistik import (
+    PolynomialRegression,
+    Ttest,
+    Normalizer,
+)
 
 __all__ = [
     "Tidsserie",
@@ -46,16 +48,21 @@ def til_decimalår(date: dt):
 
     return date.year + fraction
 
+def normaliser_data(
+    x: np.ndarray,
+    y: np.ndarray,
+    a: float = -1,
+    b: float = 1
+) -> tuple[np.ndarray, np.ndarray]:
+    """Normaliserer tidsseriens x og y data til intervallet [a , b]."""
 
-def beregn_fraktil_for_t_fordeling(q: float, dof: int = 0) -> float:
-    """Returner den q'te fraktil for t-fordelingen med dof frihedsgrader."""
-    return t.ppf(q, dof)
+    center = (b+a)/2
+    span = b-a
 
+    x_norm = Normalizer().normalize(x, center, span)
+    y_norm = Normalizer().normalize(y, center, span)
 
-def beregn_fraktil_for_normalfordeling(q: float) -> float:
-    """Returner den q'te fraktil for normalfordelingen."""
-    return norm.ppf(q)
-
+    return x_norm, y_norm
 
 class TidsserietypeID:
     """
@@ -450,7 +457,7 @@ class GNSSTidsserie(Tidsserie):
         Kombiner data fra dage tættere på hinanden end binsize (i dage).
 
         x antages at være i decimalår og sorteret i stigende rækkefølge.
-        Binning bruges som præprocessering til analyse med klassen PolynomieRegression1D.
+        Binning bruges som præprocessering til analyse med klassen PolynomieRegression.
         """
 
         if len(x) != len(y):
@@ -485,19 +492,19 @@ class GNSSTidsserie(Tidsserie):
 
         return x, y
 
-    def forbered_lineær_regression(self, x: list, y: list, **kwargs) -> None:
+    def forbered_lineær_regression(self, x: list, y: list, grad: int=1, binsize: int=14) -> None:
         """
-        Opret "linreg" attribut af typen PolynomieRegression1D på tidsserien.
+        Opret "linreg" attribut af typen PolynomieRegression på tidsserien.
 
         Initialiserer en simpel PolynomieRegression i 1 dimension, dvs. med én
         forklarende variabel x, og én afhængig variabel y.
 
-        Polynomiegraden sættes med kwarg'en "grad".
-        Data kan reduceres med kwarg'en "binsize", se "GNSSTidsserie.binning(...)".
+        Polynomiegraden sættes med "grad".
+        Data kan reduceres med "binsize", se "GNSSTidsserie.binning(...)".
         """
-        x_binned, y_binned = self.binning(x, y, **kwargs)
+        x_binned, y_binned = self.binning(x, y, binsize)
 
-        self.linreg = PolynomieRegression1D(x_binned, y_binned, **kwargs)
+        self.linreg = PolynomialRegression(x_binned, y_binned, degree=grad)
 
     def beregn_lineær_regression(self) -> None:
         """
@@ -560,7 +567,7 @@ class TidsserieEnsemble:
         i tidsserierne.
 
         Kræver at hver tidsserie har en linær regression "linreg"-attribut af typen
-        PolynomieRegression1D, som er blevet løst, ved at få kørt sin "solve-metode."
+        PolynomieRegression, som er blevet løst, ved at få kørt sin "solve-metode."
         """
         if not self.tidsserier:
             raise ValueError(
@@ -579,284 +586,6 @@ class TidsserieEnsemble:
         # Opdater ensemblets tidsserier med den samlede varians.
         for ts in self.tidsserier.values():
             ts.linreg.var_samlet = self.var_samlet
-
-
-class PolynomieRegression1D:
-    """
-    Foretag lineær regression over en tidsserie.
-    """
-    def __init__(
-        self,
-        x: list[float],
-        y: list[float],
-        y_vægte: float | list[float] = 1,
-        grad: int = 1,
-        **kwargs,
-    ):
-        self.x = np.array(x)
-        self.y = np.array(y)
-        self.grad = grad
-
-        self._y_vægte = np.array(y_vægte)
-        self._var0 = None
-        self.var_samlet = None
-
-    @functools.cached_property
-    def _A(self) -> np.ndarray:
-        """Returner designmatricen A"""
-        return P.polyvander(self.x, self.grad)
-
-    @functools.cached_property
-    def _W(self) -> np.ndarray:
-        """
-        Returner diagonalen af vægtmatricen W
-
-        Hvis vægtene er udefineret returneres enhedsmatricen. Pt. understøttes kun
-        ukorrelerede observationer, dvs. at vægtmatricen er en diagonalmatrix.
-        """
-        return np.ones(self.N) * self._y_vægte
-
-    @functools.cached_property
-    def _invATA(self) -> np.ndarray:
-        """
-        Returner den inverse matrix af størrelsen (A^T * W * A)
-
-        A er designmatricen for regressionen. W er vægtmatricen for observationerne.
-        """
-        return np.linalg.inv(self._A.T @ np.diag(self._W) @ self._A)
-
-    def solve(self) -> None:
-        """Løs hvad løses skal"""
-
-        if self.dof <= 0:
-            raise ValueError(
-                "Antallet af punkter er mindre end eller lig antallet af parametre."
-            )
-
-        self.beta, [SSR, _, _, _] = P.polyfit(
-            self.x, self.y, self.grad, full=True, w=self._W
-        )
-
-        if SSR.size == 0:
-            raise ValueError(
-                "Ligningssystemet har for lav rang. Kan forsøges fikset ved at normalisere data "
-                "eller sætte polynomiegraden ned."
-            )
-
-        self.residualer = self.y - self.beregn_prædiktioner(self.x)
-        self.SSR = np.dot(self._W, self.residualer**2)
-
-        self._var0 = self.SSR / self.dof
-        self.var_samlet = self._var0
-
-    @property
-    def R2(self) -> float:
-        """
-        Returner bestemmelseskoefficienten R².
-
-        R² måler mængden af variation i data der forklares af modellen.
-        """
-        return 1 - (self.SSR / np.sum((self.y - self.y.mean()) ** 2))
-
-    @property
-    def ddof(self) -> int:
-        """Returner "Delta Degrees of Freedom"."""
-        return self.grad + 1
-
-    @property
-    def N(self) -> int:
-        """Returner længden af tidsserien."""
-        return len(self.x)
-
-    @property
-    def dof(self) -> int:
-        """Returner antallet af frihedsgrader."""
-        return self.N - self.ddof
-
-    @property
-    def var0(self) -> float:
-        """Returner estimeret varians af residualer."""
-        return self._var0
-
-    @property
-    def mex(self) -> float:
-        """Returner middelepokedatoen."""
-        return sum(self.x) / self.N
-
-    @property
-    def mey(self) -> float:
-        """Returner regressionens værdi ved middelepokedatoen."""
-        return P.polyval(self.mex, self.beta)
-
-    def KovariansMatrix(self, er_samlet: bool = False) -> np.ndarray:
-        """
-        Returner kovariansmatrix for estimerede parametre β₀, β₁ ...
-
-        Kovariansmatricen har følgende struktur:
-        COV =  [[Var(β₀)    , Cov(β₀,β₁)],
-                [Cov(β₁, β₀), Var(β₁)   ]]
-
-        Kovariansmatricen beregnes som:
-            COV = Var * (A^T * W * A)^(-1), hvor Var=SSR/dof
-        Se fx. https://en.wikipedia.org/wiki/Weighted_least_squares#Parameter_errors_and_correlation
-        """
-        if er_samlet is False:
-            var = self.var0
-        elif er_samlet is True:
-            var = self.var_samlet
-
-        return var * self._invATA
-
-    def VarBeta(self, er_samlet: bool = False) -> np.ndarray:
-        """Returner den estimerede varians af de estimerede parametre βᵢ"""
-        return np.diag(self.KovariansMatrix(er_samlet))
-
-    def normaliser_data(
-        self, a: float = -1, b: float = 1
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """Normaliserer tidsseriens x og y data til intervallet [a , b]."""
-
-        def normaliser(data: np.ndarray, a: float, b: float):
-            return a + (b - a) * (data - data.min()) / (data.max() - data.min())
-
-        x_norm = normaliser(self.x, a, b)
-        y_norm = normaliser(self.y, a, b)
-
-        return x_norm, y_norm
-
-    def beregn_konfidensinterval(
-        self, alpha: float = 0.05, er_samlet: bool = False
-    ) -> np.ndarray:
-        """
-        Beregn Konfidensintervaller på estimerede parametre βᵢ givet signifikansniveau alpha
-
-        Konfidensintervaller beregnes ud fra formlen:
-            ki = βᵢ ± krit * Var(βᵢ)
-        hvor krit er en kritisk værdi bestemt ud fra "fordeling" med signifikansniveau alpha.
-
-        Output er af typen np.ndarray(2,N), hvor N er antallet af parametre.
-        """
-        if er_samlet:
-            fraktil = beregn_fraktil_for_normalfordeling(1 - alpha / 2)
-        else:
-            fraktil = beregn_fraktil_for_t_fordeling(1 - alpha / 2, self.dof)
-
-        delta_ki = fraktil * np.sqrt(self.VarBeta(er_samlet))
-
-        return self.beta + np.outer([-1, 1], delta_ki)
-
-    def beregn_prædiktioner(self, x_præd: List[float]) -> np.ndarray:
-        """Beregn regressionens værdi i punkterne x_præd."""
-        return P.polyval(x_præd, self.beta)
-
-    def beregn_konfidensbånd(
-        self,
-        x_præd: List[float],
-        y_præd: List[float] = None,
-        *,
-        alpha: float = 0.05,
-        er_samlet: bool = False,
-    ) -> np.ndarray:
-        """
-        Beregn Konfidensbånd for regressionslinjen.
-
-        Konfidensbåndet er givet ved:
-            pi = prædiktion ± delta_pi
-
-        Output er af typen np.ndarray(2,N), hvor N er antallet af punkter i x_præd.
-        """
-
-        if er_samlet:
-            var = self.var_samlet
-            fraktil = beregn_fraktil_for_normalfordeling(1 - alpha / 2)
-        else:
-            var = self.var0
-            fraktil = beregn_fraktil_for_t_fordeling(1 - alpha / 2, self.dof)
-
-        if y_præd is None:
-            y_præd = self.beregn_prædiktioner(x_præd)
-
-        A_præd = P.polyvander(x_præd, self.grad)
-        delta_pi = fraktil * np.sqrt(var * np.diag(A_præd @ self._invATA @ A_præd.T))
-
-        return y_præd + np.outer([-1, 1], delta_pi)
-
-    def beregn_hypotesetest_hældning(
-        self,
-        reference_hældning: float = 0,
-        alpha: float = 0.05,
-        er_samlet: bool = False,
-    ) -> "HypoteseTest":
-        """
-        Test om den estimerede hældning er signifikant forskellig fra en referenceværdi
-
-        Returnerer objekt af typen HypoteseTest.
-        """
-        std_est = np.sqrt(self.VarBeta(er_samlet)[1])
-
-        H0 = reference_hældning - self.beta[1]
-
-        if er_samlet:
-            return Ztest(std_est=std_est, H0=H0, alpha=alpha)
-
-        return Ttest(std_est=std_est, dof=self.dof, H0=H0, alpha=alpha)
-
-
-class HypoteseTest:
-    """Foretag statistisk hypotesetest."""
-
-    def __init__(
-        self,
-        std_est: float,
-        kritiskværdi: float,
-        H0: float = 0,
-        alpha: float = 0.05,
-    ):
-        self.H0 = H0
-        self.alpha = alpha
-        self.std_est = std_est
-        self.kritiskværdi = kritiskværdi
-
-    @property
-    def score(self) -> float:
-        """Returner hypotesetestens score."""
-        return abs(self.H0 / self.std_est)
-
-    @property
-    def H0accepteret(self) -> bool:
-        """
-        Evaluer hypotesetestens resultat.
-
-        Hvis H0 accepteres, betyder det at der ikke kan påvises en signifikant forskel
-        mellem den testede parameter og referencen.
-        Omvendt, hvis H0 forkastes, betyder det at test-parameteren med signifikant
-        sandsynlighed adskiller sig fra referencen.
-        """
-        return bool(self.score < self.kritiskværdi)
-
-
-class Ztest(HypoteseTest):
-    """Foretag statistisk Z-test"""
-
-    def __init__(self, std_est: float, H0: float = 0, alpha: float = 0.05):
-
-        kritiskværdi = beregn_fraktil_for_normalfordeling(1 - alpha / 2)
-        super().__init__(std_est, kritiskværdi, H0, alpha)
-
-
-class Ttest(HypoteseTest):
-    """Foretag statistisk T-test"""
-
-    def __init__(
-        self,
-        std_est: float,
-        dof: int,
-        H0: float = 0,
-        alpha: float = 0.05,
-    ):
-        self.dof = dof
-        kritiskværdi = beregn_fraktil_for_t_fordeling(1 - alpha / 2, dof)
-        super().__init__(std_est, kritiskværdi, H0, alpha)
 
 
 class HøjdeTidsserie(Tidsserie):
@@ -885,14 +614,14 @@ class HøjdeTidsserie(Tidsserie):
         """
         return [k.sz for k in self.koordinater]
 
-    def forbered_lineær_regression(self, x: list[float], y: list[float], **kwargs) -> None:
+    def forbered_lineær_regression(self, x: list[float], y: list[float], grad: int=1) -> None:
         """
-        Opret "linreg" attribut af typen PolynomieRegression1D på tidsserien.
+        Opret "linreg" attribut af typen PolynomieRegression på tidsserien.
 
         Initialiserer en simpel PolynomieRegression i 1 dimension, dvs. med én
         forklarende variabel x, og én afhængig variabel y.
         """
-        self.linreg = PolynomieRegression1D(x, y, **kwargs)
+        self.linreg = PolynomialRegression(x, y, degree=grad)
 
     def beregn_lineær_regression(self) -> None:
         """
@@ -902,7 +631,7 @@ class HøjdeTidsserie(Tidsserie):
         """
         self.linreg.solve()
 
-    def signifikant_trend_test(self, alpha: float = 0.01) -> "HypoteseTest":
+    def signifikant_trend_test(self, alpha: float = 0.01) -> Ttest:
         """
         Test om punktets trend er signifikant forskellig fra 0.
 
@@ -910,7 +639,6 @@ class HøjdeTidsserie(Tidsserie):
         værdi TREND_SD_MULTIPLIER = 2.5 Nu anvendes T-test med signifikansniveau på 1 %,
         hvilket svarer til en kritisk værdi på 2.58 (for dof>>1).
         """
-
-        return self.linreg.beregn_hypotesetest_hældning(
-            reference_hældning=0, alpha=alpha
-        )
+        sd = self.linreg.std_theta[1]
+        H0 = 0-self.linreg.theta[1]
+        return Ttest(sd, self.linreg.dof, H0, alpha)
