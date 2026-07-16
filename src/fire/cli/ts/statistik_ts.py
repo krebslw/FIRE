@@ -9,7 +9,12 @@ from fire.api.model import (
     HøjdeTidsserie,
     Punkt,
 )
-
+from fire.api.statistik import (
+    compute_confidence_interval_t_distribution,
+    compute_confidence_interval_normal_distribution,
+    Ttest,
+    Ztest,
+)
 
 @dataclass
 class Statistik:
@@ -83,12 +88,17 @@ def beregn_statistik_til_gnss_rapport(
     linreg = tidsserie.linreg
 
     # Er ikke samlet
-    var_beta = linreg.VarBeta(er_samlet=False)[1]
-    std_beta = np.sqrt(var_beta)
-    konfidensinterval = linreg.beregn_konfidensinterval(alpha, er_samlet=False)
-    T_test = linreg.beregn_hypotesetest_hældning(
-        reference_hældning, alpha, er_samlet=False
-    )
+    var_theta = linreg.var_theta[1]
+    std_theta = np.sqrt(var_theta)
+
+    # konfidensinterval
+    delta_ki = compute_confidence_interval_t_distribution(std_theta, linreg.dof, alpha)
+    konfidensinterval =  linreg.theta + np.outer([-1, 1], delta_ki)
+
+    # hypotesetest
+    H0 = reference_hældning - linreg.theta[1]
+    T_test = Ttest(std_theta, linreg.dof, H0, alpha)
+
 
     statistik = StatistikGnss(
         TidsserieID=tidsserie.navn,
@@ -97,47 +107,54 @@ def beregn_statistik_til_gnss_rapport(
         N_binned=linreg.N,
         dof=linreg.dof,
         ddof=linreg.ddof,
-        grad=linreg.grad,
+        grad=linreg.degree,
         R2=linreg.R2,
-        var_0=linreg.var0,
-        std_0=np.sqrt(linreg.var0),
+        var_0=linreg.MSE,
+        std_0=np.sqrt(linreg.MSE),
         reference_hældning=reference_hældning,
-        hældning=linreg.beta[1],
-        var_hældning=var_beta,
-        std_hældning=std_beta,
+        hældning=linreg.theta[1],
+        var_hældning=var_theta,
+        std_hældning=std_theta,
         ki_hældning_nedre=konfidensinterval[0, 1],
         ki_hældning_øvre=konfidensinterval[1, 1],
         mex=linreg.mex,
         mey=linreg.mey,
-        T_test_H0accepteret=T_test.H0accepteret,
+        T_test_H0accepteret=T_test.H0accepted,
         T_test_score=T_test.score,
         T_test_alpha=T_test.alpha,
-        T_test_kritiskværdi=T_test.kritiskværdi,
+        T_test_kritiskværdi=T_test.critical_value,
     )
 
     # er_samlet
     if not er_samlet:
         return statistik
 
-    var_beta_samlet = linreg.VarBeta(er_samlet=True)[1]
-    std_beta_samlet = np.sqrt(var_beta_samlet)
-    konfidensinterval_samlet = linreg.beregn_konfidensinterval(alpha, er_samlet=True)
-    Z_test = linreg.beregn_hypotesetest_hældning(
-        reference_hældning, alpha, er_samlet=True
-    )
+    # set reference variance to the estimated variance (which is based on all the
+    # timeseries) and re-compute model parameter variances
+    linreg.var0_hat = linreg.var_samlet
+    var_theta_samlet = linreg.var_theta[1]
+    std_theta_samlet = np.sqrt(var_theta_samlet)
+
+    # konfidensinterval
+    delta_ki = compute_confidence_interval_normal_distribution(std_theta_samlet, alpha)
+    konfidensinterval_samlet =  linreg.theta + np.outer([-1, 1], delta_ki)
+
+    # hypotesetest
+    H0 = reference_hældning - linreg.theta[1]
+    Z_test = Ztest(std_theta_samlet, H0, alpha)
 
     statistik_samlet = StatistikGnssSamlet(
         **asdict(statistik),
         var_samlet=linreg.var_samlet,
         std_samlet=np.sqrt(linreg.var_samlet),
-        var_hældning_samlet=var_beta_samlet,
-        std_hældning_samlet=std_beta_samlet,
+        var_hældning_samlet=var_theta_samlet,
+        std_hældning_samlet=std_theta_samlet,
         ki_hældning_nedre_samlet=konfidensinterval_samlet[0, 1],
         ki_hældning_øvre_samlet=konfidensinterval_samlet[1, 1],
-        Z_test_H0accepteret=Z_test.H0accepteret,
+        Z_test_H0accepteret=Z_test.H0accepted,
         Z_test_score=Z_test.score,
         Z_test_alpha=Z_test.alpha,
-        Z_test_kritiskværdi=Z_test.kritiskværdi,
+        Z_test_kritiskværdi=Z_test.critical_value,
     )
     return statistik_samlet
 
@@ -159,9 +176,12 @@ def beregn_statistik_til_hts_rapport(tidsserie: HøjdeTidsserie) -> StatistikHts
     trend_test = tidsserie.signifikant_trend_test()
 
     # Er ikke samlet
-    var_beta = linreg.VarBeta(er_samlet=False)[1]
-    std_beta = np.sqrt(var_beta)
-    konfidensinterval = linreg.beregn_konfidensinterval(er_samlet=False)
+    var_theta = linreg.var_theta[1]
+    std_theta = np.sqrt(var_theta)
+
+    # konfidensinterval
+    delta_ki = compute_confidence_interval_t_distribution(std_theta, linreg.dof)
+    konfidensinterval =  linreg.theta + np.outer([-1, 1], delta_ki)
 
     statistik = StatistikHts(
         TidsserieID=tidsserie.navn,
@@ -169,20 +189,20 @@ def beregn_statistik_til_hts_rapport(tidsserie: HøjdeTidsserie) -> StatistikHts
         N=len(tidsserie),
         dof=linreg.dof,
         ddof=linreg.ddof,
-        grad=linreg.grad,
+        grad=linreg.degree,
         R2=linreg.R2,
-        var_0=linreg.var0,
-        std_0=np.sqrt(linreg.var0),
-        hældning=linreg.beta[1],
-        var_hældning=var_beta,
-        std_hældning=std_beta,
+        var_0=linreg.MSE,
+        std_0=np.sqrt(linreg.MSE),
+        hældning=linreg.theta[1],
+        var_hældning=var_theta,
+        std_hældning=std_theta,
         ki_hældning_nedre=konfidensinterval[0, 1],
         ki_hældning_øvre=konfidensinterval[1, 1],
         mex=linreg.mex,
         mey=linreg.mey,
         Start=tidsserie.t[0],
         Slut=tidsserie.t[-1],
-        er_bevægelse_signifikant=not trend_test.H0accepteret,
+        er_bevægelse_signifikant=not trend_test.H0accepted,
         alpha_bevægelse_signifikant=trend_test.alpha,
     )
 
