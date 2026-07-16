@@ -5,7 +5,7 @@ from click.testing import CliRunner
 import pytest
 
 from fire.cli.ts import ts
-from fire.api.model.tidsserier import PolynomieRegression1D
+from fire.api.model.tidsserier import PolynomialRegression
 
 
 # CLI
@@ -34,10 +34,10 @@ def test_cli_analyse_gnss_fejler(mocker, options):
         )
         assert result.exit_code != 0
 
-    # analyse-gnss opretter PolynomieRegression1D attributter på tidsserierne, så disse
+    # analyse-gnss opretter PolynomieRegression attributter på tidsserierne, så disse
     # slettes igen, da det senere testes at de ikke eksisterer
     for obj in gc.get_objects():
-        if isinstance(obj, PolynomieRegression1D):
+        if isinstance(obj, PolynomialRegression):
             del obj
 
 
@@ -67,11 +67,11 @@ def test_cli_analyse_gnss_kører(firedb, mocker, options, tjek_sti):
             + options,
         )
 
-        assert Path(tjek_sti).exists()
         assert result.exit_code == 0
+        assert Path(tjek_sti).exists()
 
-    # analyse-gnss opretter PolynomieRegression1D attributter på tidsserierne, så disse
+    # analyse-gnss opretter PolynomieRegression attributter på tidsserierne, så disse
     # slettes igen, da det senere testes at de ikke eksisterer
     for obj in gc.get_objects():
-        if isinstance(obj, PolynomieRegression1D):
+        if isinstance(obj, PolynomialRegression):
             del obj

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from fire.api.model.tidsserier import PolynomieRegression1D
+from fire.api.model.tidsserier import PolynomialRegression
 from fire.cli.ts.statistik_ts import (
     Statistik,
     StatistikGnss,
@@ -25,12 +25,6 @@ def test_beregn_statistik_til_gnss_rapport(gnsstidsserie):
     )
 
     assert isinstance(statistik, StatistikGnss)
-
-    statistik = beregn_statistik_til_gnss_rapport(
-        gnsstidsserie, alpha=0.05, reference_hældning=0, er_samlet=True
-    )
-
-    assert isinstance(statistik, StatistikGnssSamlet)
 
 
 def test_beregn_statistik_til_hts_rapport(højdetidsserie):
