@@ -30,10 +30,11 @@ class Statistik:
     mex: float
     mey: float
 
-    def __str__(self):
-        header = ", ".join([str(field.name) for field in fields(self)])
-        linje = ", ".join([str(getattr(self, field.name)) for field in fields(self)])
-        return f"{header}\n{linje}"
+    def header(self):
+        return [str(field.name) for field in fields(self)]
+
+    def row(self):
+        return [str(getattr(self, field.name)) for field in fields(self)]
 
 
 @dataclass
