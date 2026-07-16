@@ -27,6 +27,12 @@ from fire.cli.niv import (
     udled_jessenpunkt_fra_punktoversigt,
     afbryd_hvis_ugyldigt_jessenpunkt,
 )
+from fire.cli.exceptions import (
+    AfbrydFejl,
+    IntetAtGøre,
+    advarsel,
+    YndefuldeFejl,
+)
 import fire.io.dataframe as frame
 from fire.io.regneark import arkdef
 from fire.io.formattering import forkort
@@ -108,7 +114,10 @@ def fjern_punkt_fra_punktsamling(
 
     punkt = db.hent_punkt(ident)
 
-    try:
+    with YndefuldeFejl(
+        NoResultFound,
+        f"Punktsamling med objektid {punktsamlingsid} ikke fundet!",
+    ):
         punktsamling = (
             db.session.query(PunktSamling)
             .filter(
@@ -117,18 +126,9 @@ def fjern_punkt_fra_punktsamling(
             )  # NOQA
             .one()
         )
-    except NoResultFound:
-        fire.cli.print(f"Punktsamling med objektid {punktsamlingsid} ikke fundet!")
-        raise SystemExit
 
     if punktsamling.jessenpunkt == punkt:
-        fire.cli.print(
-            f"FEJL: Må ikke fjerne punktsamlingens jessenpunkt!",
-            bold=True,
-            fg="black",
-            bg="yellow",
-        )
-        raise SystemExit()
+        raise AfbrydFejl(f"Må ikke fjerne punktsamlingens jessenpunkt!")
 
     # Tidsserier som skal lukkes først!
     tidsserier = [
@@ -138,16 +138,10 @@ def fjern_punkt_fra_punktsamling(
     ]
 
     if tidsserier:
-        fire.cli.print(
-            f"FEJL: Må ikke fjerne et punkt fra en punktsamling hvor der ligger aktive tidsserier ({tidsserier})! ",
-            bold=True,
-            fg="black",
-            bg="yellow",
+        raise AfbrydFejl(
+            f"Må ikke fjerne et punkt fra en punktsamling hvor der ligger aktive tidsserier ({tidsserier})!",
+            f"Anvend 'fire luk tidsserie' for at lukke tidsserierne først.",
         )
-        fire.cli.print(
-            f"Anvend 'fire luk tidsserie' for at lukke tidsserierne først.", bold=True
-        )
-        raise SystemExit()
 
     punktsamling.fjern_punkter([punkt])
 
@@ -156,12 +150,11 @@ def fjern_punkt_fra_punktsamling(
         beskrivelse=f"fire niv fjern-punkt-fra-punktsamling: Fjernet punkt {ident} fra punktsamling {punktsamling.navn}",
     )
     fire.cli.firedb.indset_sagsevent(sagsevent, commit=False)
-    try:
+
+    fejltekst = f"Punkt {punkt.ident} IKKE slettet fra '{punktsamling.navn}'"
+    with YndefuldeFejl(Exception, fejltekst, med_årsag=True):
+        # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()
-    except Exception as ex:
-        # rul tilbage hvis databasen smider en exception
-        fire.cli.firedb.session.rollback()
-        raise ex
 
     # Generer dokumentation til fanebladet "Sagsgang"
     sagsgangslinje = {
@@ -324,12 +317,9 @@ def opret_punktsamling(
         )
     else:
         # Hverken Punktoversigt eller jessenpunktets ident er givet.
-        fire.cli.print(
-            f"FEJL: Intet Jessenpunkt angivet, og kan ikke udlede Jessenpunkt fra Punktoversigten, da den er fravalgt.",
-            fg="black",
-            bg="yellow",
+        raise IntetAtGøre(
+            "Intet Jessenpunkt angivet, og kan ikke udlede Jessenpunkt fra Punktoversigten, da den er fravalgt."
         )
-        raise SystemExit(1)
 
     afbryd_hvis_ugyldigt_jessenpunkt(jessenpunkt)
 
@@ -477,38 +467,26 @@ def udtræk_punktsamling(
     # Find Punktsamling(en/erne)
     if punktsamlingsnavn:
         # Find den valgte punktsamling. Hvis brugeren har valgt et jessenpunkt, ignoreres det
-        try:
+        with YndefuldeFejl(
+            NoResultFound, f"Punktsamling {punktsamlingsnavn} ikke fundet!"
+        ):
             punktsamlinger = [fire.cli.firedb.hent_punktsamling(punktsamlingsnavn)]
-        except NoResultFound:
-            fire.cli.print(
-                f"FEJL! Punktsamling {punktsamlingsnavn} ikke fundet!",
-                fg="black",
-                bg="yellow",
-            )
-            raise SystemExit
+
     elif jessenpunkt_ident:
         # Udtræk alle punktsamlinger som har det valgte Jessenpunkt
-        try:
+        with YndefuldeFejl(
+            NoResultFound, f"Jessenpunkt {jessenpunkt_ident} ikke fundet!"
+        ):
             jessenpunkt = fire.cli.firedb.hent_punkt(jessenpunkt_ident)
-        except NoResultFound:
-            fire.cli.print(
-                f"FEJL! Jessenpunkt {jessenpunkt_ident} ikke fundet!",
-                fg="black",
-                bg="yellow",
-            )
-            raise SystemExit
 
         afbryd_hvis_ugyldigt_jessenpunkt(jessenpunkt)
         punktsamlinger = [
             ps for ps in jessenpunkt.punktsamlinger if ps.jessenpunkt == jessenpunkt
         ]
     else:
-        fire.cli.print(
-            f"Hverken Jessenpunkt eller Punktsamling angivet. Afbryder...",
-            fg="black",
-            bg="yellow",
+        raise IntetAtGøre(
+            f"Hverken Jessenpunkt eller Punktsamling angivet. Afbryder..."
         )
-        raise SystemExit
 
     # Hent Punktoversigten, hvis den er tilvalgt, og udvid punktlisten.
     if anvend_punktoversigt:
@@ -659,13 +637,7 @@ def ilæg_punktsamling(
         fire.cli.print(f"Behandler punktgruppe {punktgruppenavn}")
 
         if pd.isna(formål) or formål == "":
-            fire.cli.print(
-                f"FEJL: Formål for punktsamling {punktgruppenavn} ikke angivet!",
-                fg="white",
-                bg="red",
-                bold=True,
-            )
-            raise SystemExit(1)
+            raise AfbrydFejl(f"Formål for punktsamling {punktgruppenavn} ikke angivet!")
 
         jessenpunkt = fire.cli.firedb.hent_punkt(punktgruppedata["Jessenpunkt"])
         afbryd_hvis_ugyldigt_jessenpunkt(jessenpunkt)
@@ -732,7 +704,9 @@ def ilæg_punktsamling(
     for pktsamling in pktsamlinger_til_ilæggelse:
 
         # Sammenlign med de andre punktsamlinger som er på vej til at blive lagt i db
-        ligmed, subset, superset = er_punktsamling_unik(pktsamling, pktsamlinger_til_ilæggelse)
+        ligmed, subset, superset = er_punktsamling_unik(
+            pktsamling, pktsamlinger_til_ilæggelse
+        )
 
         # Sammenlign med alle andre punktsamlinger
         ligmed_alle, subset_alle, superset_alle = er_punktsamling_unik(pktsamling)
@@ -743,24 +717,15 @@ def ilæg_punktsamling(
 
         if ligmed:
             ligmed = ", ".join(ligmed)
-            advarsel_ligmed = (
-                f"Advarsel! {pktsamling.navn} indeholder de samme punkter som: {ligmed}"
-            )
-            fire.cli.print(advarsel_ligmed, fg="black", bg="yellow")
+            advarsel(f"{pktsamling.navn} indeholder de samme punkter som: {ligmed}")
 
         if superset:
             superset = ", ".join(superset)
-            advarsel_superset = (
-                f"Advarsel! Punkterne i {pktsamling.navn} er et superset af: {superset}"
-            )
-            fire.cli.print(advarsel_superset, fg="black", bg="yellow")
+            advarsel(f"Punkterne i {pktsamling.navn} er et superset af: {superset}")
 
         if subset:
             subset = ", ".join(subset)
-            advarsel_subset = (
-                f"Advarsel! Punkterne i {pktsamling.navn} er en delmængde af: {subset}"
-            )
-            fire.cli.print(advarsel_subset, fg="black", bg="yellow")
+            advarsel(f"Punkterne i {pktsamling.navn} er en delmængde af: {subset}")
 
         if not (ligmed or superset or subset):
             continue
@@ -784,12 +749,7 @@ def ilæg_punktsamling(
     if not (
         koord_til_oprettelse or pktsamling_til_redigering or pktsamling_til_oprettelse
     ):
-        fire.cli.print(
-            f"Ingen punktsamlinger at oprette eller redigere. Afbryder!",
-            fg="yellow",
-            bold=True,
-        )
-        return
+        raise IntetAtGøre(f"Ingen punktsamlinger at oprette eller redigere. Afbryder!")
 
     # ================= 3A. SAGSEVENT REDIGER PUNKTSAMLING =================
 
@@ -801,12 +761,8 @@ def ilæg_punktsamling(
             punktsamlinger=pktsamling_til_redigering,
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_rediger_punktsamlinger, commit=False)
-        try:
+        with YndefuldeFejl(Exception, med_årsag=True):
             fire.cli.firedb.session.flush()
-        except Exception as ex:
-            # rul tilbage hvis databasen smider en exception
-            fire.cli.firedb.session.rollback()
-            raise ex
 
         # Generer dokumentation til fanebladet "Sagsgang"
         sagsgangslinje = {
@@ -831,12 +787,8 @@ def ilæg_punktsamling(
             koordinater=koord_til_oprettelse,
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_nye_jessenkoter, commit=False)
-        try:
+        with YndefuldeFejl(Exception, med_årsag=True):
             fire.cli.firedb.session.flush()
-        except Exception as ex:
-            # rul tilbage hvis databasen smider en exception
-            fire.cli.firedb.session.rollback()
-            raise ex
 
         # Generer dokumentation til fanebladet "Sagsgang"
         sagsgangslinje = {
@@ -857,12 +809,8 @@ def ilæg_punktsamling(
             punktsamlinger=pktsamling_til_oprettelse,
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_opret_punktsamlinger, commit=False)
-        try:
+        with YndefuldeFejl(Exception, med_årsag=True):
             fire.cli.firedb.session.flush()
-        except Exception as ex:
-            # rul tilbage hvis databasen smider en exception
-            fire.cli.firedb.session.rollback()
-            raise ex
 
         # Generer dokumentation til fanebladet "Sagsgang"
         sagsgangslinje = {
@@ -977,13 +925,7 @@ def ilæg_tidsserie(
         formål = row["Formål"].strip()
 
         if pd.isna(formål) or formål == "":
-            fire.cli.print(
-                f"FEJL: Formål for tidsserie {tidsserienavn} ikke angivet!",
-                fg="white",
-                bg="red",
-                bold=True,
-            )
-            raise SystemExit(1)
+            raise AfbrydFejl(f"Formål for tidsserie {tidsserienavn} ikke angivet!")
 
         try:
             ts = fire.cli.firedb.hent_tidsserie(tidsserienavn)
@@ -1029,12 +971,12 @@ def ilæg_tidsserie(
             tidsserier=ts_til_redigering,
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_rediger_tidsserier, commit=False)
-        try:
-            fire.cli.firedb.session.flush([sagsevent_rediger_tidsserier,])
-        except Exception as ex:
-            # rul tilbage hvis databasen smider en exception
-            fire.cli.firedb.session.rollback()
-            raise ex
+        with YndefuldeFejl(Exception, med_årsag=True):
+            fire.cli.firedb.session.flush(
+                [
+                    sagsevent_rediger_tidsserier,
+                ]
+            )
 
         # Generer dokumentation til fanebladet "Sagsgang"
         sagsgangslinje = {
@@ -1055,12 +997,8 @@ def ilæg_tidsserie(
             tidsserier=ts_til_oprettelse,
         )
         fire.cli.firedb.indset_sagsevent(sagsevent_opret_tidsserier, commit=False)
-        try:
-            fire.cli.firedb.session.flush([sagsevent_opret_tidsserier,])
-        except Exception as ex:
-            # rul tilbage hvis databasen smider en exception
-            fire.cli.firedb.session.rollback()
-            raise ex
+        with YndefuldeFejl(Exception, med_årsag=True):
+            fire.cli.firedb.session.flush()
 
         # Generer dokumentation til fanebladet "Sagsgang"
         sagsgangslinje = {
@@ -1162,13 +1100,10 @@ def find_punktsamling(
 
     # Sikr at den fundne Punktsamling også har korrekt Jessenpunkt
     if punktsamling.jessenpunkt != jessenpunkt:
-        fire.cli.print(
-            f"FEJL: Jessenpunktet '{punktsamling.jessenpunkt.ident}' for punktsamlingen '{punktsamlingsnavn}' "
+        raise AfbrydFejl(
+            f"Jessenpunktet '{punktsamling.jessenpunkt.ident}' for punktsamlingen '{punktsamlingsnavn}' "
             f"er ikke det samme som det angivne Jessenpunkt '{jessenpunkt.ident}'",
-            fg="black",
-            bg="yellow",
         )
-        raise SystemExit(1)
 
     return punktsamling
 
@@ -1189,7 +1124,7 @@ def er_punktsamling_unik(
     der falder inden for de 3 kategorier.
     """
     if not isinstance(punktsamling_A, PunktSamling):
-        raise TypeError("'punktsamling' er ikke en instans af PunktSamling")
+        raise AfbrydFejl("'punktsamling' er ikke en instans af PunktSamling")
 
     # Mængde af punkter i Punktsamling A
     punkter_A = {pkt.ident for pkt in punktsamling_A.punkter}
@@ -1237,12 +1172,7 @@ def opret_ny_tidsserie(
     except NoResultFound:
         pass
     else:
-        fire.cli.print(
-            f"FEJL: Tidsserien '{tidsserienavn}' eksisterer allerede. ",
-            fg="black",
-            bg="yellow",
-        )
-        raise SystemExit
+        raise AfbrydFejl(f"Tidsserien '{tidsserienavn}' eksisterer allerede.")
 
     if punkt not in punktsamling.punkter:
         punktsamling.tilføj_punkter([punkt])
@@ -1277,13 +1207,10 @@ def opret_ny_punktsamling(
     except NoResultFound:
         pass
     else:
-        fire.cli.print(
-            f"FEJL: Punktsamlingen '{punktsamlingsnavn}' eksisterer allerede. "
+        raise AfbrydFejl(
+            f"Punktsamlingen '{punktsamlingsnavn}' eksisterer allerede. ",
             f"Anvend 'fire niv udtræk-punktsamling' for at udtrække og redigere i eksisterende punktsamlinger.",
-            fg="black",
-            bg="yellow",
         )
-        raise SystemExit
 
     # fjern dubletter med list(set( ... ))
     punkter = list(set([jessenpunkt] + punkter))

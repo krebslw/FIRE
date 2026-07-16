@@ -23,6 +23,7 @@ from fire.api.model.geometry import (
 )
 from fire.cli.info import punktinforapport
 from fire.cli.niv import bekræft
+from fire.cli.exceptions import YndefuldeFejl
 import fire.cli
 
 PUNKTSKABELONER = {
@@ -281,25 +282,18 @@ def punktopret(
         beskrivelse="Oprettelse af nyt punkt",
         punkter=[punkt],
     )
-    try:
+
+    with YndefuldeFejl(DatabaseError, "Punkt ikke oprettet", med_årsag=True):
         fire.cli.firedb.indset_sagsevent(sagsevent_punkt_opret, commit=False)
         fire.cli.firedb.session.flush()
-    except DatabaseError as e:
-        fire.cli.firedb.session.rollback()
-        fire.cli.print(f"Der opstod en fejl - punkt IKKE oprettet:")
-        fire.cli.print(e)
-        raise SystemExit
 
     # Opret punktinformationer
     punktinformationer = []
     for attribut in attributter:
-        try:
+        with YndefuldeFejl(ValueError, med_årsag=True):
             if attribut in SPECIELLE_INFOTYPER:
                 punktinformationer.append(SPECIELLE_INFOTYPER[attribut](punkt))
                 continue
-        except ValueError as fejl:
-            fire.cli.print(f"FEJL: {fejl}", bg="red", bold=True)
-            raise SystemExit
 
         pit = fire.cli.firedb.hent_punktinformationtype(attribut)
         tekst = None
@@ -341,24 +335,20 @@ def punktopret(
     fire.cli.print(f"  Oprettelsesdato             {punkt.registreringfra}")
     punktinforapport(punktinformationer, historik=False)
 
-    try:
+    with YndefuldeFejl(DatabaseError, "Punkt IKKE oprettet", med_årsag=True):
         fire.cli.firedb.indset_sagsevent(sagsevent_punktinfo_opret, commit=False)
         fire.cli.firedb.session.flush()
         fire.cli.firedb.luk_sag(sag, commit=False)
         fire.cli.firedb.session.flush()
-    except DatabaseError as e:
-        fire.cli.firedb.session.rollback()
-        fire.cli.print("Der opstod en fejl - punkt IKKE oprettet:")
-        fire.cli.print(e)
+
+    spørgsmål = click.style(
+        f"Er du sikker på at du vil oprette punktet i {fire.cli.firedb.db}-databasen med ovenstående information?",
+        bg="red",
+        fg="white",
+    )
+    if bekræft(spørgsmål):
+        fire.cli.firedb.session.commit()
+        fire.cli.print("Punkt oprettet!")
     else:
-        spørgsmål = click.style(
-            f"Er du sikker på at du vil oprette punktet i {fire.cli.firedb.db}-databasen med ovenstående information?",
-            bg="red",
-            fg="white",
-        )
-        if bekræft(spørgsmål):
-            fire.cli.firedb.session.commit()
-            fire.cli.print("Punkt oprettet!")
-        else:
-            fire.cli.firedb.session.rollback()
-            fire.cli.print("Afbrudt, punkt ikke oprettet!")
+        fire.cli.firedb.session.rollback()
+        fire.cli.print("Afbrudt, punkt ikke oprettet!")

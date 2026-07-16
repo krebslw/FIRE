@@ -18,6 +18,9 @@ from fire.cli.niv import (
     er_projekt_okay,
     skriv_ark,
 )
+from fire.cli.exceptions import (
+    YndefuldeFejl,
+)
 
 
 @niv_command_group.command()
@@ -71,17 +74,11 @@ def luk_sag(projektnavn: str, sagsbehandler, **kwargs) -> None:
     )
     fire.cli.firedb.indset_sagsevent(sagsevent, commit=False)
     fire.cli.firedb.luk_sag(sag, commit=False)
-    try:
+
+    fejltekst = f"Sag {sag.id} for '{projektnavn}' IKKE lukket!"
+    with YndefuldeFejl(Exception, fejltekst, med_årsag=True):
         # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()
-    except Exception as ex:
-        # rul tilbage hvis databasen smider en exception
-        fire.cli.firedb.session.rollback()
-        fire.cli.print(
-            f"Der opstod en fejl - sag {sag.id} for '{projektnavn}' IKKE lukket!"
-        )
-        fire.cli.print(f"Mulig årsag: {ex}")
-        raise SystemExit(1)
 
     spørgsmål = click.style(
         f"Er du sikker på at du vil lukke sagen {projektnavn}?",

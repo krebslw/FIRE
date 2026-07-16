@@ -21,6 +21,9 @@ from fire.cli.niv import (
     skriv_ark,
     er_projekt_okay,
 )
+from fire.cli.exceptions import (
+    advarsel,
+)
 
 
 @niv.command()
@@ -111,11 +114,9 @@ def netoversigt(projektnavn: str, **kwargs) -> None:
     # Analyser net
     net_uden_ensomme, ensomme_subnet, estimerbare_punkter = motor.netanalyse()
     if ensomme_subnet:
-        fire.cli.print(
-            f"ADVARSEL: Manglende fastholdt punkt i mindst et subnet! Forslag til fastholdte punkter i hvert subnet:",
-            bg="yellow",
-            fg="black",
-        )
+        advarseltekst = "Manglende fastholdt punkt i mindst et subnet! Forslag til fastholdte punkter i hvert subnet:"
+        advarsel(advarseltekst)
+
         for i, forslag in enumerate(ensomme_subnet):
             fire.cli.print(f"  Subnet {i}: {forslag}", fg="red")
 
@@ -146,9 +147,7 @@ def netoversigt(projektnavn: str, **kwargs) -> None:
     skriv_ark(projektnavn, resultater, "-netoversigt")
 
     singulære_punkter = tuple(sorted(resultater["Singulære"]["Punkt"]))
-    fire.cli.print(
-        f"Fandt {len(singulære_punkter)} singulære punkter."
-    )
+    fire.cli.print(f"Fandt {len(singulære_punkter)} singulære punkter.")
     fire.cli.print(f"Fandt {len(polygoner)} polygoner.")
 
 

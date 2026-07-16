@@ -38,6 +38,11 @@ from fire.cli.niv import (
     er_projekt_okay,
 )
 from fire.cli.niv._udtræk_revision import LOKATION_DEFAULT
+from fire.cli.exceptions import (
+    IntetAtGøre,
+    advarsel,
+    YndefuldeFejl,
+)
 
 
 def opret_punktnavne_til_ikke_oprettede_punkter(ark: pd.DataFrame) -> pd.DataFrame:
@@ -162,6 +167,7 @@ def udfyld_udeladte_identer(ark: pd.DataFrame) -> pd.DataFrame:
     ark["Punkt"] = punkter
 
     return ark
+
 
 def geometri_indenfor_danmark(geometriobjekt: GeometriObjekt) -> bool:
     """
@@ -511,10 +517,7 @@ def ilæg_revision(
         revision = revision.drop(range(start, stop), axis="index")
 
     if revision.empty:
-        fire.cli.print(
-            "Ingen besøgte punkter til ilægning. Stopper.", fg="yellow", bold=True
-        )
-        raise SystemExit
+        raise IntetAtGøre("Ingen besøgte punkter til ilægning. Stopper.")
 
     # Find alle punkter, der skal nyoprettes
     nye_punkter = []
@@ -548,25 +551,24 @@ def ilæg_revision(
         punkt = fire.cli.firedb.hent_punkt(row["Punkt"])
         # gem her inden ny geometri tilknyttes punktet
         try:
-            (λ1, φ1) = punkt.geometri.koordinater
+            λ1, φ1 = punkt.geometri.koordinater
         except AttributeError:
             # hvis ikke punktet har en lokationskoordinat bruger vi (11, 56), da dette
             # er koordinaten der skrives i revisionsregnearket ved udtræk når der
             # mangler en lokationskoordinat.
-            (λ1, φ1) = LOKATION_DEFAULT
+            λ1, φ1 = LOKATION_DEFAULT
 
         go = læs_lokation(row["Ny værdi"])
         go.punkt = punkt
         nye_lokationer.append(go)
-        (λ2, φ2) = go.koordinater
+        λ2, φ2 = go.koordinater
 
         g = Geod(ellps="GRS80")
         _, _, dist = g.inv(λ1, φ1, λ2, φ2)
         if dist >= 25:
-            fire.cli.print(
-                f"    ADVARSEL: Ny lokationskoordinat for {punkt.landsnummer} afviger {dist:.0f} m fra den gamle",
-                fg="yellow",
-                bold=True,
+            advarsel(
+                f"Ny lokationskoordinat for {punkt.landsnummer} afviger {dist:.0f} m fra den gamle",
+                præfix="    ADVARSEL: ",
             )
 
     if len(nye_punkter) > 0 or len(nye_lokationer) > 0:
@@ -594,16 +596,13 @@ def ilæg_revision(
         sridnavn = r["Attribut"].upper()
         if sridnavn not in sridnavne:
             continue
-        try:
+
+        fejltekst = f"Ukorrekt koordinatformat:\n{'    '.join(r['Ny værdi'])}"
+        uddybende_tekst = "Skal være på formen: 'x y z t sx sy sz', hvor ubrugte værdier sættes til 'nan'"
+        with YndefuldeFejl(
+            ValueError, fejltekst, uddybende_tekst, med_årsag=True
+        ):
             koord = [float(k.replace(",", ".")) for k in r["Ny værdi"].split()]
-        except ValueError as ex:
-            fire.cli.print(
-                f"Ukorrekt koordinatformat:\n{'    '.join(r['Ny værdi'])}\n{ex}"
-            )
-            fire.cli.print(
-                "Skal være på formen: 'x y z t sx sy sz', hvor ubrugte værdier sættes til 'nan'"
-            )
-            raise SystemExit(1)
 
         # Oversæt NaN til None
         koord = [None if isnan(k) else k for k in koord]
@@ -701,20 +700,14 @@ def ilæg_revision(
         # Ved opdatering af eksisterende punkter vil vi gerne checke
         # infonøglerne, så vi er nødt til at hente det faktiske punkt,
         # med tilørende infonøgler, fra databasen
-        try:
+        # NB! Førhen blev denne fejltekst formatteret som gul-på-rød skrift.
+        # Nu er det bare hvid-på-rød som alle andre fejltekster.
+        fejltekst = f"Kan ikke finde punkt {ident}!"
+        with YndefuldeFejl(NoResultFound, fejltekst, med_årsag=True):
             punkt = fire.cli.firedb.hent_punkt(ident)
             infonøgler = {
                 info.objektid: i for i, info in enumerate(punkt.punktinformationer)
             }
-        except NoResultFound as ex:
-            fire.cli.print(
-                f"FEJL: Kan ikke finde punkt {ident}!",
-                fg="yellow",
-                bg="red",
-                bold=True,
-            )
-            fire.cli.print(f"Mulig årsag: {ex}")
-            raise SystemExit(1)
 
         # Hent alle revisionselementer for punktet fra revisionsarket
         rev = revision.query(f"Punkt == '{ident}'")
@@ -796,10 +789,8 @@ def ilæg_revision(
                     # Ingen definitiv test her: Tom tekst kan være gyldig.
                     # Men vi sørger for at den ikke er None
                     if tekst is None or tekst == "":
-                        fire.cli.print(
-                            f"    ADVARSEL: Tom tekst anført for {pitnavn}.",
-                            fg="yellow",
-                            bold=True,
+                        advarsel(
+                            f"Tom tekst anført for {pitnavn}.", præfix="    ADVARSEL: "
                         )
                         tekst = ""
                     pi = PunktInformation(infotype=pit, punkt=punkt, tekst=tekst)
@@ -808,10 +799,9 @@ def ilæg_revision(
                         # Både punktum og komma er accepterede decimalseparatorer
                         tal = float(r["Ny værdi"].replace(",", "."))
                     except ValueError as ex:
-                        fire.cli.print(
-                            f"    FEJL: {pitnavn} forventer numerisk værdi [{ex}].",
-                            fg="yellow",
-                            bold=True,
+                        advarsel(
+                            f"{pitnavn} forventer numerisk værdi [{ex}].",
+                            præfix="    ADVARSEL: ",
                         )
                         tal = 0
                     pi = PunktInformation(infotype=pit, punkt=punkt, tal=tal)
@@ -857,10 +847,9 @@ def ilæg_revision(
                 try:
                     tal = float(r["Ny værdi"])
                 except ValueError as ex:
-                    fire.cli.print(
-                        f"    FEJL: {pitnavn} forventer numerisk værdi [{ex}].",
-                        fg="yellow",
-                        bold=True,
+                    advarsel(
+                        f"{pitnavn} forventer numerisk værdi [{ex}].",
+                        præfix="    ADVARSEL: ",
                     )
                     tal = 0
                 pi = PunktInformation(infotype=pit, punkt=punkt, tal=tal)
@@ -922,13 +911,9 @@ def ilæg_revision(
 
 def flush():
     """Indlæs data i database"""
-    try:
+    fejltekst = "Revisionsark IKKE indlæst."
+    with YndefuldeFejl(DatabaseError, fejltekst, med_årsag=True):
         fire.cli.firedb.session.flush()
-    except DatabaseError as ex:
-        fire.cli.print("FEJL! Mulig årsag:", fg="red", bold=True)
-        fire.cli.print(f"{ex}", fg="red")
-        fire.cli.firedb.session.rollback()
-        raise SystemExit(1)
 
 
 def opdater_sagsgang(sagsgang, sagsevent, sagsbehandler):
@@ -961,12 +946,14 @@ def læs_lokation(lokation: str) -> GeometriObjekt:
     ), f"Lokation '{lokation}' matcher ikke format: 55.443322 [N] 12.345678 [Ø]."
     if len(lok) == 2:
         lok = [lok[0], "", lok[1], ""]
-    try:
+
+    with YndefuldeFejl(
+        ValueError,
+        f"Ikke-numerisk lokationskoordinat anført: {lokation}",
+        med_årsag=True,
+    ):
         e = float(lok[2].replace(",", "."))
         n = float(lok[0].replace(",", "."))
-    except ValueError as ex:
-        fire.cli.print(f"Ikke-numerisk lokationskoordinat anført: {lokation} ({ex})")
-        raise SystemExit(1)
 
     # Håndter verdenshjørner Nn/ØøEe/VvWw/Ss
     if lok[3].upper() in ("S", "N"):

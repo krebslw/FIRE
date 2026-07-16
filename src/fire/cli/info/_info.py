@@ -33,6 +33,11 @@ from fire.api.model import (
     Grafik,
 )
 from fire.cli.click_types import Datetime
+from fire.cli.exceptions import (
+    AfbrydFejl,
+    IntetAtGøre,
+    YndefuldeFejl,
+)
 
 # Dato-format til kommandolinie-argument.
 DATE_FORMAT = "%d-%m-%Y"
@@ -534,13 +539,10 @@ def punkt(
 
     ident = klargør_ident_til_søgning(ident)
 
-    try:
+    with YndefuldeFejl(NoResultFound, f"Kunne ikke finde {ident}"):
         punkter = fire.cli.firedb.hent_punkter(
             ident, inkluder_historiske_identer=historik
         )
-    except NoResultFound:
-        fire.cli.print(f"Fejl: Kunne ikke finde {ident}.", fg="red", err=True)
-        raise SystemExit(1)
 
     # Succesfuld søgning - vis hvad der blev fundet
     n = len(punkter)
@@ -595,11 +597,8 @@ def srid(srid: str, ts: bool, **kwargs):
     else:
         srid_name = srid
 
-        try:
+        with YndefuldeFejl(NoResultFound, f"{srid_name} ikke fundet!"):
             srid = fire.cli.firedb.hent_srid(srid_name)
-        except NoResultFound:
-            fire.cli.print(f"Fejl! {srid_name} ikke fundet!", fg="red", err=True)
-            raise SystemExit(1)
 
         fire.cli.print("--- SRID ---", bold=True)
         fire.cli.print(f" Navn:       :  {srid.name}")
@@ -632,7 +631,7 @@ def infotype(infotype: str, søg: bool, **kwargs):
     for alle de punktinfotyper, som matcher INFOTYPE et vilkårligt sted i
     enten navn eller beskrivelse.
     """
-    try:
+    with YndefuldeFejl(NoResultFound, f"{infotype} ikke fundet!"):
         if søg:
             punktinfotyper = (
                 fire.cli.firedb.session.query(PunktInformationType)
@@ -655,9 +654,6 @@ def infotype(infotype: str, søg: bool, **kwargs):
 
         if not punktinfotyper:
             raise NoResultFound
-    except NoResultFound:
-        fire.cli.print(f"Fejl! {infotype} ikke fundet!", fg="red", err=True)
-        raise SystemExit(1)
 
     if len(punktinfotyper) == 1:
         pit = punktinfotyper[0]
@@ -711,8 +707,7 @@ def obstype(obstype: str, **kwargs):
 
     ot = fire.cli.firedb.hent_observationstype(obstype)
     if ot is None:
-        fire.cli.print(f"Fejl! {obstype} ikke fundet!", fg="red", err=True)
-        raise SystemExit(1)
+        AfbrydFejl(f"{obstype} ikke fundet!")
 
     fire.cli.print("--- OBSERVATIONSTYPE ---", bold=True)
     fire.cli.print(f"  Navn        :  {ot.name}")
@@ -978,17 +973,14 @@ def sag(
         sag = fire.cli.firedb.hent_sag(sagsid)
     except (NoResultFound, MultipleResultsFound):
 
-        try:
+        with YndefuldeFejl(NoResultFound, f"Kunne ikke finde {sagsid}"):
             if sagsid or fra or til or aktive:
                 sager = fire.cli.firedb.hent_sager(
                     søgetekst=sagsid, aktive=aktive, tid_fra=fra, tid_til=til
                 )
 
-            if len(sager) == 1:
-                sag = sager[0]
-        except NoResultFound as fejl:
-            fire.cli.print(fejl)
-            raise SystemExit
+        if len(sager) == 1:
+            sag = sager[0]
 
     if sag:
         fire.cli.print(
@@ -1148,16 +1140,13 @@ def sagsevent(sagseventid: str, **kwargs) -> None:
             f"{'-'*spacer_bredde} {tekst} {'-'*spacer_bredde}"[0:80], bold=bold
         )
 
-    try:
+    with (
+        YndefuldeFejl(NoResultFound, f'"{sagseventid}" ikke fundet!'),
+        YndefuldeFejl(
+            MultipleResultsFound, f'Partielt UUID "{sagseventid}" ikke unikt!'
+        ),
+    ):
         event = fire.cli.firedb.hent_sagsevent(sagseventid)
-    except NoResultFound:
-        fire.cli.print(f'Fejl! "{sagseventid}" ikke fundet!', fg="red", err=True)
-        raise SystemExit(1)  # pylint: disable=raise-missing-from
-    except MultipleResultsFound:
-        fire.cli.print(
-            f'Fejl! Partielt UUID "{sagseventid}" ikke unikt!', fg="red", err=True
-        )
-        raise SystemExit(1)  # pylint: disable=raise-missing-from
 
     fire.cli.print("\n")
     _header("SAGSEVENT", bold=True)
@@ -1261,17 +1250,14 @@ def punktsamling(punktsamling: str, **kwargs):
     if not punktsamling:
         punktsamlinger = fire.cli.firedb.hent_alle_punktsamlinger()
         if not punktsamlinger:
-            raise SystemExit("Der findes ingen punktsamlinger i databasen.")
+            raise IntetAtGøre("Der findes ingen punktsamlinger i databasen.")
 
         punktsamlingsrapport(punktsamlinger)
 
         return
 
-    try:
+    with YndefuldeFejl(NoResultFound, f"{punktsamling} ikke fundet!"):
         punktsamling = fire.cli.firedb.hent_punktsamling(punktsamling)
-    except NoResultFound:
-        fire.cli.print(f"Fejl! {punktsamling} ikke fundet!", fg="red", err=True)
-        raise SystemExit(1)
 
     fire.cli.print(
         "------------------------- PUNKTSAMLING -------------------------", bold=True

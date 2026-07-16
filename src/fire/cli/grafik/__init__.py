@@ -21,6 +21,10 @@ from fire.api.model import (
 )
 from fire.enumtools import enum_values
 from fire.cli.niv import bekræft
+from fire.cli.exceptions import (
+    AfbrydFejl,
+    YndefuldeFejl,
+)
 
 
 @click.group()
@@ -53,10 +57,8 @@ def vis(filnavn: str, **kwargs) -> None:
     """
     db = fire.cli.firedb
 
-    try:
+    with YndefuldeFejl(NoResultFound, f"Fandt ikke {filnavn}!"):
         grafik = db.hent_grafik(filnavn)
-    except NoResultFound:
-        raise SystemExit(f"Fandt ikke {filnavn}!")
 
     ext = Path(grafik.filnavn).suffix
     with tempfile.NamedTemporaryFile("wb", suffix=ext) as tmp:
@@ -125,9 +127,9 @@ def indsæt(
 
     if g:
         if ident not in g.punkt.identer:
-            raise SystemExit(
+            raise AfbrydFejl(
                 f"Kan ikke indsætte {filnavn} på {ident},"
-                " allerede regisreret på {g.punkt.ident}"
+                f" allerede regisreret på {g.punkt.ident}"
             )
 
     punkt = db.hent_punkt(ident)
@@ -148,11 +150,8 @@ def indsæt(
         beskrivelse="Indsættelse af ny grafik med 'fire grafik'",
     )
     db.indset_sag(sag, commit=False)
-    try:
+    with YndefuldeFejl(Exception):
         fire.cli.firedb.session.flush()
-    except Exception as ex:
-        fire.cli.firedb.session.rollback()
-        raise SystemExit(ex)
 
     # opret grafik
     grafik = Grafik.fra_fil(punkt, sti)
@@ -165,25 +164,21 @@ def indsæt(
     )
     db.indset_sagsevent(sagsevent, commit=False)
     db.luk_sag(sag, commit=False)
-    try:
+    with YndefuldeFejl(Exception, f"Fil {filnavn} IKKE indsat!"):
         # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()
-    except Exception as e:
-        # rul tilbage hvis databasen smider en exception
-        fire.cli.firedb.session.rollback()
-        fire.cli.print(f"Der opstod en fejl - fil {filnavn} IKKE indsat!")
+
+    spørgsmål = click.style(
+        f"Er du sikker på at du vil tilknytte grafikken {filnavn} til {punkt.ident}?",
+        bg="red",
+        fg="white",
+    )
+    if bekræft(spørgsmål):
+        fire.cli.firedb.session.commit()
+        fire.cli.print(f"fil {filnavn} tilknyttet {punkt.ident}!")
     else:
-        spørgsmål = click.style(
-            f"Er du sikker på at du vil tilknytte grafikken {filnavn} til {punkt.ident}?",
-            bg="red",
-            fg="white",
-        )
-        if bekræft(spørgsmål):
-            fire.cli.firedb.session.commit()
-            fire.cli.print(f"fil {filnavn} tilknyttet {punkt.ident}!")
-        else:
-            fire.cli.firedb.session.rollback()
-            fire.cli.print(f"fil {filnavn} IKKE tilknyttet {punkt.ident}!")
+        fire.cli.firedb.session.rollback()
+        fire.cli.print(f"fil {filnavn} IKKE tilknyttet {punkt.ident}!")
 
 
 @grafik.command()
@@ -212,10 +207,8 @@ def slet(filnavn: str, sagsbehandler: str, **kwargs) -> None:
     """
     db = fire.cli.firedb
 
-    try:
+    with YndefuldeFejl(NoResultFound, f"Fandt ikke {filnavn}!"):
         grafik = db.hent_grafik(filnavn)
-    except NoResultFound:
-        raise SystemExit(f"Fandt ikke {filnavn}!")
 
     punkt = grafik.punkt
 
@@ -225,11 +218,8 @@ def slet(filnavn: str, sagsbehandler: str, **kwargs) -> None:
         beskrivelse="Afregistrering af grafik med `fire grafik slet`",
     )
     db.indset_sag(sag, commit=False)
-    try:
+    with YndefuldeFejl(Exception):
         fire.cli.firedb.session.flush()
-    except Exception as ex:
-        fire.cli.firedb.session.rollback()
-        raise SystemExit(ex)
 
     sagsevent = sag.ny_sagsevent(
         beskrivelse=f"Grafik {filnavn} for {punkt.ident} afregistreret",
@@ -237,22 +227,18 @@ def slet(filnavn: str, sagsbehandler: str, **kwargs) -> None:
     )
     db.indset_sagsevent(sagsevent, commit=False)
     db.luk_sag(sag, commit=False)
-    try:
+    with YndefuldeFejl(Exception, f"Fil {filnavn} IKKE slettet!"):
         # Indsæt alle objekter i denne session
         fire.cli.firedb.session.flush()
-    except Exception as e:
-        # rul tilbage hvis databasen smider en exception
-        fire.cli.firedb.session.rollback()
-        fire.cli.print(f"Der opstod en fejl - fil {filnavn} IKKE slettet!")
+
+    spørgsmål = click.style(
+        f"Er du sikker på at du vil slettet grafikken {filnavn} tilhørende {punkt.ident}?",
+        bg="red",
+        fg="white",
+    )
+    if bekræft(spørgsmål):
+        fire.cli.firedb.session.commit()
+        fire.cli.print(f"fil {filnavn} slettet fra {punkt.ident}!")
     else:
-        spørgsmål = click.style(
-            f"Er du sikker på at du vil slettet grafikken {filnavn} tilhørende {punkt.ident}?",
-            bg="red",
-            fg="white",
-        )
-        if bekræft(spørgsmål):
-            fire.cli.firedb.session.commit()
-            fire.cli.print(f"fil {filnavn} slettet fra {punkt.ident}!")
-        else:
-            fire.cli.firedb.session.rollback()
-            fire.cli.print(f"fil {filnavn} IKKE slettet fra {punkt.ident}!")
+        fire.cli.firedb.session.rollback()
+        fire.cli.print(f"fil {filnavn} IKKE slettet fra {punkt.ident}!")

@@ -24,6 +24,12 @@ from fire.api.model import (
 from fire.io.regneark import arkdef
 import fire.cli
 from fire.cli import firedb, grøn
+from fire.cli.exceptions import (
+    AfbrydFejl,
+    IntetAtGøre,
+    YndefuldeFejl,
+    advarsel,
+)
 
 # Kotesystemer som understøttes i niv-modulet
 KOTESYSTEMER = {
@@ -163,7 +169,9 @@ def juster_kolonnebredder(faneblad: Worksheet):
     """
     max_bredde = 40
     for kolonne in faneblad.columns:
-        kolonnebredde = min(max([len(str(row.value)) for row in kolonne])+1, max_bredde)
+        kolonnebredde = min(
+            max([len(str(row.value)) for row in kolonne]) + 1, max_bredde
+        )
         faneblad.column_dimensions[kolonne[0].column_letter].width = kolonnebredde
 
 
@@ -372,29 +380,22 @@ def find_parameter(projektnavn: str, parameter: str) -> str:
 def find_sag(projektnavn: str, accepter_inaktiv=False) -> Sag:
     """Bomb hvis sag for projektnavn ikke er oprettet. Ellers returnér sagen"""
     if not os.path.isfile(f"{projektnavn}.xlsx"):
-        fire.cli.print(
-            f"FEJL: Filen '{projektnavn}.xlsx' ikke fundet - står du i den rigtige folder?",
-            bold=True,
-            bg="red",
+        raise AfbrydFejl(
+            f"Filen '{projektnavn}.xlsx' ikke fundet - står du i den rigtige folder?"
         )
-        raise SystemExit(1)
-
     sagsgang = find_sagsgang(projektnavn)
     sagsid = find_sagsid(sagsgang)
-    try:
+
+    fejlbesked = (
+        f"Sag for {projektnavn} er endnu ikke oprettet - brug fire niv opret-sag!"
+    )
+    with YndefuldeFejl(Exception, fejlbesked):
         sag = fire.cli.firedb.hent_sag(sagsid)
-    except:
-        fire.cli.print(
-            f" Sag for {projektnavn} er endnu ikke oprettet - brug fire niv opret-sag! ",
-            bold=True,
-            bg="red",
-        )
-        raise SystemExit(1)
+
     if not accepter_inaktiv and not sag.aktiv:
-        fire.cli.print(
+        raise IntetAtGøre(
             f"Sag {sagsid} for {projektnavn} er markeret inaktiv. Genåbn for at gå videre."
         )
-        raise SystemExit(1)
     return sag
 
 
@@ -449,8 +450,7 @@ def opret_region_punktinfo(punkt: Punkt) -> PunktInformation:
     # indsæt region
     pit = fire.cli.firedb.hent_punktinformationtype(region)
     if pit is None:
-        fire.cli.print(f"Kan ikke finde region '{region}'")
-        raise SystemExit(1)
+        raise AfbrydFejl(f"Kan ikke finde region '{region}'")
 
     return PunktInformation(infotype=pit, punkt=punkt)
 
@@ -465,28 +465,20 @@ def er_projekt_okay(projektnavn: str) -> None:
     """
     projekt_db = find_parameter(projektnavn, "Database")
     if projekt_db != fire.cli.firedb.db:
-        fire.cli.print(
-            f"FEJL: '{projektnavn}' er oprettet i {projekt_db}-databasen - du forbinder til {fire.cli.firedb.db}-databasen!",
-            bold=True,
-            bg="red",
+        raise AfbrydFejl(
+            f"'{projektnavn}' er oprettet i {projekt_db}-databasen - du forbinder til {fire.cli.firedb.db}-databasen!"
         )
-        raise SystemExit(1)
 
     fil_version = packaging.version.parse(find_parameter(projektnavn, "Version"))
     fire_version = packaging.version.parse(fire.__version__)
     if fil_version.major != fire_version.major:
-        fire.cli.print(
-            f"FEJL: '{projektnavn}' er oprettet med version {fil_version} - du har version {fire_version} installeret!",
-            bold=True,
-            bg="red",
+        raise AfbrydFejl(
+            f"'{projektnavn}' er oprettet med version {fil_version} - du har version {fire_version} installeret!"
         )
-        raise SystemExit(1)
 
     if fil_version.minor > fire_version.minor:
-        fire.cli.print(
-            f"ADVARSEL: '{projektnavn}' er oprettet med version {fil_version} - du har version {fire_version} installeret!",
-            bold=True,
-            bg="yellow",
+        advarsel(
+            f"'{projektnavn}' er oprettet med version {fil_version} - du har version {fire_version} installeret!"
         )
         return
 
@@ -503,23 +495,12 @@ def udled_jessenpunkt_fra_punktoversigt(
     # Tjek om der er anvendt Jessen-system
     # Denne er et sanity-tjek -- Man skal ville det hvis man vil oprette punktsamlinger!
     if len(set(punktoversigt["System"])) > 1:
-        fire.cli.print(
-            "FEJL: Flere forskellige højdereferencesystemer er angivet i Punktoversigt!",
-            fg="white",
-            bg="red",
-            bold=True,
+        raise AfbrydFejl(
+            "Flere forskellige højdereferencesystemer er angivet i Punktoversigt!"
         )
-        raise SystemExit(1)
-
     kotesystem = punktoversigt["System"].iloc[0]
     if kotesystem != "Jessen":
-        fire.cli.print(
-            "FEJL: Kotesystem skal være 'Jessen'",
-            fg="white",
-            bg="red",
-            bold=True,
-        )
-        raise SystemExit(1)
+        raise AfbrydFejl("Kotesystem skal være 'Jessen'")
 
     # Tjek om der kun er ét fastholdt punkt, og gør brugeren opmærksom på hvis punktet
     # ikke har et Jessennummer.
@@ -527,36 +508,17 @@ def udled_jessenpunkt_fra_punktoversigt(
     fastholdte_koter = punktoversigt["Kote"][punktoversigt["Fasthold"] != ""]
 
     if len(fastholdte_punkter) != 1:
-        fire.cli.print(
-            "FEJL: Punktsamlinger kræver netop ét fastholdt Jessenpunkt.",
-            fg="white",
-            bg="red",
-            bold=True,
-        )
-        raise SystemExit(1)
+        raise AfbrydFejl("Punktsamlinger kræver netop ét fastholdt Jessenpunkt.")
 
     if pd.isna(fastholdte_koter).any():
-        fire.cli.print(
-            "FEJL: Fastholdt punkt har ikke nogen fastholdt kote!",
-            fg="white",
-            bg="red",
-            bold=True,
-        )
-        raise SystemExit(1)
+        raise AfbrydFejl("Fastholdt punkt har ikke nogen fastholdt kote!")
 
     jessenpunkt_ident = fastholdte_punkter.iloc[0]
     jessenpunkt_kote = fastholdte_koter.iloc[0]
 
-    try:
+    fejltekst = f"Kunne ikke finde Jessenpunktet {jessenpunkt_ident} i databasen!"
+    with YndefuldeFejl(NoResultFound, fejltekst):
         jessenpunkt = fire.cli.firedb.hent_punkt(jessenpunkt_ident)
-    except NoResultFound:
-        fire.cli.print(
-            f"FEJL: Kunne ikke finde Jessenpunktet {jessenpunkt_ident} i databasen!",
-            fg="white",
-            bg="red",
-            bold=True,
-        )
-        raise SystemExit(1)
 
     return jessenpunkt_kote, jessenpunkt
 
@@ -564,13 +526,10 @@ def udled_jessenpunkt_fra_punktoversigt(
 def afbryd_hvis_ugyldigt_jessenpunkt(jessenpunkt: Punkt) -> None:
     """Smid fejl hvis valgt jessenpunkt ikke er et registreret jessenpunkt"""
     if not jessenpunkt.jessennummer:
-        fire.cli.print(
-            f"FEJL: Jessenpunktet {jessenpunkt.ident} har intet Jessennummer. "
+        raise AfbrydFejl(
+            f"Jessenpunktet {jessenpunkt.ident} har intet Jessennummer.",
             "Jessennummer kan oprettes igennem Punktrevision ved indsættelse af IDENT:jessen og NET:jessen.",
-            fg="black",
-            bg="yellow",
         )
-        raise SystemExit(1)
 
 
 def hent_relevante_tidsserier(
@@ -596,24 +555,15 @@ def hent_relevante_tidsserier(
         # Den her fejler hvis den fundne tidsserie ikke har punkt som punkt
         # Vil kun ske hvis man manuelt har tastet noget mærkeligt ind i arket.
         if tidsserie.punkt != punkt:
-            fire.cli.print(
-                f"FEJL: Mismatch mellem punkt {punkt.ident} og tidsserie {tidsserie.navn}!",
-                fg="white",
-                bg="red",
-                bold=True,
+            raise AfbrydFejl(
+                f"Mismatch mellem punkt {punkt.ident} og tidsserie {tidsserie.navn}!"
             )
-            raise SystemExit(1)
 
         # Samme som ovenstående, men for Punktgruppenavn
         if tidsserie.punktsamling.navn != htsdata["Punktgruppenavn"]:
-            fire.cli.print(
-                f"FEJL: Mismatch mellem punktgruppe {htsdata['Punktgruppenavn']} og tidsserie {tidsserie.navn}!",
-                fg="white",
-                bg="red",
-                bold=True,
+            raise AfbrydFejl(
+                f"Mismatch mellem punktgruppe {htsdata['Punktgruppenavn']} og tidsserie {tidsserie.navn}!"
             )
-            raise SystemExit(1)
-
         if (
             tidsserie.punktsamling.jessenpunkt != fastholdt_punkt
             or tidsserie.punktsamling.jessenkote != fastholdt_kote
