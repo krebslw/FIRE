@@ -27,6 +27,8 @@ from fire.api.model import (
     PunktSamling,
     Koordinat,
     Observation,
+    GeometriskKoteforskel,
+    TrigonometriskKoteforskel,
     Boolean,
     Srid,
     Tidsserie,
@@ -38,43 +40,56 @@ from fire.cli.exceptions import (
     IntetAtGøre,
     YndefuldeFejl,
 )
+from fire.cli.pretty_tables import (
+    klargør_celle,
+    print_tabel,
+    generer_rapporttabel,
+)
+from rich.table import Table
 
 # Dato-format til kommandolinie-argument.
 DATE_FORMAT = "%d-%m-%Y"
 
 
-def observation_linje(obs: Observation) -> str:
+def observation_linje(
+    obs: GeometriskKoteforskel | TrigonometriskKoteforskel,
+) -> tuple[list[str], str]:
     if obs.observationstypeid > 2:
-        return ""
+        return [], None
 
     if obs.slettet:
-        return ""
+        return [], None
 
-    fra = obs.opstillingspunkt.ident
-    til = obs.sigtepunkt.ident
-    dH = obs.value1
-    L = obs.value2
-    N = int(obs.value3)
+    metode = "G" if obs.observationstypeid == 1 else "T"
     tid = obs.observationstidspunkt.strftime("%Y-%m-%d %H:%M")
-    grp = obs.gruppe
-    oid = obs.objektid
 
-    # Geometrisk nivellement
-    if obs.observationstypeid == 1:
-        præs = int(obs.value7)
-        eta_1 = obs.value4
-        fejlfaktor = obs.value5
-        centrering = obs.value6
-        return f"G {præs} {tid}   {dH:+09.6f}   {L:6.1f} {N:2}   {fra:12} {til:12}    {fejlfaktor:3.1f} {centrering:4.2f} {eta_1:+07.2f} {grp:6} {oid:6}"
+    # Kun GeometriskKoteForskel har disse to attributter.
+    # Hvis observationen er Trigonometrisk skrives 0 i stedet.
+    præs = getattr(obs, "præcisionsnivellement", 0)
+    eta_1 = getattr(obs, "eta_l", 0.0)
 
-    # Trigonometrisk nivellement
-    if obs.observationstypeid == 2:
-        fejlfaktor = obs.value4
-        centrering = obs.value5
-        return f"T 0 {tid}    {dH:+09.6f}  {L:6.1f} {N:2}   {fra:12} {til:12}    {fejlfaktor:3.1f} {centrering:4.2f}    0.00 {grp:6} {oid:6}"
+    row = [
+        "X" if obs.fejlmeldt else "",
+        f"{metode} {præs} {tid}",
+        f"{obs.koteforskel:+09.6f}",
+        f"{obs.nivlængde:6.1f}",
+        f"{obs.opstillinger:2}",
+        obs.opstillingspunkt.ident,
+        obs.sigtepunkt.ident,
+        f"{obs.spredning_afstand:3.1f}",
+        f"{obs.spredning_centrering:4.2f}",
+        f"{eta_1:+07.2f}",
+        f"{obs.gruppe:6}",
+        f"{obs.objektid:6}",
+    ]
+
+    # set row styles
+    style = "" if not obs.fejlmeldt else "red"
+
+    return row, style
 
 
-def koordinat_linje(koord: Koordinat) -> str:
+def koordinat_linje(koord: Koordinat) -> tuple[list[str], str]:
     """
     Konstruer koordinatoutput i overensstemmelse med koordinatens dimensionalitet,
     enhed og proveniens.
@@ -82,8 +97,8 @@ def koordinat_linje(koord: Koordinat) -> str:
     native_or_transformed = "t"
     if koord.transformeret == Boolean.FALSE:
         native_or_transformed = "n"
-
-    meta = f"{koord.t.strftime('%Y-%m-%d %H:%M')}  {(koord.srid.kortnavn or koord.srid.name):<15.15} {native_or_transformed} "
+    tid = koord.t.strftime("%Y-%m-%d %H:%M")
+    srid = f"{(koord.srid.kortnavn or koord.srid.name)}"
 
     # Se i proj.db: Er koordinatsystemet lineært eller vinkelbaseret?
     try:
@@ -96,62 +111,93 @@ def koordinat_linje(koord: Koordinat) -> str:
         if koord.srid.name == "GL:NAD83G":
             grader = True
 
-    dimensioner = 0
     if koord.x is not None and koord.y is not None:
-        dimensioner = 2
-
-    if koord.z is not None:
-        if dimensioner == 2:
-            dimensioner = 3
-        else:
-            dimensioner = 1
+        dimensioner = 3 if koord.z is not None else 2
+    else:
+        dimensioner = 1 if koord.z is not None else 0
 
     if dimensioner == 1:
-        linje = meta + f"{koord.z:.5f} ({koord.sz:.0f})"
-
+        xyz = f"{koord.z:.5f} ({koord.sz:.0f})"
     if dimensioner == 2:
         if grader:
-            linje = (
-                meta
-                + f"{koord.x:.10f}, {koord.y:.10f} ({koord.sx:.0f}, {koord.sy:.0f})"
-            )
+            xyz = f"{koord.x:.10f}, {koord.y:.10f} ({koord.sx:.0f}, {koord.sy:.0f})"
         else:
-            linje = (
-                meta + f"{koord.x:.4f}, {koord.y:.4f} ({koord.sx:.0f}, {koord.sy:.0f})"
-            )
+            xyz = f"{koord.x:.4f}, {koord.y:.4f} ({koord.sx:.0f}, {koord.sy:.0f})"
 
     if dimensioner == 3:
-        linje = meta + f"{koord.x:.10f}, {koord.y:.10f}, {koord.z:.5f}"
+        xyz = f"{koord.x:.10f}, {koord.y:.10f}, {koord.z:.5f}"
         if koord.sx is not None and koord.sy is not None and koord.sz is not None:
-            linje += f"  ({koord.sx:.0f}, {koord.sy:.0f}, {koord.sz:.0f})"
+            xyz += f" ({koord.sx:.0f}, {koord.sy:.0f}, {koord.sz:.0f})"
 
-    return linje
+    markør = "*"
+    style = "green"
+    if koord.registreringtil is not None:
+        markør = "X" if koord.fejlmeldt else "."
+        style = "red"
+
+    row = [markør, tid, srid, native_or_transformed, xyz]
+
+    return row, style
+
+
+def punktinfo_linje(punktinfo: PunktInformation) -> tuple[list[str], str]:
+    """Generér en tabelrække til punktinforapport."""
+    tekst = punktinfo.tekst or ""
+    # tal kan godt være 0, derfor tjekkes explicit for Noneness
+    tal = punktinfo.tal if punktinfo.tal is not None else ""
+
+    # marker slukkede punktinformationer med rød tekst og et minus tv for linjen
+    style, markør = "", ""
+    if punktinfo.registreringtil:
+        style, markør = "red", "-"
+    row = [f"{markør}{punktinfo.infotype.name}", f"{tekst}{tal}"]
+    return row, style
 
 
 def punktinforapport(
-    punktinformationer: List[PunktInformation], historik: bool
+    punkt: Punkt, historik: bool = False, detaljeret: bool = False
 ) -> None:
     """
-    Hjælpefunktion for 'punkt_fuld_rapport'.
+    Hjælpefunktion for 'punkt_fuld_rapport': Udskriv formateret punktinfo-tabel
     """
-    for info in punktinformationer:
-        tekst = info.tekst or ""
-        # efter mellemrum rykkes teksten ind på linje med resten af
-        # attributteksten
-        tekst = tekst.replace("\n", "\n" + " " * 30).replace("\r", "").rstrip(" \n")
+    tbl = generer_rapporttabel(
+        title=None,
+        show_header=False,
+        padding=(0, 2, 0, 2),
+    )
 
-        tal = info.tal
-        # info.tal *kan* være 0.0, derfor explicit tjek af Noneness
-        if info.tal is None:
-            tal = ""
+    # Tilføj Lokation og Oprettelsesdato
+    try:
+        for geometriobjekt in punkt.geometriobjekter:
+            # marker slukkede geometriobjekter med rød tekst og et minus tv for linjen
+            if geometriobjekt.registreringtil:
+                if not historik:
+                    continue
+                tbl.add_row("-Lokation", f"{geometriobjekt.geometri}", style="red")
+            else:
+                tbl.add_row("Lokation", f"{geometriobjekt.geometri}")
+    except Exception:
+        pass
 
-        # marker slukkede punktinformationer med rød tekst og et minus tv for linjen
-        if info.registreringtil:
-            if not historik:
-                continue
-            fire.cli.print(f" -{info.infotype.name:27} {tekst}{tal}", fg="red")
-        else:
-            fire.cli.print(f"  {info.infotype.name:27} {tekst}{tal}")
+    tbl.add_row("Oprettelsesdato", f"{punkt.registreringfra}")
+
+    # Tilføj de almindelige punktinformationer
+    for info in punkt.punktinformationer:
+        if info.registreringtil and not historik:
+            continue
+        row, style = punktinfo_linje(info)
+        tbl.add_row(*row, style=style)
+
+    # Tilføj detaljerede informationer
+    if detaljeret:
+        tbl.add_row("uuid", f"{punkt.id}")
+        tbl.add_row("objekt-id", f"{punkt.objektid}")
+        tbl.add_row("sagsid", f"{punkt.sagsevent.sagsid}")
+        tbl.add_row("sagsevent-fra", f"{punkt.sagseventfraid}")
+        if punkt.sagseventtilid is not None:
+            tbl.add_row(f"sagsevent-til", f"{punkt.sagseventtilid}")
+
+    print_tabel(tbl, align="left")
 
 
 def koordinatrapport(
@@ -173,17 +219,20 @@ def koordinatrapport(
 
     ts = True if "ts" in options.split(",") else False
     alle = True if "alle" in options.split(",") else False
+
+    tbl = generer_rapporttabel(title="--- Koordinater ---", show_header=False)
     for koord in koordinater:
         tskoord = koord.srid.name.startswith("TS:")
         if tskoord and not ts:
             continue
         if koord.registreringtil is not None:
-            if alle or (ts and tskoord) or historik:
-                markør = "X" if koord.fejlmeldt else "."
-                fire.cli.print(f"{markør} " + koordinat_linje(koord), fg="red")
-        else:
-            fire.cli.print("* " + koordinat_linje(koord), fg="green")
-    fire.cli.print("")
+            if not (alle or historik):
+                continue
+
+        row, style = koordinat_linje(koord)
+        tbl.add_row(*row, style=style)
+
+    print_tabel(tbl, align="left")
 
 
 def observationsrapport(
@@ -244,25 +293,32 @@ def observationsrapport(
     if n_vist == 0:
         return
 
-    fire.cli.print(
-        "    [Trig/Geom][Præs][T]     dH        L      N    Fra          Til             ne  d     eta    grp    id"
+    kolonnenavne = (
+        "",
+        "[Trig/Geom][Præs][T]",
+        "dH",
+        "L",
+        "N",
+        "Fra",
+        "Til",
+        "ne",
+        "d",
+        "eta",
+        "grp",
+        "id",
     )
-    fire.cli.print("  " + 110 * "-")
-    for obs in observationer:
-        linje = observation_linje(obs)
-        if linje != "" and linje is not None:
-            if obs.fejlmeldt:
-                fire.cli.print(" X  " + observation_linje(obs), fg="red")
-            else:
-                fire.cli.print("    " + observation_linje(obs))
 
-    fire.cli.print("  " + 110 * "-")
+    rows_styles = [observation_linje(obs) for obs in observationer]
+
+    tbl = generer_rapporttabel(
+        *kolonnenavne,
+        title="--- Observationer ---",
+        rows_styles=rows_styles,
+    )
 
     if not opt_detaljeret:
+        print_tabel(tbl, align="left")
         return
-
-    fire.cli.print(f"  Observationer ialt:  {n_obs_til + n_obs_fra}")
-    fire.cli.print(f"  Observationer vist:  {n_vist}")
 
     # Find ældste og yngste observation
     min_obs = datetime.datetime(9999, 12, 31, 0, 0, 0)
@@ -273,52 +329,46 @@ def observationsrapport(
         if obs.observationstidspunkt > max_obs:
             max_obs = obs.observationstidspunkt
 
-    fire.cli.print(f"  Ældste observation:  {min_obs}")
-    fire.cli.print(f"  Nyeste observation:  {max_obs}")
-    fire.cli.print("  " + 110 * "-")
+    tbl.caption = (
+        f"  Observationer ialt:  {n_obs_til + n_obs_fra}\n"
+        f"  Observationer vist:  {n_vist}\n"
+        f"  Ældste observation:  {min_obs}\n"
+        f"  Nyeste observation:  {max_obs}\n"
+    )
+    tbl.caption_style = ""
+    tbl.caption_justify = "left"
+    print_tabel(tbl, align="left")
 
 
 def punktsamlingsrapport(punktsamlinger: list[PunktSamling], id: str = None):
     """
     Hjælpefunktion for funktionerne punkt_fuld_rapport og punktsamling.
     """
-    kolonnebredder = (
-        34,
-        11,
-        13,
-        16,
-    )
-    kolonnenavne = ("Navn", "Jessenpunkt", "Antal punkter", "Antal tidsserier")
-    header = "  ".join([str(n).ljust(w) for n, w in zip(kolonnenavne, kolonnebredder)])
-    subheader = "  ".join(["-" * w for w in kolonnebredder])
 
-    fire.cli.print(header, bold=True)
-    fire.cli.print(subheader)
+    kolonnenavne = ("Navn", "Jessenpunkt", "Antal punkter", "Antal tidsserier")
+    tbl = generer_rapporttabel(
+        *kolonnenavne,
+        title="--- Punktsamlinger ---",
+    )
 
     punktsamlinger = [ps for ps in punktsamlinger if ps.registreringtil is None]
-
     # Sortér Punktsamlinger efter Jessennummer, dernæst efter Punktsamlingsnavn
     punktsamlinger.sort(key=lambda x: (x.jessenpunkt.jessennummer, x.navn))
 
     for ps in punktsamlinger:
-        farve = "white"
+        style = ""
         if ps.jessenpunkt.id == id:
-            farve = "green"
+            style = "green"
 
-        kolonner = [
+        row = [
             ps.navn,
             ps.jessenpunkt.jessennummer,
             len(ps.punkter),
             len(ps.tidsserier),
         ]
+        tbl.add_row(*[klargør_celle(c) for c in row], style=style)
 
-        linje = "  ".join(
-            [
-                textwrap.shorten(str(c), width=w, placeholder="...").ljust(w)
-                for c, w in zip(kolonner, kolonnebredder)
-            ]
-        )
-        fire.cli.print(linje, fg=farve)
+    print_tabel(tbl, align="left")
 
 
 def tidsserierapport(tidsserier: list[Tidsserie]):
@@ -326,14 +376,11 @@ def tidsserierapport(tidsserier: list[Tidsserie]):
     Hjælpefunktion for funktionerne punkt_fuld_rapport og punktsamling.
     """
 
-    kolonnebredder = [40, 17, 6, 18]
     kolonnenavne = ["Navn", "Antal datapunkter", "Type", "Referenceramme"]
-
-    header = "  ".join([str(n).ljust(w) for n, w in zip(kolonnenavne, kolonnebredder)])
-    subheader = "  ".join(["-" * w for w in kolonnebredder])
-
-    fire.cli.print(header, bold=True)
-    fire.cli.print(subheader)
+    tbl = generer_rapporttabel(
+        *kolonnenavne,
+        title="--- Tidsserier ---",
+    )
 
     def tidsserietype(tstype):
         if tstype == 1:
@@ -344,21 +391,12 @@ def tidsserierapport(tidsserier: list[Tidsserie]):
     for ts in tidsserier:
         if ts.registreringtil is not None:
             continue
-        navn_ombrudt = textwrap.wrap(str(ts.navn), kolonnebredder[0])
-        for navn_del in navn_ombrudt[:-1]:
-            fire.cli.print(navn_del)
 
-        kolonner = [
-            navn_ombrudt[-1],
-            len(ts),
-            tidsserietype(ts.tstype),
-            ts.referenceramme,
-        ]
+        row = [ts.navn, len(ts), tidsserietype(ts.tstype), ts.referenceramme]
 
-        linje = "  ".join([str(c).ljust(w) for c, w in zip(kolonner, kolonnebredder)])
-        fire.cli.print(linje)
+        tbl.add_row(*[klargør_celle(c) for c in row])
 
-    return
+    print_tabel(tbl, align="left")
 
 
 def punkt_fuld_rapport(
@@ -386,64 +424,39 @@ def punkt_fuld_rapport(
 
     # Geometri, fire-id, oprettelsesdato og PunktInformation håndteres
     # under et, da det giver et bedre indledende overblik
-    try:
-        for geometriobjekt in punkt.geometriobjekter:
-            # marker slukkede geometriobjekter med rød tekst og et minus tv for linjen
-            if geometriobjekt.registreringtil:
-                if not opt_historik:
-                    continue
-                fire.cli.print(
-                    f" -Lokation                    {geometriobjekt.geometri}", fg="red"
-                )
-            else:
-                fire.cli.print(
-                    f"  Lokation                    {geometriobjekt.geometri}"
-                )
-    except Exception:
-        pass
-
-    fire.cli.print(f"  Oprettelsesdato             {punkt.registreringfra}")
-
-    punktinforapport(punkt.punktinformationer, opt_historik)
-
-    if opt_detaljeret:
-        fire.cli.print(f"  uuid                        {punkt.id}")
-        fire.cli.print(f"  objekt-id                   {punkt.objektid}")
-        fire.cli.print(f"  sagsid                      {punkt.sagsevent.sagsid}")
-        fire.cli.print(f"  sagsevent-fra               {punkt.sagseventfraid}")
-        if punkt.sagseventtilid is not None:
-            fire.cli.print(f"  sagsevent-til               {punkt.sagseventtilid}")
+    punktinforapport(punkt, opt_historik, opt_detaljeret)
 
     if punkt.grafikker:
-        fire.cli.print("")
-        fire.cli.print("--- GRAFIK ---", bold=True)
+        tbl = generer_rapporttabel(
+            show_header=False,
+            title="--- Grafik ---",
+            padding=(0, 2, 0, 2),
+        )
         for grafik in punkt.grafikker:
             if grafik.registreringtil:
                 continue
-            print(f"{grafik.type.value.title():30}{grafik.filnavn}")
+            tbl.add_row(f"{grafik.type.value.title()}", f"{grafik.filnavn}")
+
+        fire.cli.print("")
+        print_tabel(tbl, align="left")
 
     # Koordinater og observationer klares af specialiserede hjælpefunktioner
     if "ingen" not in opt_koord.split(","):
         fire.cli.print("")
-        fire.cli.print("--- KOORDINATER ---", bold=True)
         koordinatrapport(punkt.koordinater, opt_koord, opt_historik)
 
     if opt_obs != "":
         fire.cli.print("")
-        fire.cli.print("--- OBSERVATIONER ---", bold=True)
         observationsrapport(
             punkt.observationer_til, punkt.observationer_fra, opt_obs, opt_detaljeret
         )
-        fire.cli.print("")
 
     if punkt.punktsamlinger:
         fire.cli.print("")
-        fire.cli.print("--- PUNKTSAMLINGER ---", bold=True)
         punktsamlingsrapport(punkt.punktsamlinger, punkt.id)
 
     if punkt.tidsserier:
         fire.cli.print("")
-        fire.cli.print("--- TIDSSERIER ---", bold=True)
         tidsserierapport(punkt.tidsserier)
 
 
@@ -1082,8 +1095,12 @@ def sagsevent(sagseventid: str, **kwargs) -> None:
     # oprettelse og nedlukning. De skal præsenteres på omtrent samme måde.
     # Nedenstående interne funktioner benyttes til dette.
     def _koordinatoversigt(koordinater: list[Koordinat]) -> None:
+        tbl = Table(box=None)
         for koordinat in koordinater:
-            fire.cli.print(f"{koordinat.punkt.ident:14} {koordinat_linje(koordinat)}")
+            row, style = koordinat_linje(koordinat)
+            # drop 1. kolonne som indeholder markøren
+            tbl.add_row(koordinat.punkt.ident, *row[1:])
+        print_tabel(tbl, align="left")
         fire.cli.print("\n")
 
     def _observationsoversigt(observationer: list[Observation]) -> None:
@@ -1122,8 +1139,18 @@ def sagsevent(sagseventid: str, **kwargs) -> None:
             punktinfo_oversigt[punktinfo.punkt].append(punktinfo)
 
         for punkt, punktinformationer in punktinfo_oversigt.items():
-            fire.cli.print(punkt.ident)
-            punktinforapport(punktinformationer, historik)
+            tbl = generer_rapporttabel(
+                title=punkt.ident,
+                show_header=False,
+            )
+            for info in punktinformationer:
+                if info.registreringtil and not historik:
+                    continue
+                # vi bruger ikke stilarten i denne sagseventrapport.
+                row, style = punktinfo_linje(info)
+                tbl.add_row(*row)
+
+            print_tabel(tbl, align="left")
             fire.cli.print("\n")
 
     def _grafikoversigt(grafikker: list[Grafik]) -> None:
