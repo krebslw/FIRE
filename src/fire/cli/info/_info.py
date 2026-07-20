@@ -918,7 +918,6 @@ def _grupper_sagsevents(sagsevent_liste: list[Sagsevent]) -> dict[set]:
     "-r",
     "--rapport",
     type=str,
-    default=None,
     is_flag=False,
     flag_value="",
     help="Udskriv rapport over fremsøgte sager. Gives et navn på rapporten skrives også en geojson-fil som oversigt.",
