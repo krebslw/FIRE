@@ -3,10 +3,6 @@ import re
 
 import click
 import pandas as pd
-from rich.table import Table
-from rich.console import Console
-from rich import box
-from sqlalchemy import func
 from sqlalchemy.exc import NoResultFound
 
 
@@ -19,6 +15,10 @@ from fire.api.model import (
     PunktSamling,
     Koordinat,
     Srid,
+)
+from fire.cli.exceptions import (
+    AfbrydFejl,
+    YndefuldeFejl,
 )
 
 
@@ -58,8 +58,6 @@ def _print_tidsserieoversigt(
 ) -> None:
     """
     Print en oversigt over en liste af tidsserier
-
-    raises:     SystemExit
     """
 
     def foretrukken_ident(ts: Tidsserie):
@@ -97,10 +95,9 @@ def _udtræk_tidsserie(
     `objekt` som ident.
     """
     if srid is not None:
-        try:
+        with YndefuldeFejl(NoResultFound, f"Srid '{srid}' ikke fundet i databasen."):
             srid = fire.cli.firedb.hent_srid(srid)
-        except NoResultFound:
-            raise SystemExit(f"Srid '{srid}' ikke fundet i databasen.")
+
         srid_filter = lambda ts: ts.srid == srid
     else:
         srid_filter = lambda ts: True
@@ -113,20 +110,18 @@ def _udtræk_tidsserie(
 
     # Hvis ingen tidsserier, prøver vi med objekt som ident
     if not tidsserier:
-        try:
+        with YndefuldeFejl(NoResultFound, "Punkt eller tidsserie ikke fundet"):
             punkt = fire.cli.firedb.hent_punkt(objekt)
-        except NoResultFound:
-            raise SystemExit("Punkt eller tidsserie ikke fundet")
-        else:
-            # Udtræk punktets tidsserier og filtrer på ts-type og srid
-            tidsserier = [
-                ts
-                for ts in punkt.tidsserier
-                if isinstance(ts, tidsserieklasse) and srid_filter(ts)
-            ]
+
+        # Udtræk punktets tidsserier og filtrer på ts-type og srid
+        tidsserier = [
+            ts
+            for ts in punkt.tidsserier
+            if isinstance(ts, tidsserieklasse) and srid_filter(ts)
+        ]
 
     if not tidsserier:
-        raise SystemExit("Fandt ingen tidsserier")
+        raise AfbrydFejl("Fandt ingen tidsserier")
 
     # Print oversigt over fundne tidsserier
     _print_tidsserieoversigt(tidsserier)
@@ -151,7 +146,7 @@ def _print_tidsserie(
     kolonner = []
     for p in parametre:
         if p not in parametre_alle.keys():
-            raise SystemExit(f"Ukendt tidsserieparameter '{p}'")
+            raise AfbrydFejl(f"Ukendt tidsserieparameter '{p}'")
 
         overskrifter.append(p)
         kolonner.append(tidsserie.__getattribute__(parametre_alle[p]))
@@ -178,8 +173,7 @@ def _print_tidsserier(
     """
     srid = tidsserier[0].srid
     if not all(ts.srid == srid for ts in tidsserier):
-        fire.cli.print("Fejl: Alle tidsserierne skal have samme Srid", fg="red")
-        raise SystemExit(1)
+        raise AfbrydFejl("Alle tidsserierne skal have samme Srid")
 
     overskrifter = ["Navn", "Srid"]
 
