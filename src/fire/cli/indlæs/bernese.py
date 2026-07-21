@@ -4,9 +4,6 @@ from io import BytesIO
 from zipfile import ZipFile
 
 import click
-from rich.table import Table
-from rich.console import Console
-from rich import box
 from sqlalchemy.exc import NoResultFound, IntegrityError
 
 import fire.cli
@@ -28,6 +25,10 @@ from fire.cli.exceptions import (
     AfbrydFejl,
     advarsel,
     YndefuldeFejl,
+)
+from fire.cli.pretty_tables import (
+    generer_tabel,
+    print_tabel,
 )
 
 SRIDINDEX = {
@@ -168,15 +169,15 @@ def print_koordinat_tabel(koordinater: List[Koordinat]) -> None:
     """
     Skriv liste med nye koordinater til indsættelse i databasen.
     """
-    koordinattabel = Table("Station", "T", "X", "Y", "Z", box=box.SIMPLE)
 
-    for k in koordinater:
-        koordinattabel.add_row(
-            k.punkt.gnss_navn, str(k.t), str(k.x), str(k.y), str(k.z)
-        )
+    header = ["Station", "T", "X", "Y", "Z"]
+    rows = [
+        [k.punkt.gnss_navn, str(k.t), str(k.x), str(k.y), str(k.z)]
+        for k in koordinater
+    ]
 
-    console = Console()
-    console.print(koordinattabel)
+    koordinattabel = generer_tabel(header, rows)
+    print_tabel(koordinattabel)
 
 
 def komprimer(filer: List[click.File]) -> bytes:

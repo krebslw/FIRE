@@ -252,13 +252,11 @@ def klargør_transformationer(
         },
     }
     """
-    with YndefuldeFejl(NoResultFound, f"Source-srid '{src}' ikke fundet!"):
-        transformers = {
-            fire.cli.firedb.hent_srid(src := source): {
-                target: (trans := lav_transformer(source, target))
-            }
-            for source in sources
-        }
+    transformers = {}
+    for source in sources:
+        with YndefuldeFejl(NoResultFound, f"Source-srid '{source}' ikke fundet!"):
+            srid = fire.cli.firedb.hent_srid(source)
+        transformers[srid] = {target: (trans := lav_transformer(source, target))}
 
     try:
         target_srid = fire.cli.firedb.hent_srid(target)

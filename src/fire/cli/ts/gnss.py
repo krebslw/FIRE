@@ -13,6 +13,9 @@ from fire.api.model import (
 from fire.api.model.tidsserier import (
     TidsserieEnsemble,
 )
+from fire.cli.pretty_tables import (
+    gem_til_excel,
+)
 from fire.cli.ts.plot_ts import (
     plot_tidsserie,
     plot_gnss_analyse,
@@ -746,17 +749,12 @@ def analyse_gnss(
 
     # Gem statistik
     if fil:
-        linjer = ""
+        rows = []
         for _, statistik in ts_statistik.items():
-            header = str(statistik).split("\n")[0]
-            linje = str(statistik).split("\n")[1]
+            rows.append(statistik.row())
 
-            linjer += f"{linje}\n"
-
-        outstr = f"{header}\n{linjer}"
-
-        with open(fil, "w") as f:
-            f.write(outstr)
+        header = statistik.header()
+        gem_til_excel(header, rows, fil)
 
     if not plot:
         return

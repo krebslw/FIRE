@@ -331,9 +331,7 @@ def punktopret(
     )
 
     fire.cli.print("\nOpretter punkt med følgende karakteristika:\n", bold=True)
-    fire.cli.print(f"  Lokation                    {punkt.geometri.geometri}")
-    fire.cli.print(f"  Oprettelsesdato             {punkt.registreringfra}")
-    punktinforapport(punktinformationer, historik=False)
+    punktinforapport(punkt, historik=False, detaljeret=False)
 
     with YndefuldeFejl(DatabaseError, "Punkt IKKE oprettet", med_årsag=True):
         fire.cli.firedb.indset_sagsevent(sagsevent_punktinfo_opret, commit=False)

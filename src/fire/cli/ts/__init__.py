@@ -1,12 +1,5 @@
-from datetime import datetime
-import re
-
 import click
 import pandas as pd
-from rich.table import Table
-from rich.console import Console
-from rich import box
-from sqlalchemy import func
 from sqlalchemy.exc import NoResultFound
 
 
@@ -20,7 +13,15 @@ from fire.api.model import (
     Koordinat,
     Srid,
 )
-
+from fire.cli.exceptions import (
+    AfbrydFejl,
+    YndefuldeFejl,
+)
+from fire.cli.pretty_tables import (
+    generer_tabel,
+    print_tabel,
+    gem_til_excel,
+)
 
 @click.group()
 def ts():
@@ -58,8 +59,6 @@ def _print_tidsserieoversigt(
 ) -> None:
     """
     Print en oversigt over en liste af tidsserier
-
-    raises:     SystemExit
     """
 
     def foretrukken_ident(ts: Tidsserie):
@@ -68,17 +67,17 @@ def _print_tidsserieoversigt(
         elif isinstance(ts, HøjdeTidsserie):
             return ts.punkt.ident
 
-    tabel = Table("Ident", "Tidsserienavn", "Referenceramme", box=box.SIMPLE)
-
     # Sorter tidsserier efter punkt
     tidsserier.sort(key=lambda ts: (foretrukken_ident(ts)))
 
-    for ts in tidsserier:
-        tabel.add_row(foretrukken_ident(ts), ts.navn, ts.referenceramme)
+    header = ["Ident", "Tidsserienavn", "Referenceramme"]
+    rows = [
+        [foretrukken_ident(ts), ts.navn, ts.referenceramme]
+        for ts in tidsserier
+    ]
 
-    console = Console()
-    console.print(tabel)
-
+    tabel = generer_tabel(header, rows)
+    print_tabel(tabel)
 
 def _udtræk_tidsserie(
     objekt: str,
@@ -97,10 +96,9 @@ def _udtræk_tidsserie(
     `objekt` som ident.
     """
     if srid is not None:
-        try:
+        with YndefuldeFejl(NoResultFound, f"Srid '{srid}' ikke fundet i databasen."):
             srid = fire.cli.firedb.hent_srid(srid)
-        except NoResultFound:
-            raise SystemExit(f"Srid '{srid}' ikke fundet i databasen.")
+
         srid_filter = lambda ts: ts.srid == srid
     else:
         srid_filter = lambda ts: True
@@ -113,20 +111,18 @@ def _udtræk_tidsserie(
 
     # Hvis ingen tidsserier, prøver vi med objekt som ident
     if not tidsserier:
-        try:
+        with YndefuldeFejl(NoResultFound, "Punkt eller tidsserie ikke fundet"):
             punkt = fire.cli.firedb.hent_punkt(objekt)
-        except NoResultFound:
-            raise SystemExit("Punkt eller tidsserie ikke fundet")
-        else:
-            # Udtræk punktets tidsserier og filtrer på ts-type og srid
-            tidsserier = [
-                ts
-                for ts in punkt.tidsserier
-                if isinstance(ts, tidsserieklasse) and srid_filter(ts)
-            ]
+
+        # Udtræk punktets tidsserier og filtrer på ts-type og srid
+        tidsserier = [
+            ts
+            for ts in punkt.tidsserier
+            if isinstance(ts, tidsserieklasse) and srid_filter(ts)
+        ]
 
     if not tidsserier:
-        raise SystemExit("Fandt ingen tidsserier")
+        raise AfbrydFejl("Fandt ingen tidsserier")
 
     # Print oversigt over fundne tidsserier
     _print_tidsserieoversigt(tidsserier)
@@ -151,20 +147,18 @@ def _print_tidsserie(
     kolonner = []
     for p in parametre:
         if p not in parametre_alle.keys():
-            raise SystemExit(f"Ukendt tidsserieparameter '{p}'")
+            raise AfbrydFejl(f"Ukendt tidsserieparameter '{p}'")
 
         overskrifter.append(p)
         kolonner.append(tidsserie.__getattribute__(parametre_alle[p]))
 
-    _print_tabel(
-        overskrifter,
-        kolonner,
-    )
+    tabel = generer_tabel(overskrifter, kolonner, format="col")
+    print_tabel(tabel)
 
     if not fil:
         return
 
-    _gem_tabel(overskrifter, kolonner, fil)
+    gem_til_excel(overskrifter, kolonner, fil, format="col")
 
 
 def _print_tidsserier(
@@ -178,8 +172,7 @@ def _print_tidsserier(
     """
     srid = tidsserier[0].srid
     if not all(ts.srid == srid for ts in tidsserier):
-        fire.cli.print("Fejl: Alle tidsserierne skal have samme Srid", fg="red")
-        raise SystemExit(1)
+        raise AfbrydFejl("Alle tidsserierne skal have samme Srid")
 
     overskrifter = ["Navn", "Srid"]
 
@@ -201,51 +194,13 @@ def _print_tidsserier(
         for idx, p in enumerate(parametre, 2):
             kolonner[idx].extend(ts.__getattribute__(p))
 
-    _print_tabel(
-        overskrifter,
-        kolonner,
-    )
+    tabel = generer_tabel(overskrifter, kolonner, format="col")
+    print_tabel(tabel)
 
     if not fil:
         return
 
-    _gem_tabel(overskrifter, kolonner, fil)
-
-
-def _print_tabel(overskrifter: list, kolonner: list[list]):
-
-    # Erstat "[" med "\\[" så console.Print ikke opfatter det der står inde i [parentesen]
-    # som et "markup tag", se https://rich.readthedocs.io/en/latest/markup.html#
-    # Tiltænkt steder hvor kolonnen fx hedder "Kote [m]" eller "sz [mm]"
-    overskrifter = [re.sub(r"\[(?=.*\])", "\\[", o) for o in overskrifter]
-
-    tabel = Table(*overskrifter, box=box.SIMPLE, header_style="")
-    data = list(zip(*kolonner))
-
-    def klargør_celle(input):
-        if isinstance(input, datetime):
-            return str(input)
-        if isinstance(input, float):
-            return f"{input:.4f}"
-        if not input:
-            return ""
-        return str(input)
-
-    for række in data:
-        tabel.add_row(
-            *[klargør_celle(celle) if celle is not None else "" for celle in række]
-        )
-
-    console = Console()
-    console.print(tabel)
-
-
-def _gem_tabel(overskrifter: list, kolonner: list[list], fil: click.Path):
-    data = {
-        overskrift: kolonne for (overskrift, kolonne) in zip(overskrifter, kolonner)
-    }
-    df = pd.DataFrame(data)
-    df.to_excel(fil, index=False)
+    gem_til_excel(overskrifter, kolonner, fil, format="col")
 
 
 def skift_jessenpunkt(
