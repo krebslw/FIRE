@@ -97,7 +97,7 @@ class FireDb(FireDbLuk, FireDbHent, FireDbIndset):
         """
         landsnr = self.hent_punktinformationtype("IDENT:landsnr")
 
-        uuider = []
+        uuid_punkter = {}
         punkttyper = {}
         for punkt, fikspunktstype in zip(punkter, fikspunktstyper):
             if not punkt.geometri:
@@ -106,13 +106,13 @@ class FireDb(FireDbLuk, FireDbHent, FireDbIndset):
             # Ignorer punkter, der allerede har et landsnummer
             if landsnr in [pi.infotype for pi in punkt.punktinformationer]:
                 continue
-            uuider.append(f"{punkt.id}")
+            uuid_punkter[f"{punkt.id}"] = punkt
             punkttyper[punkt.id] = fikspunktstype
 
-        if not uuider:
+        if not uuid_punkter:
             return []
 
-        distrikter = self._opmålingsdistrikt_fra_punktid(uuider)
+        distrikter = self._opmålingsdistrikt_fra_punktid(uuid_punkter.keys())
         distrikt_punkter = cs.defaultdict(list)
         for distrikt, pktid in distrikter:
             distrikt_punkter[distrikt].append(pktid)
@@ -134,7 +134,7 @@ class FireDb(FireDbLuk, FireDbHent, FireDbIndset):
 
         punktinfo = []
         for punktid, landsnummer in landsnumre.items():
-            pi = PunktInformation(punktid=punktid, infotype=landsnr, tekst=landsnummer)
+            pi = PunktInformation(punkt=uuid_punkter[punktid], infotype=landsnr, tekst=landsnummer)
             punktinfo.append(pi)
 
         return punktinfo
