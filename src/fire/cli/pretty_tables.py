@@ -7,6 +7,7 @@ import pandas as pd
 from rich import box
 from rich.console import Console
 from rich.table import Table
+from rich.style import Style
 
 
 def klargør_celle(input):
@@ -44,7 +45,7 @@ def generer_tabel(
     format: str = "row",
 ) -> Table:
     """
-    Generer en rich.Table
+    Generer en simpelt formateret rich.Table
 
     Data antages at være givet som en liste med rækker i tabellen.
     Celleindeholdet konverteres først til `str`, og floats afrundes forinden til 4
@@ -77,6 +78,53 @@ def generer_tabel(
         )
 
     return tabel
+
+
+def generer_rapporttabel(
+    *kolonnenavne,
+    title,
+    title_justify: str = "left",
+    title_style: str | Style = "",
+    box: box.Box = box.SIMPLE,
+    show_header: bool = True,
+    header_style: str | Style = "",
+    padding: int | tuple[int] = (0, 1, 0, 0),
+    rows_styles: list[tuple[list, str | Style]] = [],
+    **kwargs,
+) -> Table:
+    """
+    Generér en rapport-tabel til brug i `info`-kommandogruppen
+
+    Fungerer som en wrapper om `rich.Table` der genererer standardopsætning af tabeller
+    til brug i `fire info`.
+
+    Rækker kan tilføjes med det samme via `rows_styles` som indholder en tuple for hver
+    tabelrække med tilhørende stilarter. Rækker kan også tilføjes bagefter via
+    `Table.add_row` metoden.
+
+    Sættes `show_header=False` vises kolonnenavne ikke.
+    **kwargs gives videre til `rich.Table`.
+    """
+    tbl = Table(
+        *kolonnenavne,
+        title=title,
+        title_justify=title_justify,
+        title_style=title_style,
+        box=box,
+        show_header=show_header,
+        header_style=header_style,
+        padding=padding,
+        **kwargs,
+    )
+
+    if rows_styles:
+        for row, style in rows_styles:
+            # Der kan være tomme rækker, som derfor springes over
+            if not row:
+                continue
+            tbl.add_row(*row, style=style)
+
+    return tbl
 
 
 def gem_til_excel(
