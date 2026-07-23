@@ -39,7 +39,7 @@ class Statistik:
         return [str(field.name) for field in fields(self)]
 
     def row(self):
-        return [str(getattr(self, field.name)) for field in fields(self)]
+        return [getattr(self, field.name) for field in fields(self)]
 
 
 @dataclass
