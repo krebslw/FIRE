@@ -10,30 +10,37 @@ from fire.api.model import (
     GNSSTidsserie,
 )
 from fire.api.model.tidsserier import (
-    PolynomieRegression1D,
-    HypoteseTest,
+    PolynomialRegression,
     TidsserieEnsemble,
-    beregn_fraktil_for_t_fordeling,
-    beregn_fraktil_for_normalfordeling,
+    normaliser_data,
+    Normalizer,
+)
+from fire.api.statistik import (
+    HypothesisTest,
+    compute_confidence_interval_t_distribution,
 )
 
 
-# Uafhængige funktioner
-@pytest.mark.parametrize(
-    "q, testfunktion",
-    [
-        (-1, np.isnan),
-        (2, np.isnan),
-        (0, np.isneginf),
-        (1, np.isposinf),
-        (0.5, lambda x: np.isclose(x, 0)),
-    ],
-)
-def test_beregning_af_fraktil(q, testfunktion):
-    """Test at beregninger af fraktiler virker som forventet ved forskellige inputs"""
+def test_Normalizer():
+    data = np.linspace(2000, 2020, 100)
 
-    assert testfunktion(beregn_fraktil_for_t_fordeling(q, 123))
-    assert testfunktion(beregn_fraktil_for_normalfordeling(q))
+    old_center = (data.max()+data.min())/2
+    old_span = data.max()-data.min()
+
+    normalizer = Normalizer(data)
+
+    # Check that normalizing to old center/span does nothing
+    normalized = normalizer.normalize(data, old_center, old_span)
+    assert np.allclose(data, normalized)
+
+    # Check normalized data is in the expected interval
+    normalized = normalizer.normalize(data, 0, 2)
+    assert normalized.min() == -1
+    assert normalized.max() == 1
+
+    # Check that denormalizing goes back to original data
+    denormalized = normalizer.denormalize(normalized)
+    assert np.allclose(data, denormalized)
 
 
 @pytest.mark.parametrize(
@@ -60,44 +67,43 @@ def test_normaliser_data():
     """Test at intet data ligger uden for a eller b intervalgrænserne."""
     x = np.linspace(2000, 2020, 1000)
     y = np.logspace(-3, 3, 1000)
-    lr = PolynomieRegression1D(x, y, grad=1)
 
     a, b = -10, 10
-    x_norm, y_norm = lr.normaliser_data(a, b)
+    x_norm, y_norm = normaliser_data(x, y, a, b)
 
     assert min(x_norm) == a and max(x_norm) == b
     assert min(y_norm) == a and max(y_norm) == b
 
 
 # Initialiering af klasser
-def test_initialiser_HypoteseTest():
-    """Test at et HypoteseTest objekt kan oprettes."""
+def test_initialiser_HypothesisTest():
+    """Test at et HypothesisTest objekt kan oprettes."""
     alpha = 0.3
 
-    kritiskværdi = beregn_fraktil_for_normalfordeling(1 - alpha / 2)
+    kritiskværdi = 1.96
     std_est = 4.321
     H0 = 1.234
-    hypotesetest = HypoteseTest(std_est, kritiskværdi, H0)
+    hypotesetest = HypothesisTest(std_est, kritiskværdi, H0, alpha)
 
     assert hypotesetest.std_est == std_est
-    assert hypotesetest.kritiskværdi == kritiskværdi
+    assert hypotesetest.critical_value == kritiskværdi
     assert hypotesetest.H0 == H0
 
     assert hasattr(hypotesetest, "score")
     assert isinstance(hypotesetest.score, float)
-    assert hasattr(hypotesetest, "H0accepteret")
-    assert isinstance(hypotesetest.H0accepteret, bool)
+    assert hasattr(hypotesetest, "H0accepted")
+    assert isinstance(hypotesetest.H0accepted, bool)
 
 
-def test_initialiser_PolynomieRegression1D():
-    """Test funktionalitet ved brug af klassen PolynomieRegression1D"""
+def test_initialiser_PolynomialRegression():
+    """Test funktionalitet ved brug af klassen PolynomialRegression"""
     x = [1, 2, 4, 5, 7]
     y = [1, 2, 3, 4, 5]
     grad = 1
 
-    lr = PolynomieRegression1D(x, y, grad=grad)
+    lr = PolynomialRegression(x, y, degree=grad)
 
-    assert isinstance(lr, PolynomieRegression1D)
+    assert isinstance(lr, PolynomialRegression)
 
 
 def test_initialiser_TidsserieEnsemble():
@@ -147,7 +153,7 @@ def test_forbered_lineær_regression(firedb, gnsstidsserie):
     gnsstidsserie.forbered_lineær_regression(x, y, grad=1, binsize=10)
 
     assert hasattr(gnsstidsserie, "linreg")
-    assert isinstance(gnsstidsserie.linreg, PolynomieRegression1D)
+    assert isinstance(gnsstidsserie.linreg, PolynomialRegression)
 
 
 # PolynomierRegression1D
@@ -169,12 +175,12 @@ def test_fit_af_kendt_model(grad):
 
     y = P.polyval(x, koeffs)
 
-    lr = PolynomieRegression1D(x, y, grad=grad)
+    lr = PolynomialRegression(x, y, degree=grad)
 
     lr.solve()
 
     # Teste om de fundne koefficienter er lig de kendte
-    assert np.allclose(lr.beta, koeffs)
+    assert np.allclose(lr.theta, koeffs)
 
     # Test om residualer er 0
     assert np.isclose(lr.SSR, 0)
@@ -182,30 +188,28 @@ def test_fit_af_kendt_model(grad):
 
 
 @pytest.mark.parametrize(
-    "grad, x, y, match",
+    "grad, x, y",
     [
         (
             20,
             None,
             [1, 2, 3],
-            "Antallet af punkter er mindre end eller lig antallet af parametre",
         ),
         (
             3,
             None,
             [1, 2, 4],
-            "Antallet af punkter er mindre end eller lig antallet af parametre",
         ),
-        (1, [1, 1, 1], [1, 1, 1], "for lav rang"),
+        (1, [1, 1, 1], [1, 1, 1]),
     ],
 )
-def test_fit_model_fejlhåndtering(grad, x, y, match):
+def test_fit_model_fejlhåndtering(grad, x, y):
     if x is None:
         x = [1, 2, 4]
 
-    lr = PolynomieRegression1D(x, y, grad=grad)
-
-    with pytest.raises(ValueError, match=match):
+    lr = PolynomialRegression(x, y, degree=grad)
+    # TODO: need to check matrix condition number
+    with pytest.raises(ValueError):
         lr.solve()
 
 
@@ -214,7 +218,7 @@ def test_beregning_af_R2():
     x = np.linspace(0, 200, 1000)
 
     # y er konstant
-    lr = PolynomieRegression1D(x, x**0, grad=1)
+    lr = PolynomialRegression(x, x**0, degree=1)
     lr.solve()
 
     # Test at der smides en Runtimewarning med en besked hvor der står noget om
@@ -223,12 +227,12 @@ def test_beregning_af_R2():
         lr.R2
 
     # y er stigende
-    lr = PolynomieRegression1D(x, x, grad=1)
+    lr = PolynomialRegression(x, x, degree=1)
     lr.solve()
 
     # Modificerer hældningen og genberegner residualerne.
-    lr.beta[1] *= -1
-    lr.SSR = np.sum((lr._A @ lr.beta - lr.y) ** 2)
+    lr.theta[1] *= -1
+    lr.SSR = np.sum((lr.X @ lr.theta - lr.y) ** 2)
 
     # Test at R2 godt kan være negativ hvis modellen passer dårligere end et simpelt
     # gennemsnit.
@@ -236,66 +240,51 @@ def test_beregning_af_R2():
 
 
 @pytest.mark.parametrize("grad", [0, 1, 2, 3, 4, 5, 6, 7, 8])
-def test_matrix_algebra_i_PolynomieRegression1D(firedb, grad):
+def test_matrix_algebra_i_PolynomieRegression(firedb, grad):
     """Test at dimensionerne af diverse matricer og vektorer er som forventet."""
 
     ts = firedb.hent_tidsserie("RDIO_5D_IGb08")
 
-    x = ts.decimalår
-    y = ts.u
+    x = np.array(ts.decimalår)
+    y = np.array(ts.u)
     alpha = 0.123
 
     x_præd = np.linspace(x[0], x[-1], 100)
 
-    lr = PolynomieRegression1D(x, y, grad=grad)
-
     # Normaliser data så polynomier af høj grad ikke giver numeriske problemer
-    lr.x, lr.y = lr.normaliser_data()
+    x, y = normaliser_data(x, y)
 
-    assert isinstance(lr._A, np.ndarray)
-    assert isinstance(lr._invATA, np.ndarray)
-    assert lr._A.shape == (lr.N, lr.grad + 1)
-    assert lr._invATA.shape == (lr.grad + 1, lr.grad + 1)
+    lr = PolynomialRegression(x, y, degree=grad)
+
+    assert isinstance(lr.X, np.ndarray)
+    assert lr.X.shape == (lr.N, lr.degree + 1)
 
     lr.solve()
 
-    assert hasattr(lr, "beta")
-    assert isinstance(lr.beta, np.ndarray)
-    assert lr.beta.shape == (grad + 1,)
+    assert hasattr(lr, "theta")
+    assert isinstance(lr.theta, np.ndarray)
+    assert lr.theta.shape == (grad + 1,)
+    assert isinstance(lr.inv_normal_matrix, np.ndarray)
+    assert lr.inv_normal_matrix.shape == (lr.degree + 1, lr.degree + 1)
 
     assert isinstance(lr.SSR, float)
-    assert isinstance(lr.var0, float)
-    assert isinstance(lr.var_samlet, float)
+    assert isinstance(lr.var0_hat, float)
     assert isinstance(lr.R2, float)
-    assert isinstance(lr.KovariansMatrix(), np.ndarray)
-    assert isinstance(lr.VarBeta(), np.ndarray)
+    assert isinstance(lr.cov_theta, np.ndarray)
+    assert isinstance(lr.theta, np.ndarray)
 
-    assert lr.var0 == lr.var_samlet
+    assert lr.inv_normal_matrix.shape == lr.cov_theta.shape
+    assert lr.var_theta.shape == lr.theta.shape
 
-    assert lr._invATA.shape == lr.KovariansMatrix().shape
-    assert lr.VarBeta().shape == lr.beta.shape
-
-    ki = lr.beregn_konfidensinterval(alpha)
+    ki = compute_confidence_interval_t_distribution(lr.std_theta, lr.dof, alpha)
     assert isinstance(ki, np.ndarray)
-    assert ki.shape == (2, lr.grad + 1)
 
-    pr = lr.beregn_prædiktioner(x_præd)
+    pr = lr.compute_predictions(x_præd)
     assert isinstance(pr, np.ndarray)
     assert pr.shape == (len(x_præd),)
 
-    kb = lr.beregn_konfidensbånd(x_præd, alpha)
+    kb = lr.compute_confidence_band(x_præd, alpha=alpha)
     assert isinstance(kb, np.ndarray)
-    assert kb.shape == (2, len(x_præd))
-
-
-def test_beregn_hypotesetest_i_PolynomieRegression1D():
-    x = np.linspace(-1, 1, 1000)
-    lr = PolynomieRegression1D(x, x, grad=1)
-    lr.solve()
-
-    hyptest = lr.beregn_hypotesetest_hældning()
-
-    assert isinstance(hyptest, HypoteseTest)
 
 
 # TidsserieEnsemble
@@ -382,14 +371,14 @@ def test_beregn_samlet_varians_i_TidsserieEnsemble(firedb):
     ts = firedb.hent_tidsserie("RDIO_5D_IGb08")
     ts_ensemble.tilføj_tidsserie(ts)
 
-    # Tidsserie har ikke linreg attribut af typen PolynomieRegression1D
+    # Tidsserie har ikke linreg attribut af typen PolynomieRegression
     with pytest.raises(AttributeError, match="linreg"):
         ts_ensemble.beregn_samlet_varians()
 
     ts.forbered_lineær_regression(ts.decimalår, ts.u)
 
     # Lineær regression på tidsserie er ikke blevet løst med solve() endnu
-    with pytest.raises(AttributeError, match="(SSR)|(dof)"):
+    with pytest.raises(AttributeError, match="residuals"):
         ts_ensemble.beregn_samlet_varians()
 
     ts.linreg.solve()

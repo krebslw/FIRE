@@ -147,6 +147,8 @@ def gem_til_excel(
     if format == "col":
         rækker = list(zip(*data))
 
+    rækker = [[klargør_celle(celle) for celle in række] for række in rækker]
+
     df = pd.DataFrame.from_records(rækker, columns=overskrifter)
     df.to_excel(fil, index=False)
 

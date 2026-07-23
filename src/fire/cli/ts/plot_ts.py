@@ -12,7 +12,7 @@ from fire.api.model import (
     PunktSamling,
 )
 
-from fire.api.model.tidsserier import PolynomieRegression1D
+from fire.api.statistik import PolynomialRegression
 from fire.cli.ts.statistik_ts import (
     StatistikGnss,
     StatistikGnssSamlet,
@@ -90,7 +90,7 @@ def plot_tidsserie(
 
 def plot_gnss_analyse(
     label: str,
-    linreg: PolynomieRegression1D,
+    linreg: PolynomialRegression,
     statistik: StatistikGnssSamlet,
     alpha: float = 0.05,
     er_samlet: bool = False,
@@ -109,20 +109,14 @@ def plot_gnss_analyse(
 
     # Prædiktioner og intervaller
     x_præd = np.linspace(linreg.x[0], linreg.x[-1], 1000)
-    y_præd = linreg.beregn_prædiktioner(x_præd)
+    y_præd = linreg.compute_predictions(x_præd)
 
-    konfidensbånd = linreg.beregn_konfidensbånd(
-        x_præd,
-        y_præd,
-        alpha=alpha,
-        er_samlet=False,
-    )
+    delta_ci = linreg.compute_confidence_band(x_præd, alpha=alpha)
 
-    konfidensbånd_samlet = linreg.beregn_konfidensbånd(
+    delta_ci_samlet = linreg.compute_confidence_band(
         x_præd,
-        y_præd,
         alpha=alpha,
-        er_samlet=True,
+        var_population=linreg.var_samlet # insert population variance here
     )
 
     # Uplift
@@ -138,7 +132,7 @@ def plot_gnss_analyse(
         x_præd,
         y_præd,
         "r",
-        label=f"Hældning af fit: {linreg.beta[1]:.3f} [mm/år]",
+        label=f"Hældning af fit: {linreg.theta[1]:.3f} [mm/år]",
     )
     ax.plot(
         x_præd,
@@ -148,10 +142,10 @@ def plot_gnss_analyse(
     )
 
     # Konfidensbånd
-    ax.plot(x_præd, konfidensbånd[0, :], color="green")
+    ax.plot(x_præd, y_præd-delta_ci, color="green")
     ax.plot(
         x_præd,
-        konfidensbånd[1, :],
+        y_præd+delta_ci,
         color="green",
         label=f"{100*(1-alpha):g}% Konfidensbånd",
     )
@@ -160,12 +154,12 @@ def plot_gnss_analyse(
     if er_samlet:
         ax.plot(
             x_præd,
-            konfidensbånd_samlet[0, :],
+            y_præd-delta_ci_samlet,
             color="blue",
         )
         ax.plot(
             x_præd,
-            konfidensbånd_samlet[1, :],
+            y_præd+delta_ci_samlet,
             color="blue",
             label=f"{100*(1-alpha):g}% Konfidensbånd (samlet)",
         )
@@ -230,7 +224,7 @@ Std. af data fra alle tidsserier (samlet) = {statistik.std_samlet:.2f} mm"
 
 def plot_hts_analyse(
     label: str,
-    linreg: PolynomieRegression1D,
+    linreg: PolynomialRegression,
     statistik: StatistikHts,
     alpha: float = 0.05,
     plot_errbars: bool = False,
@@ -243,14 +237,9 @@ def plot_hts_analyse(
 
     # Prædiktioner og intervaller
     x_præd = np.linspace(linreg.x[0], linreg.x[-1], 1000)
-    y_præd = linreg.beregn_prædiktioner(x_præd)
+    y_præd = linreg.compute_predictions(x_præd)
 
-    konfidensbånd = linreg.beregn_konfidensbånd(
-        x_præd,
-        y_præd,
-        alpha=alpha,
-        er_samlet=False,
-    )
+    delta_ci = linreg.compute_confidence_band(x_præd, alpha=alpha)
 
     # Plotting
     plt.rcParams["figure.autolayout"] = True
@@ -260,7 +249,7 @@ def plot_hts_analyse(
         ax.errorbar(
             x=linreg.x,
             y=linreg.y,
-            yerr=np.sqrt(1 / linreg._W),
+            yerr=np.sqrt(1 / linreg.weights),
             fmt="ko",
             capsize=3,
             label=f"Kote $\\pm$ std. afvigelse",
@@ -272,14 +261,14 @@ def plot_hts_analyse(
         x_præd,
         y_præd,
         "r",
-        label=f"Hældning af fit: {linreg.beta[1]:.3f} [mm/år]",
+        label=f"Hældning af fit: {linreg.theta[1]:.3f} [mm/år]",
     )
 
     # Konfidensbånd
-    ax.plot(x_præd, konfidensbånd[0, :], color="green")
+    ax.plot(x_præd, y_præd-delta_ci, color="green")
     ax.plot(
         x_præd,
-        konfidensbånd[1, :],
+        y_præd+delta_ci,
         color="green",
         label=f"{100*(1-alpha):g}% Konfidensbånd",
     )
@@ -342,11 +331,11 @@ def plot_fit(x: list, y: list, y_enhed: str = "mm"):
     Enheden på x forventes at være decimalår.
     """
 
-    lr = PolynomieRegression1D(x, y)
+    lr = PolynomialRegression(x, y)
     lr.solve()
 
     x_præd = np.linspace(lr.x[0], lr.x[-1], 1000)
-    y_præd = lr.beregn_prædiktioner(x_præd)
+    y_præd = lr.compute_predictions(x_præd)
 
     plt.plot(
         x_præd,
@@ -369,31 +358,31 @@ def plot_konfidensbånd(x: list, y: list, y_enhed: str = "mm"):
     x_binned, y_binned = GNSSTidsserie.binning(x, y)
 
     # Foretag lineær regresion
-    lr = PolynomieRegression1D(x_binned, y_binned)
+    lr = PolynomialRegression(x_binned, y_binned)
     lr.solve()
 
     # Prædiktioner
     x_præd = np.linspace(lr.x[0], lr.x[-1], 1000)
-    y_præd = lr.beregn_prædiktioner(x_præd)
+    y_præd = lr.compute_predictions(x_præd)
 
     # Konfidensbånd
-    konfidensbånd = lr.beregn_konfidensbånd(x_præd, y_præd)
+    delta_ci = lr.compute_confidence_band(x_præd)
 
     plt.plot(
         x_præd,
         y_præd,
         "-",
         color="red",
-        label=f"Hældning af fit: {lr.beta[1]:.3f} [{y_enhed}/år]",
+        label=f"Hældning af fit: {lr.theta[1]:.3f} [{y_enhed}/år]",
     )
     plt.plot(
         x_præd,
-        konfidensbånd[0, :],
+        y_præd-delta_ci,
         "g-",
     )
     plt.plot(
         x_præd,
-        konfidensbånd[1, :],
+        y_præd+delta_ci,
         "g-",
         label="95% konf. bånd",
     )
