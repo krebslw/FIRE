@@ -65,7 +65,7 @@ def observation_linje(
 
     # Kun GeometriskKoteForskel har disse to attributter.
     # Hvis observationen er Trigonometrisk skrives 0 i stedet.
-    præs = getattr(obs, "præcisionsnivellement", 0)
+    præs = int(getattr(obs, "præcisionsnivellement", 0))
     eta_1 = getattr(obs, "eta_l", 0.0)
 
     row = [
