@@ -65,7 +65,7 @@ def observation_linje(
 
     # Kun GeometriskKoteForskel har disse to attributter.
     # Hvis observationen er Trigonometrisk skrives 0 i stedet.
-    præs = getattr(obs, "præcisionsnivellement", 0)
+    præs = int(getattr(obs, "præcisionsnivellement", 0))
     eta_1 = getattr(obs, "eta_l", 0.0)
 
     row = [
@@ -142,7 +142,7 @@ def koordinat_linje(koord: Koordinat) -> tuple[list[str], str]:
 
 def punktinfo_linje(punktinfo: PunktInformation) -> tuple[list[str], str]:
     """Generér en tabelrække til punktinforapport."""
-    tekst = punktinfo.tekst or ""
+    tekst = (punktinfo.tekst or "").rstrip(" \n")
     # tal kan godt være 0, derfor tjekkes explicit for Noneness
     tal = punktinfo.tal if punktinfo.tal is not None else ""
 
