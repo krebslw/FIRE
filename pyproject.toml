@@ -27,15 +27,7 @@ classifiers = [
 fire = "fire.cli.main:fire_cmd"
 
 [project.entry-points."fire.cli.fire_commands"]
-"info" = "fire.cli.info:info"
-"niv" = "fire.cli.niv:niv"
-"søg" = "fire.cli.søg:søg"
-"grafik" = "fire.cli.grafik:grafik"
-"luk" = "fire.cli.luk:luk"
-"indlæs" = "fire.cli.indlæs:indlæs"
-"ts" = "fire.cli.ts:ts"
-"config" = "fire.cli.config:config"
-"opret" = "fire.cli.opret:opret"
+"infolight" = "fire.cli.info_light:infolight"
 
 [build-system]
 requires = ['setuptools>=64']

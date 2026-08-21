@@ -20,4 +20,5 @@ def fire_cmd():
     """
     🔥 Kommandolinjeadgang til FIRE.
     """
+    print("køre cli.main.fire_cmd")
     pass
