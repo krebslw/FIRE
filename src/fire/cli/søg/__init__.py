@@ -1,3 +1,5 @@
+print("importerede cli.søg.__init__")
+
 import click
 
 

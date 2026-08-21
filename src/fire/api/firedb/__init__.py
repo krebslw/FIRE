@@ -1,3 +1,4 @@
+print("importerede api.firedb.__init__")
 from typing import List, Iterator
 from itertools import chain
 import collections as cs

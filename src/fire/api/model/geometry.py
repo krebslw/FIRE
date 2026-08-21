@@ -8,7 +8,8 @@ from typing import (
 
 from sqlalchemy.sql import expression
 from pyproj import Proj
-import pandas as pd
+# from pandas import isna
+from math import isnan as isna
 
 from fire.api.model import columntypes
 
@@ -257,7 +258,7 @@ def normaliser_lokationskoordinat(
     if invers:
         return utm32(λ, φ, inverse=False)
 
-    if pd.isna(λ) or pd.isna(φ) or 0 == λ or 0 == φ:
+    if isna(λ) or isna(φ) or 0 == λ or 0 == φ:
         return (11.0, 56.0)
 
     # Heuristik til at skelne mellem UTM og geografiske koordinater.

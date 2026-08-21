@@ -2,6 +2,7 @@
 Kommandoliniebrugergrænsefladen (en command-line interface, CLI) til FIREs API.
 
 """
+print("importerede cli.__init__")
 import sys
 import os
 import signal

@@ -1,3 +1,4 @@
+print("importerede cli.info.__init__")
 import click
 
 
@@ -19,6 +20,7 @@ from fire.cli.info._info import (
     sag,
     sagsevent,
 )
+from fire.cli.info._infopunkt import punkt
 from fire.cli.info._koordinater import (
     koordinater
 )

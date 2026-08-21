@@ -1,12 +1,14 @@
 """SQLAlchemy models for the application
 """
-
+print("importerede api.model.__init__")
 import enum
 
+print("importererde sqlalchemy")
 import sqlalchemy.orm
 from sqlalchemy import Column, Integer, DateTime, String, func
 from sqlalchemy.dialects.oracle import TIMESTAMP
 
+print("importerede resten af api.model")
 from fire.enumtools import enum_values
 
 
@@ -133,8 +135,13 @@ class Boolean(enum.Enum):
 
 
 # Expose these types
+print("importerede api.model.geometry")
 from fire.api.model.geometry import *
+print("importerede api.model.punkttyper")
 from fire.api.model.punkttyper import *
+print("importerede api.model.sagstyper")
 from fire.api.model.sagstyper import *
+print("importerede api.model.observationer")
 from fire.api.model.observationer import *
+print("importerede api.model.tidsserier")
 from fire.api.model.tidsserier import *

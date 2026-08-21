@@ -1,7 +1,7 @@
 """
 Funktionalitet til at hente diverse FIRE objekter
 """
-
+print("importerede api.firedb.hent")
 from datetime import datetime
 from typing import List, Optional
 import re

@@ -2,6 +2,7 @@
 Funktionalitet til at lukke diverse FIRE objekter
 
 """
+print("importerede api.firedb.luk")
 from fire.api.firedb.base import FireDbBase
 from fire.api.model import (
     Sag,

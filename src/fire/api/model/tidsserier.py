@@ -1,3 +1,4 @@
+print("importerede api.model.tidsserier externe afhængigheder")
 from datetime import datetime as dt
 from typing import List, Tuple, Type
 
@@ -6,7 +7,7 @@ import numpy as np
 from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
-
+print("importerede api.model.tidsserier interne afhængigheder")
 from fire.matematik import xyz2neu
 from fire.api.model import (
     FikspunktregisterObjekt,

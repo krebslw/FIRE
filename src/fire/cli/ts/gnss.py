@@ -1,3 +1,5 @@
+print("importerede cli.ts.gnss")
+
 import importlib.resources
 
 import click

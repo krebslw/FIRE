@@ -1,3 +1,5 @@
+print("importerede cli.niv.__init__")
+
 import datetime
 import os
 import os.path
@@ -8,7 +10,9 @@ from typing import (
 )
 
 import click
+print("importerer pandas")
 import pandas as pd
+print("importerede pandas")
 import pandas.io.formats.style
 from sqlalchemy.orm.exc import NoResultFound
 from openpyxl.worksheet.worksheet import Worksheet
@@ -596,17 +600,29 @@ og Click-kommandoobjektet
 . Uden præfix kan der ikke skelnes mellem de to.
 
 """
+print("importerede cli.niv._ilæg_nye_koter")
 from fire.cli.niv._ilæg_nye_koter import ilæg_nye_koter
+print("importerede cli.niv._ilæg_nye_punkter")
 from fire.cli.niv._ilæg_nye_punkter import ilæg_nye_punkter
+print("importerede cli.niv._ilæg_observationer")
 from fire.cli.niv._ilæg_observationer import ilæg_observationer
+print("importerede cli.niv._ilæg_revision")
 from fire.cli.niv._ilæg_revision import ilæg_revision
+print("importerede cli.niv._luk_sag")
 from fire.cli.niv._luk_sag import luk_sag
+print("importerede cli.niv._læs_observationer")
 from fire.cli.niv._læs_observationer import læs_observationer
+print("importerede cli.niv._netoversigt")
 from fire.cli.niv._netoversigt import netoversigt
+print("importerede cli.niv._opret_sag")
 from fire.cli.niv._opret_sag import opret_sag
+print("importerede cli.niv._regn")
 from fire.cli.niv._regn import regn
+print("importerede cli.niv._udtræk_observationer")
 from fire.cli.niv._udtræk_observationer import udtræk_observationer
+print("importerede cli.niv._udtræk_revision")
 from fire.cli.niv._udtræk_revision import udtræk_revision
+print("importerede cli.niv.punktsamling")
 from fire.cli.niv.punktsamling import (
     opret_punktsamling,
     udtræk_punktsamling,
@@ -614,4 +630,5 @@ from fire.cli.niv.punktsamling import (
     ilæg_tidsserie,
     fjern_punkt_fra_punktsamling,
 )
+print("importerede cli.niv._åbn_sag")
 from fire.cli.niv._åbn_sag import åbn_sag

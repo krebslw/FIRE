@@ -47,6 +47,9 @@ from fire.cli.pretty_tables import (
 )
 from rich.table import Table
 
+
+print("importerede cli.info._info")
+
 # Dato-format til kommandolinie-argument.
 DATE_FORMAT = "%d-%m-%Y"
 
@@ -549,7 +552,7 @@ def punkt(
     Hvis der findes skitser eller billedmateriale for et punkt angives disse
     under sektionen "Grafik" og kan vises med ``fire grafik`` kommandoen.
     """
-
+    print("kører info punkt")
     ident = klargør_ident_til_søgning(ident)
 
     with YndefuldeFejl(NoResultFound, f"Kunne ikke finde {ident}"):

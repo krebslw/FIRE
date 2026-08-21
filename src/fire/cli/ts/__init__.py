@@ -1,3 +1,5 @@
+print("importerede cli.ts.__init__")
+
 import click
 import pandas as pd
 from sqlalchemy.exc import NoResultFound

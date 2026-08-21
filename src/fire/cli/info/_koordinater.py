@@ -1,3 +1,5 @@
+print("importerede cli.info._koordinater")
+
 import click
 from pyproj import CRS, Transformer
 from pyproj.exceptions import ProjError

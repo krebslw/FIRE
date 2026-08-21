@@ -4,7 +4,7 @@ API modul til beregning af statistik og regressionsanalyse
 Modulet er engelsksproget, da mange fagtermer er lettest at
 anvende på engelsk.
 """
-
+print("importerede api.statistik.__init__")
 from numpy import ndarray
 
 

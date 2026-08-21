@@ -1,5 +1,5 @@
 """FIRE - FIkspunktREgister"""
-
+print("importerede fire.__init__")
 from uuid import uuid4
 
 __version__ = "1.10.0"

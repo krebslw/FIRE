@@ -2,7 +2,7 @@
 Funktionalitet til at indsætte diverse FIRE objekter
 
 """
-
+print("importerede api.firedb.indset")
 from sqlalchemy import func
 from fire.api.firedb.base import FireDbBase
 
