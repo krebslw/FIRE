@@ -28,13 +28,13 @@ signal.signal(signal.SIGINT, luk_pænt_ved_ctrl_c)
 firedb = FireDb()
 _show_colors = True
 
-
 def _set_monochrome(ctx, param, value):
     """
     Anvend værdien af --monokrom og sæt den globale værdi af _show_colors.
     """
     global _show_colors
     _show_colors = not value
+    os.environ["_FIRE_SHOW_COLORS"] = str(_show_colors)
 
 
 def _set_debug(ctx, param, value):
@@ -130,7 +130,7 @@ def print(*args, **kwargs):
     kommandolinjekald.
     """
 
-    kwargs["color"] = _show_colors
+    kwargs["color"] = os.getenv("_FIRE_SHOW_COLORS", "True")
     click.secho(*args, **kwargs)
 
 

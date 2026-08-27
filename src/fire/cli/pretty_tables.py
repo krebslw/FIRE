@@ -22,7 +22,7 @@ def klargør_celle(input):
 
 def print_tabel(
     tabel: Table,
-    console: Console = Console(),
+    console: Console = None,
     align: str = "right",
 ):
     """
@@ -31,7 +31,11 @@ def print_tabel(
     Alle kolonner højrejusteres for at gøre visuel inspektion af decimalpladser lettere.
     Hertil antages at float-kolonner er afrundet til samme antal decimaler.
     """
-
+    if console is None:
+        _show_colors = os.getenv("_FIRE_SHOW_COLORS", "True")
+        console = Console(
+            color_system="auto" if _show_colors=="True" else None,
+        )
     # Align kolonner til højre
     for c in tabel.columns:
         c.justify = align
