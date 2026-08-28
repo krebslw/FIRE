@@ -35,6 +35,7 @@ def _set_monochrome(ctx, param, value):
     global _show_colors
     _show_colors = not value
     os.environ["_FIRE_SHOW_COLORS"] = str(_show_colors)
+    return value
 
 
 def _set_debug(ctx, param, value):
@@ -43,7 +44,7 @@ def _set_debug(ctx, param, value):
     """
     global firedb
     firedb.engine.echo = value
-
+    return value
 
 def _set_database(ctx, param, value):
     """
@@ -52,6 +53,113 @@ def _set_database(ctx, param, value):
     if value is not None:
         new_firedb = FireDb(db=str(value).lower())
         override_firedb(new_firedb)
+    return firedb.db
+
+def _start_interactive_mode(ctx: click.Context, param, value):
+    """
+    Start interaktiv udgave af den givne click.Context
+
+    Brugeren mødes af en prompt med kommandoens almindelige signatur allerede
+    udfyldt, fx:
+
+            >>fire info punkt -I
+            fire info punkt [IDENT]
+                ... alm. punktinfo
+            fire info punkt [IDENT -H]
+                ... punktinfo med historik
+
+    hvor teksten inden for [...] er brugerens input til prompten
+    Kommandoen tager imod de samme options som den normale, ikke-interaktive
+    version.
+
+    Der kan fastholdes options til kommandoen ved at angive dem ved det første kald til
+    kommandoen. De fastholdte værdier kan altid ændres ved angivelse af andre værdier::
+
+        >>fire info punkt --db prod -H -I
+        fire info punkt [IDENT]
+            ... punktinfo med historik, trukket fra prod
+        fire info punkt [IDENT --db test]
+            ... punktinfo med historik, trukket fra test
+
+    Det er vigtigt, at interaktiv-optionen vælges som det sidste på kommandolinjen.
+    Options som kommer bagefter, vil ikke blive registreret som fastholdte. Fx
+
+        fire info punkt --db prod -I -H
+
+    vil kun fastholdte db=prod.
+
+    Årsagen er, at vi her anvender den aktive click Context's parametre, og at click parser
+    options og i den rækkefølge de er givet. Dermed vil `interaktiv` optionens callback
+    (denne funktion) blive kaldt før `historik` optionen er blevet parset og føjet til den
+    aktive click Context.
+
+    Interaktiv mode kan også bruges til at lave fancy shell-scripting hvor fx en tekstfil
+    pipes ind i en FIRE-kommando. Havelåge ("#") kan anvendes som kommentar-tegn i
+    inputfil, både i starten af linjen og in-line.
+
+        # Klargør en fil med identer der skal søges på
+        echo GM901 >> pkter
+        echo GM902 >> pkter
+        echo #GM902 en linje der helt springes over >> pkter
+        echo RDIO # en in-line kommentar >> pkter
+
+        # Smid hver linje ind i fire info punkt og skriv til terminalen
+        fire info punkt --db prod -I < pkter
+
+        # Gem i stedet resultaterne i en fil
+        fire info punkt --db prod -I < pkter > infopunkt_out
+
+        # Ryd op
+        rm pkter infopunkt_out
+    """
+    import shlex
+
+
+    if value is False:
+        return value
+
+    kommando = ctx.command
+    kommandovej = ctx.command_path
+    faste_args = ctx.params
+
+    # TODO: quiet mode?
+    faste_args_lst = [f"{opt}={val}" for opt, val in ctx.params.items()]
+    print(f"Starter interaktiv session for '{kommandovej}'")
+    if faste_args_lst:
+        print(f"med fastsatte argumenter for: \n  {'\n  '.join(faste_args_lst)}")
+    print(f"Afbryd med CTRL+C eller CTRL+Z+ENTER")
+
+    while True:
+
+        brugerinput = click.prompt(f"{kommandovej} ", prompt_suffix="", type=str)
+
+        # split på # for at muliggøre kommentarer i en fil der pipes ind
+        brugerinput = brugerinput.split("#")[0]
+        if not brugerinput or brugerinput.strip()[0] in ("#"):
+            continue
+
+        # Brugerinput splittes med shlex der respekterer at strenge kan
+        # indeholde mellemrum hvis de er wrapped med "".
+        args = shlex.split(brugerinput, " ")
+
+        # make_context parser alle options og kalder deres callbacks.
+        # default_map bruges til at override de almindelige defaults med de
+        # fastholdte parametre
+        try:
+            ny_ctx = kommando.make_context(
+                info_name=f"Interaktiv version af {kommandovej}",
+                args=args,
+                parent=ctx,
+                default_map=faste_args,
+            )
+
+            ny_ctx.command.callback(**ny_ctx.params)
+        except Exception as exc:
+            print(exc)
+        except SystemExit as exc:
+            # SystemExits, smidt igennem AfbrydFejl bliver også fanget og printet (inkl
+            # click formattering)
+            print(exc)
 
 
 _default_options = [
@@ -66,14 +174,24 @@ _default_options = [
         "-m",
         "--monokrom",
         is_flag=True,
+        default=False,
         callback=_set_monochrome,
         help="Vis ikke farver i terminalen",
     ),
     click.option(
         "--debug",
         is_flag=True,
+        default=False,
         callback=_set_debug,
         help="Vis debug output fra FIRE-databasen.",
+    ),
+    click.option(
+        "-I",
+        "--interaktiv",
+        is_flag=True,
+        default=False,
+        callback=_start_interactive_mode,
+        help="Slå interaktiv mode til.",
     ),
     click.help_option(help="Vis denne hjælp tekst"),
 ]
