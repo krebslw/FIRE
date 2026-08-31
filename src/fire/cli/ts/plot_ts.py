@@ -342,7 +342,7 @@ def plot_fit(x: list, y: list, y_enhed: str = "mm"):
         y_præd,
         "-",
         color="red",
-        label=f"Hældning af fit: {lr.beta[1]:.3f} [{y_enhed}/år]",
+        label=f"Hældning af fit: {lr.theta[1]:.3f} [{y_enhed}/år]",
     )
     plot_data(lr.x, lr.y)
     plt.ylim(lr.y.min(), lr.y.max())
