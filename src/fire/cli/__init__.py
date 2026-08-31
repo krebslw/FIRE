@@ -86,7 +86,7 @@ def _start_interactive_mode(ctx: click.Context, param, value):
 
         fire info punkt --db prod -I -H
 
-    vil kun fastholdte db=prod.
+    vil kun fastholde db=prod.
 
     Årsagen er, at vi her anvender den aktive click Context's parametre, og at click parser
     options og i den rækkefølge de er givet. Dermed vil `interaktiv` optionens callback
@@ -120,14 +120,19 @@ def _start_interactive_mode(ctx: click.Context, param, value):
 
     kommando = ctx.command
     kommandovej = ctx.command_path
+
+    # Her tilgås de parametre som allerede er blevet parset i den nuværende context.
+    # Alternativt, kan `is_eager=True` sættes på alle andre parametre på alle kommandoer,
+    # for at tvinge dem til at blive evalueret før `--interaktiv` flaget, men det bliver
+    # hurtigt meget omfattende.
     faste_args = ctx.params
 
     # TODO: quiet mode?
     faste_args_lst = [f"{opt}={val}" for opt, val in ctx.params.items()]
-    print(f"Starter interaktiv session for '{kommandovej}'")
+    print(f"\nStarter interaktiv session for '{kommandovej}'")
     if faste_args_lst:
-        print(f"med fastsatte argumenter for: \n  {'\n  '.join(faste_args_lst)}")
-    print(f"Afbryd med CTRL+C eller CTRL+Z+ENTER")
+        print(f"med flg. fastsatte argumenter: \n  {'\n  '.join(faste_args_lst)}")
+    print(f"\nAfbryd med CTRL+C eller CTRL+Z+ENTER\n")
 
     while True:
 
@@ -149,7 +154,6 @@ def _start_interactive_mode(ctx: click.Context, param, value):
             ny_ctx = kommando.make_context(
                 info_name=f"Interaktiv version af {kommandovej}",
                 args=args,
-                parent=ctx,
                 default_map=faste_args,
             )
 
@@ -193,7 +197,7 @@ _default_options = [
         callback=_start_interactive_mode,
         help="Slå interaktiv mode til.",
     ),
-    click.help_option(help="Vis denne hjælp tekst"),
+    click.help_option(help="Vis denne hjælpetekst"),
 ]
 
 
