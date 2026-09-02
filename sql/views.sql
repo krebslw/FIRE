@@ -44,6 +44,14 @@
 --
 --		SELECT * FROM user_sdo_index_info;
 
+-- Sæt denne så der ventes max 10 sekunder på at "låsen" på tabellerne frigives og næste
+-- statement begynder.
+-- Denne er som default sat til NOWAIT. Somme tider (i vores CICD flow) kunne dette give
+-- fejlen "ORA-00054: resource busy and acquire with NOWAIT (...)"
+-- Dette skete når en proces ikke var heeelt færdig med oprettelsen af et view og derfor
+-- ikke havde frigivet låsen, og den næste statement så forsøgte at tilgå tabellen og
+-- oprette indexet
+ALTER SESSION SET DDL_LOCK_TIMEOUT=10;
 
 -- V_FIKSPUNKTER_DK
 --
