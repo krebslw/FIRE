@@ -1159,6 +1159,92 @@ VALUES
 CREATE INDEX v_gnet_geometri_idx ON v_gnet (geometri) INDEXTYPE IS MDSYS.SPATIAL_INDEX PARAMETERS('layer_gtype=point');
 
 
+CREATE MATERIALIZED VIEW V_REFGR
+REFRESH ON DEMAND
+START WITH SYSDATE NEXT SYSDATE + 1 / 24
+AS
+WITH punkter AS (
+	SELECT DISTINCT punktid
+	FROM PUNKTINFO p
+	JOIN punktinfotype pit ON p.infotypeid=pit.infotypeid
+	WHERE pit.infotype='NET:REFGR' AND p.registreringtil IS NULL
+), gnss_ident AS (
+	SELECT pi.punktid,
+	MIN(pi.tekst) KEEP (DENSE_RANK FIRST ORDER BY tekst) ident
+	FROM punktinfo pi
+	JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+	WHERE pit.infotype='IDENT:GNSS' AND pi.registreringtil IS NULL
+	GROUP BY pi.punktid
+), station_ident AS (
+	SELECT pi.punktid,
+	MIN(pi.tekst) KEEP (DENSE_RANK FIRST ORDER BY tekst) ident
+	FROM punktinfo pi
+	JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+	WHERE pit.infotype='IDENT:station' AND pi.registreringtil IS NULL
+	GROUP BY pi.punktid
+), geometrier AS (
+	SELECT go.geometri, go.punktid
+	FROM geometriobjekt go
+	WHERE go.registreringtil IS NULL
+), msl AS (
+	SELECT k.z, k.t, k.punktid
+	FROM koordinat k
+	JOIN sridtype s ON k.sridid = s.sridid
+	WHERE k.registreringtil IS NULL and s.srid = 'EPSG:5714'
+), gr96_2d AS (
+	SELECT k.x, k.y, k.z, k.t, k.punktid
+	FROM koordinat k
+	JOIN sridtype s ON k.sridid = s.sridid
+	WHERE k.registreringtil IS NULL and s.srid = 'EPSG:4747'
+), gr96_3d AS (
+	SELECT k.x, k.y, k.z, k.t, k.punktid
+	FROM koordinat k
+	JOIN sridtype s ON k.sridid = s.sridid
+	WHERE k.registreringtil IS NULL and s.srid = 'EPSG:4909'
+), beskrivelser AS (
+	SELECT pi.punktid, pi.tekst FROM punktinfo pi
+	JOIN punktinfotype pit ON pi.infotypeid=pit.infotypeid
+	WHERE pit.infotype='ATTR:beskrivelse' AND pi.registreringtil IS NULL
+)
+SELECT
+  geometrier.geometri geometri,
+  p.punktid punktid,
+  gnss_ident.ident AS gnss_nr,
+  station_ident.ident AS station_nr,
+  COALESCE(gr96_3d.x, gr96_2d.x) AS GR96_LON,
+  COALESCE(gr96_3d.y, gr96_2d.y) AS GR96_LAT,
+  COALESCE(gr96_3d.z, gr96_2d.z) AS GR96_H,
+  COALESCE(gr96_3d.t, gr96_2d.t) AS GR96_tid,
+  beskrivelser.tekst beskrivelse
+FROM punkter p
+JOIN geometrier ON geometrier.punktid = p.punktid
+-- ikke alle punkter har beskrivelse m.m.
+LEFT JOIN msl ON msl.punktid = p.punktid
+LEFT JOIN gr96_2d ON gr96_2d.punktid = p.punktid
+LEFT JOIN gr96_3d ON gr96_3d.punktid = p.punktid
+LEFT JOIN gnss_ident ON gnss_ident.punktid = p.punktid
+LEFT JOIN station_ident ON station_ident.punktid = p.punktid
+LEFT JOIN beskrivelser ON beskrivelser.punktid = p.punktid
+;
+
+INSERT INTO
+  user_sdo_geom_metadata (table_name, column_name, diminfo, srid)
+VALUES
+  (
+    'V_REFGR',
+    'GEOMETRI',
+    MDSYS.SDO_DIM_ARRAY(
+      MDSYS.SDO_DIM_ELEMENT('Longitude', -180.0000, 180.0000, 0.005),
+      MDSYS.SDO_DIM_ELEMENT('Latitude', -90.0000, 90.0000, 0.005)
+    ),
+    4326
+  );
+
+CREATE INDEX v_refgr_geometri_idx
+ON v_refgr (geometri)
+INDEXTYPE IS MDSYS.SPATIAL_INDEX PARAMETERS('layer_gtype=point');
+
+
 -- 3. præs observationer
 CREATE MATERIALIZED VIEW v_pres3_obs AS
 WITH
