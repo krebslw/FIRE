@@ -148,12 +148,19 @@ def _start_interactive_mode(ctx: click.Context, param, value):
         args = shlex.split(brugerinput, " ")
 
         # make_context parser alle options og kalder deres callbacks.
-        # default_map bruges til at override de almindelige defaults med de
-        # fastholdte parametre
+        # default_map bruges til at override de almindelige defaults med de fastholdte
+        # parametre
+        # der oprettes med vilje en separat kontekst uden "parentkontekst". Den nye
+        # kontekst har så ikke "auto_envvar_prefix" sat, hvilket så gør at eventuelle
+        # defaults sat med miljøvariable ignoreres.
+        # Den tekniske årsag er, at miljøvariable tager præcedens over "default_map", som
+        # vi her bruger til at fastsætte parametre, så derfor ville en parameter i
+        # "default_map" aldrig blive brugt hvis den tilsvarende miljøvariabel var sat.
         try:
             ny_ctx = kommando.make_context(
                 info_name=f"Interaktiv version af {kommandovej}",
                 args=args,
+                # parent=ctx, # vi nedarver med vilje ikke context settings fra parent
                 default_map=faste_args,
             )
 
