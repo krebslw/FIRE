@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+import os
 from pathlib import Path
 
 import numpy as np
@@ -11,12 +13,21 @@ from fire.cli.niv import (
     skriv_ark,
 )
 
+@contextmanager
+def isoleret_filsystem(mappe):
+    oprindelig_mappe = os.getcwd()
+    try:
+        os.chdir(mappe)
+        yield
+    finally:
+        os.chdir(oprindelig_mappe)
 
-def test_revision(mocker):
+
+def test_revision(mocker, tmp_path):
     """Test fire niv kommandoer relateret til punktrevision"""
     runner = CliRunner()
 
-    with runner.isolated_filesystem():
+    with isoleret_filsystem(tmp_path):
         # fire niv opret-sag test
         mocker.patch("fire.cli.niv._opret_sag.bekræft", return_value=True)
         result = runner.invoke(niv, ["opret-sag", "testsag", "This is only a test"])
@@ -65,7 +76,7 @@ def test_revision(mocker):
         assert result.exit_code == 0
 
 
-def test_observationer(mocker):
+def test_observationer(mocker, tmp_path):
     """Test fire niv kommandoer relateret til punktrevision"""
     runner = CliRunner()
 
@@ -75,7 +86,7 @@ def test_observationer(mocker):
         with open(Path(__file__).resolve().parent / filename) as f:
             files.append((filename, f.readlines()))
 
-    with runner.isolated_filesystem():
+    with isoleret_filsystem(tmp_path):
         # kopier filer til isoleret filsystem
         for filename, data in files:
             with open(filename, "w") as f:
@@ -130,7 +141,7 @@ def _sammenlign_kolonner(df, ark1, ark2, kolonnenavn):
     return df[ark1][kolonnenavn].equals(df[ark2][kolonnenavn])
 
 
-def test_regn():
+def test_regn(tmp_path):
     """Test fire niv kommandoer relateret til punktrevision
 
     Sagen "test_regn" er på forhånd oprettet uden om databasen, hvilket gør det
@@ -149,7 +160,7 @@ def test_regn():
     with open(Path(__file__).resolve().parent / filename, "rb") as f:
         filedata = f.read()
 
-    with runner.isolated_filesystem():
+    with isoleret_filsystem(tmp_path):
         # kopier filer til isoleret filsystem
         with open(filename, "wb") as f:
             f.write(filedata)
