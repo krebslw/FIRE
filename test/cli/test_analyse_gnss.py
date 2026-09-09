@@ -1,4 +1,6 @@
+from contextlib import contextmanager
 import gc
+import os
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -7,6 +9,14 @@ import pytest
 from fire.cli.ts import ts
 from fire.api.model.tidsserier import PolynomialRegression
 
+@contextmanager
+def isoleret_filsystem(mappe):
+    oprindelig_mappe = os.getcwd()
+    try:
+        os.chdir(mappe)
+        yield
+    finally:
+        os.chdir(oprindelig_mappe)
 
 # CLI
 @pytest.mark.parametrize(
@@ -19,11 +29,11 @@ from fire.api.model.tidsserier import PolynomialRegression
         (["--no-plot", "RDIO_5D_IGb08"]),
     ],
 )
-def test_cli_analyse_gnss_fejler(mocker, options):
+def test_cli_analyse_gnss_fejler(tmp_path, mocker, options):
     """Test at fire ts analyse-gnss fejler ved forkert input"""
     runner = CliRunner()
 
-    with runner.isolated_filesystem():
+    with isoleret_filsystem(tmp_path):
         mocker.patch("matplotlib.pyplot.show", return_value=None)
         result = runner.invoke(
             ts,
@@ -53,11 +63,11 @@ def test_cli_analyse_gnss_fejler(mocker, options):
         (["--plot", "--grad", "2", "RDIO_5D_IGb08"], "."),
     ],
 )
-def test_cli_analyse_gnss_kører(firedb, mocker, options, tjek_sti):
+def test_cli_analyse_gnss_kører(firedb, tmp_path, mocker, options, tjek_sti):
     """Test at fire ts analyse-gnss kan køre ved korrekt input"""
     runner = CliRunner()
 
-    with runner.isolated_filesystem():
+    with isoleret_filsystem(tmp_path):
         mocker.patch("matplotlib.pyplot.show", return_value=None)
         result = runner.invoke(
             ts,
