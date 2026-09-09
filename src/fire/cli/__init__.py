@@ -259,6 +259,7 @@ def print(*args, **kwargs):
     """
 
     kwargs["color"] = os.getenv("_FIRE_SHOW_COLORS", "True")=="True"
+
     click.secho(*args, **kwargs)
 
 
