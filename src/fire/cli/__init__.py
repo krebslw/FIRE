@@ -2,6 +2,7 @@
 Kommandoliniebrugergrænsefladen (en command-line interface, CLI) til FIREs API.
 
 """
+
 import sys
 import os
 import signal
@@ -28,13 +29,26 @@ signal.signal(signal.SIGINT, luk_pænt_ved_ctrl_c)
 firedb = FireDb()
 _show_colors = True
 
+
+def _get_monochrome():
+    """Hent konfigurationsindstilling for monokrom"""
+    return firedb.config.getboolean("general", "monokrom")
+
+
 def _set_monochrome(ctx, param, value):
     """
     Anvend værdien af --monokrom og sæt den globale værdi af _show_colors.
     """
-    global _show_colors
-    _show_colors = not value
-    os.environ["_FIRE_SHOW_COLORS"] = str(_show_colors)
+    if value is not None:
+        global _show_colors
+        _show_colors = not value
+
+        # Sæt også databasekonfigurationens monokrom-indstilling, så den
+        # kan tilgås uden for dette modul (pretty_tables).
+        # Dette overskriver værdien af monokrom der evt. måtte være sat i
+        # konfigurationsfilen (fire.ini)
+        firedb.config.set("general", "monokrom", str(value))
+
     return value
 
 
@@ -42,9 +56,11 @@ def _set_debug(ctx, param, value):
     """
     Ændrer debug tilstand på firedb object vha --debug.
     """
-    global firedb
-    firedb.engine.echo = value
+    if value is not None:
+        firedb.engine.echo = value
+
     return value
+
 
 def _set_database(ctx, param, value):
     """
@@ -54,6 +70,7 @@ def _set_database(ctx, param, value):
         new_firedb = FireDb(db=str(value).lower())
         override_firedb(new_firedb)
     return firedb.db
+
 
 def _start_interactive_mode(ctx: click.Context, param, value):
     """
@@ -89,7 +106,7 @@ def _start_interactive_mode(ctx: click.Context, param, value):
     vil kun fastholde db=prod.
 
     Årsagen er, at vi her anvender den aktive click Context's parametre, og at click parser
-    options og i den rækkefølge de er givet. Dermed vil `interaktiv` optionens callback
+    options i den rækkefølge de er givet. Dermed vil `interaktiv` optionens callback
     (denne funktion) blive kaldt før `historik` optionen er blevet parset og føjet til den
     aktive click Context.
 
@@ -114,7 +131,6 @@ def _start_interactive_mode(ctx: click.Context, param, value):
     """
     import shlex
 
-
     if value is False:
         return value
 
@@ -126,8 +142,6 @@ def _start_interactive_mode(ctx: click.Context, param, value):
     # for at tvinge dem til at blive evalueret før `--interaktiv` flaget, men det bliver
     # hurtigt meget omfattende.
     faste_args = ctx.params
-
-    # TODO: quiet mode?
     faste_args_lst = [f"{opt}={val}" for opt, val in ctx.params.items()]
     print(f"\nStarter interaktiv session for '{kommandovej}'")
     if faste_args_lst:
@@ -184,14 +198,14 @@ _default_options = [
         "-m",
         "--monokrom",
         is_flag=True,
-        default=False,
+        default=None,
         callback=_set_monochrome,
         help="Vis ikke farver i terminalen",
     ),
     click.option(
         "--debug",
         is_flag=True,
-        default=False,
+        default=None,
         callback=_set_debug,
         help="Vis debug output fra FIRE-databasen.",
     ),
@@ -258,7 +272,7 @@ def print(*args, **kwargs):
     kommandolinjekald.
     """
 
-    kwargs["color"] = os.getenv("_FIRE_SHOW_COLORS", "True")=="True"
+    kwargs["color"] = _show_colors
     click.secho(*args, **kwargs)
 
 
