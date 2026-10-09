@@ -69,7 +69,7 @@ def _set_database(ctx, param, value):
     if value is not None:
         new_firedb = FireDb(db=str(value).lower())
         override_firedb(new_firedb)
-    return firedb.db
+    return value
 
 
 def _start_interactive_mode(ctx: click.Context, param, value):
