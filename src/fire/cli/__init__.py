@@ -32,7 +32,7 @@ _show_colors = True
 
 def _get_monochrome():
     """Hent konfigurationsindstilling for monokrom"""
-    return firedb.config.getboolean("general", "monokrom")
+    return firedb.config.getboolean("general", "monochrome")
 
 
 def _set_monochrome(ctx, param, value):
@@ -47,7 +47,7 @@ def _set_monochrome(ctx, param, value):
         # kan tilgås uden for dette modul (pretty_tables).
         # Dette overskriver værdien af monokrom der evt. måtte være sat i
         # konfigurationsfilen (fire.ini)
-        firedb.config.set("general", "monokrom", str(value))
+        firedb.config.set("general", "monochrome", str(value))
 
     return value
 
