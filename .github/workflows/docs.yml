@@ -49,27 +49,32 @@ jobs:
         echo "PATH=$PATH" >> "$GITHUB_ENV"
 
         which sqlplus
-    - name: Add conda to system path
-      run: |
-        # $CONDA is an environment variable pointing to the root of the miniconda directory
-        echo $CONDA/bin >> $GITHUB_PATH
+    - name: Setup Miniconda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        miniforge-version: "latest"
+        python-version: 3.13
+        auto-update-conda: true
+        use-mamba: true
     - name: Install dependencies
       run: |
         conda config --set always_yes yes --set changeps1 no
         conda update -q conda
         # Useful for debugging any issues with conda
         conda info -a
-        #
+
+        # Create fire-dev environment
         conda env create --file environment-dev.yml
-        source activate fire-dev
-        hash -r
-        #
+
         # Install fire
-        pip install -e .
+        conda run -n fire-dev pip install -e .
+
         # Copy config file to suitable location
-        cp test/ci/fire.ini ~/.fire.ini
+        conda run -n fire-dev --no-capture-output cp test/ci/fire.ini ~/.fire.ini || true
+
         # Build docs
-        sphinx-build -b html ./docs ./docs/_build
+        conda run -n fire-dev sphinx-build -b html ./docs ./docs/_build
+
         # GitHub pages ignores folder starting with _, can be avoid by
         # adding a .nojekyll file
         touch ./docs/_build/.nojekyll
